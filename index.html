@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Ledger — IT Business Suite</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F6F8;
+    --surface:#FFFFFF;
+    --ink:#152033;
+    --ink-soft:#5B6B82;
+    --line:#E3E8EE;
+    --navy:#152A4D;
+    --navy-2:#1F3A63;
+    --teal:#0E9C90;
+    --teal-soft:#E3F5F3;
+    --amber:#C77F16;
+    --amber-soft:#FBF0DD;
+    --red:#C4383D;
+    --red-soft:#FBE7E7;
+    --green:#2E8B4F;
+    --green-soft:#E7F5EC;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    overscroll-behavior-y:none;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  #app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:84px;}
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    background:var(--navy);
+    color:#fff;
+    padding:14px 16px calc(14px + env(safe-area-inset-top,0px));
+    padding-top:calc(14px + env(safe-area-inset-top,0px));
+    display:flex;align-items:center;gap:10px;
+  }
+  .topbar .back{
+    width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.08);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;border:none;color:#fff;
+  }
+  .topbar .title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .topbar .sub{font-size:11px;color:rgba(255,255,255,.55);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+  .content{padding:14px 14px 8px;}
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:12px;
+  }
+  .stripe{
+    border-left:4px solid var(--line);
+    padding-left:12px;
+  }
+  .stripe.paid,.stripe.received,.stripe.accepted{border-left-color:var(--green);}
+  .stripe.sent,.stripe.draft{border-left-color:var(--ink-soft);}
+  .stripe.overdue{border-left-color:var(--red);}
+  .stripe.pending{border-left-color:var(--amber);}
+  .stripe.partial{border-left-color:var(--amber);}
+  .stripe.planning{border-left-color:var(--ink-soft);}
+  .stripe.active{border-left-color:var(--teal);}
+  .stripe.completed{border-left-color:var(--green);}
+  .stripe.on-hold{border-left-color:var(--amber);}
+  .badge{
+    display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;
+    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .badge.paid,.badge.received,.badge.accepted{background:var(--green-soft);color:var(--green);}
+  .badge.sent{background:var(--teal-soft);color:var(--teal);}
+  .badge.draft{background:#EEF1F5;color:var(--ink-soft);}
+  .badge.overdue{background:var(--red-soft);color:var(--red);}
+  .badge.pending{background:var(--amber-soft);color:var(--amber);}
+  .badge.partial{background:var(--amber-soft);color:var(--amber);}
+  .badge.converted{background:#EEF1F5;color:var(--ink-soft);}
+  .badge.planning{background:#EEF1F5;color:var(--ink-soft);}
+  .badge.active{background:var(--teal-soft);color:var(--teal);}
+  .badge.completed{background:var(--green-soft);color:var(--green);}
+  .badge.on-hold{background:var(--amber-soft);color:var(--amber);}
+  .row-between{display:flex;align-items:center;justify-content:space-between;}
+  .muted{color:var(--ink-soft);}
+  .small{font-size:12.5px;}
+  .tiny{font-size:11px;}
+  .btn{
+    border:none;border-radius:11px;padding:12px 16px;font-weight:600;font-size:14.5px;
+    cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-teal{background:var(--teal);color:#fff;}
+  .btn-ghost{background:var(--surface);color:var(--navy);border:1px solid var(--line);}
+  .btn-danger{background:var(--red-soft);color:var(--red);}
+  .btn-block{width:100%;}
+  .btn-sm{padding:8px 12px;font-size:13px;border-radius:9px;}
+  input,select,textarea{
+    width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:10px 11px;font-size:14.5px;color:var(--ink);font-family:'IBM Plex Sans',sans-serif;
+    outline:none;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--navy-2);}
+  label{font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:5px;margin-top:12px;}
+  label:first-child{margin-top:0;}
+  .field{margin-bottom:2px;}
+  .item-row{
+    border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#FAFBFC;
+  }
+  .item-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+  .totals{border-top:1px dashed var(--line);margin-top:12px;padding-top:10px;}
+  .totals .line{display:flex;justify-content:space-between;padding:3px 0;font-size:14px;}
+  .totals .line.grand{font-weight:700;font-size:17px;font-family:'Space Grotesk',sans-serif;border-top:1px solid var(--line);margin-top:6px;padding-top:8px;}
+  .tabbar{
+    position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;
+    background:var(--surface);border-top:1px solid var(--line);
+    display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));
+    z-index:30;
+  }
+  .tabbtn{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;
+    background:none;border:none;color:var(--ink-soft);font-size:10.5px;font-weight:600;
+    cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+  }
+  .tabbtn.active{color:var(--navy);}
+  .tabbtn svg{width:20px;height:20px;}
+  .fab{
+    position:fixed;bottom:78px;left:50%;transform:translateX(calc(-50% + 200px));
+    width:52px;height:52px;border-radius:16px;background:var(--teal);color:#fff;
+    display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;
+    box-shadow:0 8px 20px rgba(14,156,144,.35);z-index:25;
+  }
+  @media (max-width:520px){.fab{transform:translateX(calc(-50vw + 200px));left:50vw;}}
+  .empty{text-align:center;padding:40px 16px;color:var(--ink-soft);}
+  .empty svg{width:40px;height:40px;margin-bottom:10px;opacity:.5;}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;}
+  .stat .num{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;}
+  .stat .lbl{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-soft);}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);}
+  .toggle-row:last-child{border-bottom:none;}
+  .switch{position:relative;width:42px;height:24px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:#D7DDE5;border-radius:24px;cursor:pointer;transition:.15s;}
+  .slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;}
+  input:checked + .slider{background:var(--teal);}
+  input:checked + .slider:before{transform:translateX(18px);}
+  .bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+  .bar-track{flex:1;height:9px;background:#EEF1F5;border-radius:6px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--teal);border-radius:6px;}
+  .section-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin:18px 0 10px;color:var(--ink);}
+  .section-title:first-child{margin-top:0;}
+  .divider{height:1px;background:var(--line);margin:14px 0;}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,20,30,.5);z-index:40;display:flex;align-items:flex-end;}
+  .modal-sheet{background:var(--surface);width:100%;max-width:520px;margin:0 auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:88vh;overflow-y:auto;}
+  .modal-handle{width:36px;height:4px;background:var(--line);border-radius:3px;margin:0 auto 12px;}
+  .segmented{display:flex;background:#EEF1F5;border-radius:10px;padding:3px;gap:3px;}
+  .segmented button{flex:1;border:none;background:none;padding:8px 4px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
+  .segmented button.active{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .chip-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
+  .chip{flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12.5px;font-weight:600;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .chip.active{background:var(--navy);border-color:var(--navy);color:#fff;}
+  ::-webkit-scrollbar{display:none;}
+  .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
+  .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ---------- ICONS ---------- */
+const ICO = {
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>',
+  sales:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h7M9 17h7"/></svg>',
+  stock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/></svg>',
+  reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>',
+  more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
+  printer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="1"/><path d="M6 17v4h12v-4"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L1 21h22z"/><path d="M12 9v5M12 17h.01"/></svg>',
+  phone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.3 1.8.6 2.6a2 2 0 01-.5 2.1L8 9.6a16 16 0 006.4 6.4l1.2-1.2a2 2 0 012.1-.5c.8.3 1.7.5 2.6.6a2 2 0 011.7 2z"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
+  cart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 002 1.6h9.7a2 2 0 002-1.6L23 6H6"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
+};
+const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
+
+/* ---------- STORAGE ---------- */
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects'];
+const DEFAULT_SETTINGS={
+  companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'',
+  currency:'AED', vatRate:5, vatDefaultOn:true,
+  invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ',
+  invoiceNext:1, quoteNext:1, poNext:1, projectNext:1
+};
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[] };
+let VIEW = {name:'dashboard', params:{}};
+let SALES_TAB='invoices', STOCK_TAB='inventory';
+let STACK=[]; // for back navigation
+let CURRENT_USER=null; // {id,name,username,role} — session only, not persisted
+let AUTH_ERR='';
+
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function isAdmin(){ return CURRENT_USER && CURRENT_USER.role==='admin'; }
+
+/* ---------- FIREBASE (optional — paste your project's config below) ----------
+   1. console.firebase.google.com → Create project (free "Spark" plan is enough)
+   2. Build → Firestore Database → Create database → Start in "production mode" → pick a region
+   3. Build → Authentication → Get started → Sign-in method → enable "Anonymous"
+   4. Project settings (gear icon) → General → "Your apps" → Add app → Web (</>) → register it
+   5. Copy the firebaseConfig object it shows you and paste it below, replacing the null.
+   6. In Firestore → Rules, paste:
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /ledger/{doc} { allow read, write: if request.auth != null; }
+          }
+        }
+      then click Publish.
+   Leave this as null to keep using the built-in storage (polling every 6s) instead. */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBOpkoZ-KWnT0oM649_PlqZxoPlT_fPGLA",
+  authDomain: "ledgerapp-97a65.firebaseapp.com",
+  projectId: "ledgerapp-97a65",
+  storageBucket: "ledgerapp-97a65.firebasestorage.app",
+  messagingSenderId: "204325234124",
+  appId: "1:204325234124:web:0493dc1b2f99ffd465e969"
+};
+/* Example:
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSy...", authDomain: "your-app.firebaseapp.com", projectId: "your-app",
+  storageBucket: "your-app.appspot.com", messagingSenderId: "123456789", appId: "1:123:web:abcd"
+};
+*/
+let FIREBASE_ENABLED=false, fbDB=null, fbAuth=null;
+
+let STORAGE_MODE='builtin'; // 'firebase' | 'builtin' | 'none'
+async function loadAll(){
+  if(FIREBASE_CONFIG){
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      fbDB = firebase.firestore();
+      fbAuth = firebase.auth();
+      await new Promise((resolve)=>{
+        const timeout=setTimeout(resolve,5000);
+        fbAuth.onAuthStateChanged(user=>{ if(user){ clearTimeout(timeout); resolve(); } });
+        fbAuth.signInAnonymously().catch(e=>{ console.error('Firebase auth failed',e); clearTimeout(timeout); resolve(); });
+      });
+      if(fbAuth.currentUser){ FIREBASE_ENABLED=true; STORAGE_MODE='firebase'; }
+    }catch(e){ console.error('Firebase init failed — falling back to built-in storage',e); }
+  }
+
+  if(FIREBASE_ENABLED){
+    for(const k of KEYS){
+      try{
+        const snap = await fbDB.collection('ledger').doc(k).get();
+        if(snap.exists && snap.data().json) S[k]=JSON.parse(snap.data().json);
+      }catch(e){ console.error('firestore read failed',k,e); }
+    }
+  } else if(typeof window.storage === 'undefined' || !window.storage){
+    // No Claude storage bridge available (e.g. opened as a plain downloaded file, or outside claude.ai)
+    STORAGE_MODE='none';
+  } else {
+    for(const k of KEYS){
+      try{
+        const r = await window.storage.get(k,true);
+        if(r && r.value) S[k] = JSON.parse(r.value);
+      }catch(e){ /* not found yet, keep default */ }
+    }
+  }
+  if(!S.settings || !S.settings.companyName) S.settings = {...DEFAULT_SETTINGS, ...(S.settings||{})};
+  render();
+
+  if(FIREBASE_ENABLED){ attachFirestoreListeners(); }
+  else if(STORAGE_MODE!=='none'){ startSync(); }
+}
+const FORM_VIEWS=['invoice-form','quote-form','item-form','purchase-form','settings-form','team-form','bulk-payment','project-form'];
+
+/* Realtime path (Firebase) */
+function attachFirestoreListeners(){
+  KEYS.forEach(k=>{
+    fbDB.collection('ledger').doc(k).onSnapshot(snap=>{
+      if(!snap.exists) return;
+      const json = snap.data().json;
+      if(json===undefined) return;
+      const current = JSON.stringify(S[k]);
+      if(json!==current){
+        S[k]=JSON.parse(json);
+        if(!FORM_VIEWS.includes(VIEW.name) && CURRENT_USER){ render(); flashSync(); }
+      }
+    }, err=>console.error('firestore listener error',k,err));
+  });
+}
+
+/* Polling fallback path (built-in storage) */
+let syncTimer=null, syncing=false;
+function startSync(){
+  if(syncTimer) return;
+  syncTimer = setInterval(syncPull, 6000);
+}
+async function syncPull(){
+  if(STORAGE_MODE==='none' || syncing || FORM_VIEWS.includes(VIEW.name)) return;
+  syncing = true;
+  const onAuthScreen = !CURRENT_USER; // setup or login — never yank the form out from under typing
+  try{
+    let changed=false;
+    for(const k of KEYS){
+      const r = await window.storage.get(k,true);
+      const incoming = r && r.value ? r.value : null;
+      const current = JSON.stringify(S[k]);
+      if(incoming!==null && incoming!==current){ S[k]=JSON.parse(incoming); changed=true; }
+    }
+    if(changed && !onAuthScreen){ render(); flashSync(); }
+  }catch(e){ /* offline or transient — ignore */ }
+  syncing = false;
+}
+function flashSync(){
+  const el=document.getElementById('syncDot');
+  if(el){ el.style.opacity='1'; setTimeout(()=>{ if(el) el.style.opacity='0'; },1200); }
+}
+let storageWarned=false;
+async function persist(key){
+  const payload = JSON.stringify(S[key]);
+  if(FIREBASE_ENABLED){
+    try{ await fbDB.collection('ledger').doc(key).set({json:payload, updatedAt: Date.now()}); return; }
+    catch(e){ console.error('firestore save failed',key,e); toast('Save failed — check connection'); return; }
+  }
+  if(STORAGE_MODE==='none'){
+    if(!storageWarned){ storageWarned=true; toast('Not saved — open this from the Claude conversation, or set up Firebase (More → Sync)'); }
+    return; // keep working in-memory for this session even though nothing persists
+  }
+  try{
+    await window.storage.set(key, payload, true);
+  }catch(e){
+    console.error('storage.set failed, retrying without shared flag',key,e);
+    try{
+      await window.storage.set(key, payload, false);
+      if(!storageWarned){ storageWarned=true; toast('Saved locally only — live sync unavailable right now'); }
+    }catch(e2){
+      console.error('save failed',key,e2);
+      toast('Save failed — check connection, or set up Firebase (More → Sync)');
+    }
+  }
+}
+
+/* ---------- UTIL ---------- */
+const uid=()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const todayISO=()=> new Date().toISOString().slice(0,10);
+function fmtMoney(n){ n = Number(n)||0; return S.settings.currency+' '+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso+'T00:00:00'); return d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}); }
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer=null;
+function toast(msg){
+  clearTimeout(toastTimer);
+  let el = document.getElementById('toastEl');
+  if(!el){ el=document.createElement('div'); el.id='toastEl'; el.className='toast'; document.body.appendChild(el); }
+  el.textContent = msg; el.style.display='block';
+  toastTimer = setTimeout(()=>{ el.style.display='none'; },2200);
+}
+
+function nextNumber(type){
+  const s=S.settings;
+  if(type==='invoice'){ const n=s.invoiceNext||1; s.invoiceNext=n+1; return `${s.invoicePrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
+  if(type==='quote'){ const n=s.quoteNext||1; s.quoteNext=n+1; return `${s.quotePrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
+  if(type==='purchase'){ const n=s.poNext||1; s.poNext=n+1; return `${s.poPrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
+  if(type==='project'){ const n=s.projectNext||1; s.projectNext=n+1; return `${s.projectPrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
+}
+
+function calcItems(items){
+  return items.map(it=>{
+    const qty=Number(it.qty)||0, price=Number(it.price)||0, disc=Number(it.discountPct)||0;
+    const gross = qty*price;
+    const discAmt = gross*(disc/100);
+    return {...it, gross, discAmt, net: gross-discAmt};
+  });
+}
+function calcTotals(items, vatOn, vatRate, overallDiscPct){
+  const calced = calcItems(items);
+  const subtotal = calced.reduce((a,b)=>a+b.net,0);
+  const overallDiscAmt = subtotal*((Number(overallDiscPct)||0)/100);
+  const afterDisc = subtotal - overallDiscAmt;
+  const vatAmt = vatOn ? afterDisc*((Number(vatRate)||0)/100) : 0;
+  const total = afterDisc+vatAmt;
+  return {calced, subtotal, overallDiscAmt, afterDisc, vatAmt, total};
+}
+
+/* ---------- PAYMENTS ---------- */
+const PAY_METHODS=['Cash','Card','Bank transfer','Cheque','Other'];
+function docTotal(d){ return calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct).total; }
+function paymentsSum(d){ return (d.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0); }
+function remaining(d){ return Math.max(0, docTotal(d) - paymentsSum(d)); }
+function refreshPaymentStatus(d){
+  const total=docTotal(d), paid=paymentsSum(d);
+  if(total>0 && paid>=total-0.005) d.status='paid';
+  else if(paid>0) d.status='partial';
+  else if(d.status==='paid'||d.status==='partial') d.status='sent';
+}
+
+/* ---------- PROJECTS ---------- */
+function boqLineTotal(item){ return (Number(item.qty)||0)*(Number(item.unitPrice)||0); }
+function projectValue(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineTotal(b),0); }
+function projectAdvances(p){ return (p.payments||[]).reduce((a,pay)=>a+(Number(pay.amount)||0),0); }
+function projectBalance(p){ return Math.max(0, projectValue(p)-projectAdvances(p)); }
+function boqProgressPct(p, field){
+  const totalQty = (p.boq||[]).reduce((a,b)=>a+(Number(b.qty)||0),0);
+  if(totalQty<=0) return 0;
+  const doneQty = (p.boq||[]).reduce((a,b)=>a+Math.min(Number(b[field])||0, Number(b.qty)||0),0);
+  return Math.min(100, doneQty/totalQty*100);
+}
+function ensureModalRoot(){
+  let m=document.getElementById('modalRoot');
+  if(!m){ m=document.createElement('div'); m.id='modalRoot'; document.body.appendChild(m); }
+  return m;
+}
+function closeModal(){ const m=document.getElementById('modalRoot'); if(m) m.innerHTML=''; }
+function payKindStore(kind){ return kind==='project'? S.projects : S.invoices; }
+function payKindKey(kind){ return kind==='project'? 'projects' : 'invoices'; }
+function payKindRemaining(kind,d){ return kind==='project'? projectBalance(d) : remaining(d); }
+let PAYMENT_ROWS=[];
+function paymentRowHtml(idx, r){
+  return `<div class="item-row payRow" data-idx="${idx}">
+    <div class="item-grid">
+      <div><label>Amount</label><input type="number" min="0" step="0.01" class="pr_amount" value="${r.amount!==undefined?r.amount:''}" oninput="updatePaymentRowsTotals()"></div>
+      <div><label>Date</label><input type="date" class="pr_date" value="${r.date||todayISO()}"></div>
+    </div>
+    <div class="item-grid">
+      <div><label style="margin-top:8px">Paid via</label><select class="pr_method">${PAY_METHODS.map(m=>`<option value="${m}" ${r.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div><label style="margin-top:8px">Received by</label><input class="pr_to" list="teamNames" value="${esc(r.paidTo||CURRENT_USER.name)}"></div>
+    </div>
+    <label style="margin-top:8px">Reference / note (optional)</label>
+    <input class="pr_note" value="${esc(r.note||'')}" placeholder="e.g. transfer ref, cheque no.">
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="removePaymentRow(${idx})">${ic('trash')} Remove this payment</button>
+  </div>`;
+}
+function readPaymentRowsFromDOM(){
+  return [...document.querySelectorAll('.payRow')].map(row=>({
+    amount: row.querySelector('.pr_amount').value,
+    date: row.querySelector('.pr_date').value,
+    method: row.querySelector('.pr_method').value,
+    paidTo: row.querySelector('.pr_to').value,
+    note: row.querySelector('.pr_note').value
+  }));
+}
+function showPaymentModal(kind, id){
+  const d=payKindStore(kind).find(x=>x.id===id); if(!d) return;
+  const rem=payKindRemaining(kind,d);
+  const names=[...new Set(S.users.map(u=>u.name))];
+  PAYMENT_ROWS=[{amount: rem>0?rem.toFixed(2):'', date:todayISO(), method:PAY_METHODS[0], paidTo:CURRENT_USER.name, note:''}];
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:2px">Record ${kind==='project'?'advance ':''}payment(s)</div>
+      <div class="tiny muted" style="margin-bottom:10px">Remaining: <span class="mono">${fmtMoney(rem)}</span></div>
+      <datalist id="teamNames">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+      <div id="paymentRowsWrap">${PAYMENT_ROWS.map((r,i)=>paymentRowHtml(i,r)).join('')}</div>
+      <button class="btn btn-ghost btn-block" onclick="addPaymentRow()">${ic('plus')} Add another payment</button>
+      <div class="totals" id="paymentRowsTotals"></div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary btn-block" onclick="savePayments('${kind}','${id}')">${ic('check')} Save payment(s)</button>
+      </div>
+    </div>
+  </div>`;
+  updatePaymentRowsTotals();
+}
+function addPaymentRow(){
+  PAYMENT_ROWS = readPaymentRowsFromDOM();
+  PAYMENT_ROWS.push({amount:'', date:todayISO(), method:PAY_METHODS[0], paidTo:CURRENT_USER.name, note:''});
+  document.getElementById('paymentRowsWrap').innerHTML = PAYMENT_ROWS.map((r,i)=>paymentRowHtml(i,r)).join('');
+  updatePaymentRowsTotals();
+}
+function removePaymentRow(idx){
+  PAYMENT_ROWS = readPaymentRowsFromDOM();
+  PAYMENT_ROWS.splice(idx,1);
+  if(PAYMENT_ROWS.length===0) PAYMENT_ROWS.push({amount:'', date:todayISO(), method:PAY_METHODS[0], paidTo:CURRENT_USER.name, note:''});
+  document.getElementById('paymentRowsWrap').innerHTML = PAYMENT_ROWS.map((r,i)=>paymentRowHtml(i,r)).join('');
+  updatePaymentRowsTotals();
+}
+function updatePaymentRowsTotals(){
+  const box=document.getElementById('paymentRowsTotals'); if(!box) return;
+  const rows=readPaymentRowsFromDOM();
+  const total=rows.reduce((a,r)=>a+(Number(r.amount)||0),0);
+  box.innerHTML=`<div class="line grand"><span>Total this batch</span><span class="mono">${fmtMoney(total)}</span></div>`;
+}
+function savePayments(kind, id){
+  const d=payKindStore(kind).find(x=>x.id===id); if(!d) return;
+  const rows=readPaymentRowsFromDOM().filter(r=>Number(r.amount)>0);
+  if(rows.length===0){ toast('Enter at least one payment amount'); return; }
+  if(!d.payments) d.payments=[];
+  rows.forEach(r=>{
+    d.payments.push({
+      id:uid(), amount:Number(r.amount), date:r.date||todayISO(), method:r.method,
+      paidTo:r.paidTo.trim()||CURRENT_USER.name, note:r.note.trim(), recordedBy:CURRENT_USER.name
+    });
+  });
+  if(kind==='invoice') refreshPaymentStatus(d);
+  persist(payKindKey(kind));
+  closeModal();
+  toast(rows.length>1? `${rows.length} payments recorded` : 'Payment recorded');
+  render();
+}
+function removePayment(kind, id, payId){
+  if(!isAdmin()){ toast('Only admins can remove payments'); return; }
+  if(!confirm('Remove this payment record?')) return;
+  const d=payKindStore(kind).find(x=>x.id===id); if(!d) return;
+  d.payments=(d.payments||[]).filter(p=>p.id!==payId);
+  if(kind==='invoice') refreshPaymentStatus(d);
+  persist(payKindKey(kind));
+  render();
+}
+
+/* ---------- BULK PAYMENT (one payment across several invoices) ---------- */
+function bulkCustomers(){
+  return [...new Set(S.invoices.filter(i=>remaining(i)>0).map(i=>i.customer))].sort();
+}
+function renderBulkPayment(){
+  const customers = bulkCustomers();
+  const names=[...new Set(S.users.map(u=>u.name))];
+  return `
+  ${topbar('Bulk payment','One payment across several invoices', true)}
+  <div class="content">
+    ${customers.length===0? emptyState('sales','No open balances','Every invoice is already settled.') : `
+    <div class="card">
+      <label>Customer</label>
+      <select id="bp_customer" onchange="renderBulkInvoiceRows()">
+        <option value="">Select a customer…</option>
+        ${customers.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="bulkInvoicesWrap"></div>
+    <div class="card" id="bulkPaymentMeta" style="display:none">
+      <label>Total amount received</label>
+      <input id="bp_total" type="number" min="0" step="0.01" oninput="updateBulkTotals()">
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="autoSplitBulk()">Auto-split — oldest invoice first</button>
+      <div class="item-grid" style="margin-top:4px">
+        <div><label>Date</label><input id="bp_date" type="date" value="${todayISO()}"></div>
+        <div><label>Paid via</label><select id="bp_method">${PAY_METHODS.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
+      </div>
+      <label>Received by (paid to whom)</label>
+      <input id="bp_to" list="teamNames2" value="${esc(CURRENT_USER.name)}" placeholder="Who took the payment">
+      <datalist id="teamNames2">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+      <label>Reference / note (optional)</label>
+      <input id="bp_note" placeholder="e.g. transfer ref, cheque no.">
+      <div class="totals" id="bulkTotalsBox"></div>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="saveBulkPayment()">${ic('check')} Apply payment</button>
+    `}
+  </div>`;
+}
+function renderBulkInvoiceRows(){
+  const customer = document.getElementById('bp_customer').value;
+  const wrap = document.getElementById('bulkInvoicesWrap');
+  const metaBox = document.getElementById('bulkPaymentMeta');
+  if(!customer){ wrap.innerHTML=''; metaBox.style.display='none'; return; }
+  const invs = S.invoices.filter(i=>i.customer===customer && remaining(i)>0).sort((a,b)=>a.date.localeCompare(b.date));
+  wrap.innerHTML = `<div class="section-title">Open invoices for ${esc(customer)}</div>` + invs.map(i=>`
+    <div class="item-row" data-invid="${i.id}">
+      <div class="row-between"><div class="small" style="font-weight:600">${i.number}</div><div class="tiny muted">${fmtDate(i.date)}</div></div>
+      <div class="tiny muted" style="margin-bottom:6px">Remaining: <span class="mono">${fmtMoney(remaining(i))}</span></div>
+      <input type="number" min="0" step="0.01" class="bulkAmt" placeholder="Amount to apply to this invoice" oninput="updateBulkTotals()">
+    </div>`).join('');
+  metaBox.style.display='block';
+  updateBulkTotals();
+}
+function autoSplitBulk(){
+  const total = Number(document.getElementById('bp_total').value)||0;
+  let left = total;
+  document.querySelectorAll('.item-row[data-invid]').forEach(row=>{
+    const inv = S.invoices.find(x=>x.id===row.dataset.invid);
+    const rem = inv? remaining(inv) : 0;
+    const alloc = Math.min(rem, Math.max(0,left));
+    row.querySelector('.bulkAmt').value = alloc>0 ? alloc.toFixed(2) : '';
+    left -= alloc;
+  });
+  updateBulkTotals();
+}
+function updateBulkTotals(){
+  const box=document.getElementById('bulkTotalsBox');
+  if(!box) return;
+  const rows=[...document.querySelectorAll('.item-row[data-invid]')];
+  const allocated = rows.reduce((a,r)=>a+(Number(r.querySelector('.bulkAmt').value)||0),0);
+  const total = Number(document.getElementById('bp_total')?.value)||0;
+  const diff = total-allocated;
+  box.innerHTML=`
+    <div class="line"><span class="muted">Allocated to invoices</span><span class="mono">${fmtMoney(allocated)}</span></div>
+    <div class="line grand"><span>${diff<0?'Over-allocated by':'Unallocated'}</span><span class="mono" style="color:${diff<0?'var(--red)':'inherit'}">${fmtMoney(Math.abs(diff))}</span></div>`;
+}
+function saveBulkPayment(){
+  const customer = document.getElementById('bp_customer')?.value;
+  if(!customer){ toast('Select a customer'); return; }
+  const date=document.getElementById('bp_date').value||todayISO();
+  const method=document.getElementById('bp_method').value;
+  const paidTo=document.getElementById('bp_to').value.trim()||CURRENT_USER.name;
+  const note=document.getElementById('bp_note').value.trim();
+  const rows=[...document.querySelectorAll('.item-row[data-invid]')];
+  let count=0;
+  rows.forEach(row=>{
+    const amt = Number(row.querySelector('.bulkAmt').value)||0;
+    if(amt<=0) return;
+    const inv = S.invoices.find(x=>x.id===row.dataset.invid);
+    if(!inv) return;
+    if(!inv.payments) inv.payments=[];
+    inv.payments.push({id:uid(), amount:amt, date, method, paidTo, note, recordedBy:CURRENT_USER.name});
+    refreshPaymentStatus(inv);
+    count++;
+  });
+  if(count===0){ toast('Enter at least one allocation amount'); return; }
+  persist('invoices');
+  toast(`Payment applied to ${count} invoice${count>1?'s':''}`);
+  goBack();
+}
+
+function findInventoryByName(name){
+  return S.inventory.find(i=>i.name.toLowerCase()===String(name||'').toLowerCase());
+}
+function adjustStock(id, delta){
+  const it = S.inventory.find(i=>i.id===id);
+  if(it){ it.stock = Math.max(0,(Number(it.stock)||0)+delta); }
+}
+
+/* ---------- AUTH ---------- */
+function renderSetup(){
+  return `
+  <div class="content" style="padding-top:60px">
+    <div style="text-align:center;margin-bottom:22px">
+      <div class="display" style="font-size:22px;font-weight:700">Set up Ledger</div>
+      <div class="tiny muted">Create the first admin account for your team</div>
+    </div>
+    <div class="card">
+      <label>Your name</label><input id="su_name" placeholder="e.g. Hatef">
+      <label>Username</label><input id="su_user" placeholder="e.g. hatef" autocapitalize="off">
+      <label>PIN / passcode (min 4 characters)</label><input id="su_pin" type="password" placeholder="••••">
+      <div id="su_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px">${esc(AUTH_ERR)}</div>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doSetupAdmin()">${ic('check')} Create admin account</button>
+  </div>`;
+}
+async function doSetupAdmin(){
+  const name=document.getElementById('su_name').value.trim();
+  const username=document.getElementById('su_user').value.trim().toLowerCase();
+  const pin=document.getElementById('su_pin').value;
+  if(!name||!username||pin.length<4){ AUTH_ERR='Fill in all fields — PIN needs 4+ characters.'; render(); return; }
+  const passHash = await sha256(username+':'+pin);
+  const user={id:uid(), name, username, passHash, role:'admin'};
+  S.users.push(user);
+  await persist('users');
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+  AUTH_ERR='';
+  toast('Welcome, '+name+'!');
+  render();
+}
+function renderLogin(){
+  return `
+  <div class="content" style="padding-top:60px">
+    <div style="text-align:center;margin-bottom:22px">
+      <div class="display" style="font-size:22px;font-weight:700">${esc(S.settings.companyName||'Ledger')}</div>
+      <div class="tiny muted">Sign in to continue</div>
+    </div>
+    <div class="card">
+      <label>Username</label><input id="li_user" placeholder="Username" autocapitalize="off">
+      <label>PIN / passcode</label><input id="li_pin" type="password" placeholder="••••">
+      <div id="li_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px">${esc(AUTH_ERR)}</div>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()">${ic('check')} Sign in</button>
+  </div>`;
+}
+async function doLogin(){
+  const username=document.getElementById('li_user').value.trim().toLowerCase();
+  const pin=document.getElementById('li_pin').value;
+  const passHash = await sha256(username+':'+pin);
+  const user = S.users.find(u=>u.username===username && u.passHash===passHash);
+  if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+  AUTH_ERR='';
+  render();
+}
+function logout(){ CURRENT_USER=null; go('dashboard'); }
+
+
+function go(name, params={}){ closeModal(); VIEW={name,params}; window.scrollTo(0,0); render(); }
+function goBack(){ if(STACK.length){ const v=STACK.pop(); VIEW=v; render(); } else { go('dashboard'); } }
+function goPush(name, params={}){ STACK.push(VIEW); go(name, params); }
+
+/* ---------- RENDER ROOT ---------- */
+function noStorageBanner(){
+  if(STORAGE_MODE!=='none') return '';
+  return `<div style="background:var(--amber-soft);color:var(--amber);padding:10px 14px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px">
+    ${ic('alert')} Nothing will be saved — open this from the Claude conversation, or set up Firebase for standalone hosting.
+  </div>`;
+}
+function render(){
+  const app = document.getElementById('app');
+  if(!S.users || S.users.length===0){ app.innerHTML = noStorageBanner() + renderSetup(); return; }
+  if(!CURRENT_USER){ app.innerHTML = noStorageBanner() + renderLogin(); return; }
+  // staff can't reach admin-only views directly
+  if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
+  let body='';
+  switch(VIEW.name){
+    case 'dashboard': body = renderDashboard(); break;
+    case 'sales': body = renderSalesList(); break;
+    case 'invoice-form': body = renderDocForm('invoice', VIEW.params.id); break;
+    case 'quote-form': body = renderDocForm('quote', VIEW.params.id); break;
+    case 'invoice-view': body = renderDocView('invoice', VIEW.params.id); break;
+    case 'quote-view': body = renderDocView('quote', VIEW.params.id); break;
+    case 'stock': body = renderStockList(); break;
+    case 'item-form': body = renderItemForm(VIEW.params.id); break;
+    case 'purchase-form': body = renderPurchaseForm(VIEW.params.id); break;
+    case 'purchase-view': body = renderPurchaseView(VIEW.params.id); break;
+    case 'bulk-payment': body = renderBulkPayment(); break;
+    case 'projects': body = renderProjectsList(); break;
+    case 'project-form': body = renderProjectForm(VIEW.params.id); break;
+    case 'project-view': body = renderProjectView(VIEW.params.id); break;
+    case 'reports': body = renderReports(); break;
+    case 'more': body = renderMore(); break;
+    case 'settings-form': body = renderSettingsForm(); break;
+    case 'team-form': body = renderTeamForm(); break;
+    default: body = renderDashboard();
+  }
+  app.innerHTML = noStorageBanner() + body + renderTabbar();
+  afterRender();
+}
+
+/* ---------- TOPBAR helper ---------- */
+function topbar(title, sub, showBack, rightBtn){
+  return `<div class="topbar">
+    ${showBack?`<button class="back" onclick="goBack()">${ICO.back}</button>`:''}
+    <div style="flex:1;min-width:0">
+      <div class="title">${esc(title)}</div>
+      ${sub?`<div class="sub">${esc(sub)}</div>`:''}
+    </div>
+    <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
+    ${rightBtn||''}
+  </div>`;
+}
+
+/* ---------- TABBAR ---------- */
+const TAB_SECTIONS={
+  'dashboard':'dashboard',
+  'sales':'sales','invoice-form':'sales','quote-form':'sales','invoice-view':'sales','quote-view':'sales','bulk-payment':'sales',
+  'stock':'stock','item-form':'stock','purchase-form':'stock','purchase-view':'stock',
+  'projects':'projects','project-form':'projects','project-view':'projects',
+  'reports':'reports',
+  'more':'more','settings-form':'more','team-form':'more'
+};
+function switchTab(id){ STACK=[]; go(id); }
+function renderTabbar(){
+  const tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['reports','reports','Reports'],['more','more','More']];
+  const active = TAB_SECTIONS[VIEW.name] || 'dashboard';
+  return `<div class="tabbar">
+    ${tabs.map(([id,icon,label])=>`
+      <button class="tabbtn ${active===id?'active':''}" onclick="switchTab('${id}')">
+        ${ic(icon)}<span>${label}</span>
+      </button>`).join('')}
+  </div>`;
+}
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard(){
+  const inv = S.invoices;
+  const outstanding = inv.reduce((a,b)=>a+remaining(b),0);
+  const now = new Date(); const thisMonth = now.toISOString().slice(0,7);
+  const paidThisMonth = inv.reduce((a,b)=> a + (b.payments||[]).filter(p=>(p.date||'').slice(0,7)===thisMonth).reduce((x,p)=>x+(Number(p.amount)||0),0), 0);
+  const lowStock = S.inventory.filter(i=> Number(i.stock) <= Number(i.lowStockThreshold||0));
+  const draftQuotes = S.quotes.filter(q=>q.status!=='converted').length;
+
+  const recent = [
+    ...inv.map(d=>({...d,kind:'invoice'})),
+    ...S.quotes.map(d=>({...d,kind:'quote'})),
+    ...S.purchases.map(d=>({...d,kind:'purchase'}))
+  ].sort((a,b)=> (b.date||'').localeCompare(a.date||'')).slice(0,6);
+
+  return `
+  ${topbar(S.settings.companyName||'Dashboard', 'Overview')}
+  <div class="content">
+    <div class="grid2">
+      <div class="stat"><div class="num">${fmtMoney(outstanding)}</div><div class="lbl">Outstanding</div></div>
+      <div class="stat"><div class="num">${fmtMoney(paidThisMonth)}</div><div class="lbl">Paid — this month</div></div>
+      <div class="stat"><div class="num">${draftQuotes}</div><div class="lbl">Open quotes</div></div>
+      <div class="stat" style="${lowStock.length?'border-color:#F1C4A8':''}">
+        <div class="num" style="${lowStock.length?'color:var(--red)':''}">${lowStock.length}</div>
+        <div class="lbl">Low stock items</div>
+      </div>
+    </div>
+
+    <div class="section-title">Quick actions</div>
+    <div class="grid2">
+      <button class="btn btn-primary" onclick="newInvoice()">${ic('plus')} New invoice</button>
+      <button class="btn btn-ghost" onclick="newQuote()">${ic('sales')} New quote</button>
+      <button class="btn btn-ghost" onclick="newPurchase()">${ic('cart')} New purchase</button>
+      <button class="btn btn-ghost" onclick="newProject()">${ic('box')} New project</button>
+    </div>
+
+    ${lowStock.length? `
+    <div class="section-title">Low stock</div>
+    <div class="card">
+      ${lowStock.slice(0,5).map(i=>`
+        <div class="row-between" style="padding:6px 0">
+          <div class="small"><span class="low-dot"></span>${esc(i.name)}</div>
+          <div class="tiny mono muted">${i.stock} left</div>
+        </div>`).join('')}
+    </div>`:''}
+
+    <div class="section-title">Recent activity</div>
+    ${recent.length===0? emptyState('sales','Nothing yet','Create your first invoice or quote to see it here.') :
+      `<div class="card" style="padding:6px 14px">
+        ${recent.map(d=>`
+          <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--line)" onclick="${d.kind==='purchase'?`go('purchase-view',{id:'${d.id}'})`:`go('${d.kind}-view',{id:'${d.id}'})`}">
+            <div>
+              <div class="small" style="font-weight:600">${esc(d.customer||d.supplier||'—')}</div>
+              <div class="tiny mono muted">${d.number} · ${fmtDate(d.date)}</div>
+            </div>
+            <span class="badge ${d.status}">${d.status}</span>
+          </div>`).join('').replace(/border-bottom:1px solid var\(--line\)(?=[^]*?$)/,'')}
+      </div>`}
+  </div>`;
+}
+
+function emptyState(icon,title,sub){
+  return `<div class="empty">${ic(icon)}<div style="font-weight:600;color:var(--ink);margin-top:6px">${esc(title)}</div><div class="tiny">${esc(sub)}</div></div>`;
+}
+
+/* ---------- SALES (Invoices / Quotes) ---------- */
+function renderSalesList(){
+  const list = SALES_TAB==='invoices'? S.invoices : S.quotes;
+  const sorted=[...list].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return `
+  ${topbar('Sales','Invoices & quotes')}
+  <div class="content">
+    <div class="segmented">
+      <button class="${SALES_TAB==='invoices'?'active':''}" onclick="SALES_TAB='invoices';render()">Invoices</button>
+      <button class="${SALES_TAB==='quotes'?'active':''}" onclick="SALES_TAB='quotes';render()">Quotes</button>
+    </div>
+    ${SALES_TAB==='invoices'? `<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('bulk-payment',{})">${ic('cart')} Bulk payment — apply one payment across invoices</button></div>`:''}
+    <div style="height:12px"></div>
+    ${sorted.length===0? emptyState('sales', SALES_TAB==='invoices'?'No invoices yet':'No quotes yet', 'Tap the + button to create one.') :
+      sorted.map(d=>{
+        const t = calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct);
+        return `<div class="card stripe ${d.status}" onclick="go('${SALES_TAB==='invoices'?'invoice':'quote'}-view',{id:'${d.id}'})">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:600">${esc(d.customer||'Untitled')}</div>
+              <div class="tiny mono muted">${d.number} · ${fmtDate(d.date)}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="mono" style="font-weight:600">${fmtMoney(t.total)}</div>
+              <span class="badge ${d.status}">${d.status}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+  </div>
+  <button class="fab" onclick="${SALES_TAB==='invoices'?'newInvoice()':'newQuote()'}">${ic('plus')}</button>`;
+}
+function newInvoice(){ goPush('invoice-form',{id:null}); }
+function newQuote(){ goPush('quote-form',{id:null}); }
+
+/* ---------- DOC FORM (shared by invoice & quote) ---------- */
+function renderDocForm(type, id){
+  const list = type==='invoice'? S.invoices : S.quotes;
+  const editing = id ? list.find(d=>d.id===id) : null;
+  const d = editing || {
+    id:null, number:null, date:todayISO(), dueDate:'', customer:'', phone:'', email:'',
+    items:[{desc:'',qty:1,price:0,discountPct:0,invId:null}],
+    vatOn: S.settings.vatDefaultOn, vatRate:S.settings.vatRate, discountPct:0,
+    status:'draft', notes:'', payments:[]
+  };
+  const statusOptions = type==='invoice'
+    ? ['draft','sent','partial','paid','overdue']
+    : ['draft','sent','accepted'];
+
+  return `
+  ${topbar(editing? `Edit ${type}` : `New ${type}`, editing?d.number:'', true)}
+  <div class="content">
+    <div class="card">
+      <label>Customer name</label>
+      <input id="f_customer" value="${esc(d.customer)}" placeholder="Customer or company name">
+      <div class="item-grid">
+        <div><label>Phone</label><input id="f_phone" value="${esc(d.phone)}" placeholder="+971 ..."></div>
+        <div><label>Email</label><input id="f_email" value="${esc(d.email)}" placeholder="client@email.com"></div>
+      </div>
+      <div class="item-grid">
+        <div><label>Date</label><input id="f_date" type="date" value="${d.date}"></div>
+        <div><label>${type==='invoice'?'Due date':'Valid until'}</label><input id="f_due" type="date" value="${d.dueDate||''}"></div>
+      </div>
+      <label>Status</label>
+      <select id="f_status">
+        ${statusOptions.map(s=>`<option value="${s}" ${d.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="section-title">Items</div>
+    <div id="itemsWrap">${renderItemRows(d.items)}</div>
+    <button class="btn btn-ghost btn-block" onclick="addItemRow()">${ic('plus')} Add item</button>
+
+    <div class="card" style="margin-top:14px">
+      <div class="toggle-row">
+        <div>
+          <div style="font-weight:600;font-size:14px">VAT (${S.settings.vatRate}%)</div>
+          <div class="tiny muted">Optional — toggle off for VAT-exempt</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="f_vat" ${d.vatOn?'checked':''} onchange="liveTotals()"><span class="slider"></span></label>
+      </div>
+      <label>Overall discount (%)</label>
+      <input id="f_disc" type="number" min="0" max="100" step="0.5" value="${d.discountPct||0}" oninput="liveTotals()">
+      <div class="totals" id="totalsBox"></div>
+    </div>
+
+    <div class="card">
+      <label>Notes</label>
+      <textarea id="f_notes" rows="3" placeholder="Payment terms, bank details, thank-you note...">${esc(d.notes)}</textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:6px">
+      ${editing && isAdmin() ?`<button class="btn btn-danger" onclick="deleteDoc('${type}','${d.id}')">${ic('trash')}</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveDoc('${type}','${d.id||''}')">${ic('check')} Save ${type}</button>
+    </div>
+  </div>`;
+}
+
+function renderItemRows(items){
+  return items.map((it,idx)=>`
+    <div class="item-row" data-idx="${idx}">
+      <input list="invDatalist" placeholder="Item / service description" value="${esc(it.desc)}"
+        oninput="onItemDescChange(${idx}, this.value)" class="rowDesc">
+      <div class="item-grid">
+        <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" oninput="liveTotals()" class="rowQty"></div>
+        <div><label style="margin-top:8px">Unit price</label><input type="number" min="0" step="0.01" value="${it.price}" oninput="liveTotals()" class="rowPrice"></div>
+      </div>
+      <div class="item-grid">
+        <div><label style="margin-top:8px">Discount %</label><input type="number" min="0" max="100" step="1" value="${it.discountPct||0}" oninput="liveTotals()" class="rowDiscount"></div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="removeItemRow(${idx})">${ic('trash')} Remove</button>
+        </div>
+      </div>
+    </div>`).join('') +
+    `<datalist id="invDatalist">${S.inventory.map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist>`;
+}
+function readItemsFromDOM(){
+  const rows=[...document.querySelectorAll('.item-row')];
+  return rows.map(r=>{
+    const desc=r.querySelector('.rowDesc').value.trim();
+    const match=findInventoryByName(desc);
+    return {
+      desc, qty:Number(r.querySelector('.rowQty').value)||0,
+      price:Number(r.querySelector('.rowPrice').value)||0,
+      discountPct:Number(r.querySelector('.rowDiscount').value)||0,
+      invId: match?match.id:null
+    };
+  }).filter(r=>r.desc || r.qty || r.price);
+}
+function onItemDescChange(idx,val){
+  const match=findInventoryByName(val);
+  if(match){
+    const rows=[...document.querySelectorAll('.item-row')];
+    const r=rows[idx];
+    if(r){ r.querySelector('.rowPrice').value = match.sellPrice; }
+  }
+  liveTotals();
+}
+let currentDraftItems=null;
+function addItemRow(){
+  currentDraftItems = readItemsFromDOM();
+  currentDraftItems.push({desc:'',qty:1,price:0,discountPct:0,invId:null});
+  document.getElementById('itemsWrap').innerHTML = renderItemRows(currentDraftItems);
+  liveTotals();
+}
+function removeItemRow(idx){
+  currentDraftItems = readItemsFromDOM();
+  currentDraftItems.splice(idx,1);
+  if(currentDraftItems.length===0) currentDraftItems.push({desc:'',qty:1,price:0,discountPct:0,invId:null});
+  document.getElementById('itemsWrap').innerHTML = renderItemRows(currentDraftItems);
+  liveTotals();
+}
+function liveTotals(){
+  const box=document.getElementById('totalsBox');
+  if(!box) return;
+  const items=readItemsFromDOM();
+  const vatOn=document.getElementById('f_vat')?.checked;
+  const discountPct=Number(document.getElementById('f_disc')?.value)||0;
+  const t=calcTotals(items,vatOn,S.settings.vatRate,discountPct);
+  box.innerHTML=`
+    <div class="line"><span class="muted">Subtotal</span><span class="mono">${fmtMoney(t.subtotal)}</span></div>
+    ${t.overallDiscAmt?`<div class="line"><span class="muted">Discount</span><span class="mono">-${fmtMoney(t.overallDiscAmt)}</span></div>`:''}
+    ${vatOn?`<div class="line"><span class="muted">VAT (${S.settings.vatRate}%)</span><span class="mono">${fmtMoney(t.vatAmt)}</span></div>`:''}
+    <div class="line grand"><span>Total</span><span class="mono">${fmtMoney(t.total)}</span></div>`;
+}
+
+function saveDoc(type,id){
+  const list = type==='invoice'? S.invoices : S.quotes;
+  const customer = document.getElementById('f_customer').value.trim();
+  if(!customer){ toast('Please enter a customer name'); return; }
+  const items = readItemsFromDOM();
+  if(items.length===0){ toast('Add at least one item'); return; }
+  const isNew = !id;
+  let doc;
+  if(isNew){
+    doc = { id:uid(), number: nextNumber(type), stockApplied:false };
+    list.push(doc);
+  } else {
+    doc = list.find(d=>d.id===id);
+  }
+  doc.customer=customer;
+  doc.phone=document.getElementById('f_phone').value.trim();
+  doc.email=document.getElementById('f_email').value.trim();
+  doc.date=document.getElementById('f_date').value||todayISO();
+  doc.dueDate=document.getElementById('f_due').value||'';
+  doc.status=document.getElementById('f_status').value;
+  doc.items=items;
+  doc.vatOn=document.getElementById('f_vat').checked;
+  doc.vatRate=S.settings.vatRate;
+  doc.discountPct=Number(document.getElementById('f_disc').value)||0;
+  doc.notes=document.getElementById('f_notes').value;
+
+  // Stock effect: invoices reduce stock once, on first save
+  if(type==='invoice' && isNew){
+    items.forEach(it=>{ if(it.invId) adjustStock(it.invId, -Number(it.qty||0)); });
+    doc.stockApplied=true;
+    persist('inventory');
+  }
+
+  persist(type==='invoice'?'invoices':'quotes');
+  persist('settings');
+  toast(`${type[0].toUpperCase()+type.slice(1)} saved`);
+  goBack();
+}
+function deleteDoc(type,id){
+  if(!isAdmin()){ toast('Only admins can delete'); return; }
+  if(!confirm('Delete this document? This cannot be undone.')) return;
+  const key = type==='invoice'?'invoices':'quotes';
+  const list = S[key];
+  const item = list.find(d=>d.id===id);
+  if(type==='invoice' && item && item.stockApplied){
+    item.items.forEach(it=>{ if(it.invId) adjustStock(it.invId, Number(it.qty||0)); });
+    persist('inventory');
+  }
+  S[key]=list.filter(d=>d.id!==id);
+  persist(key);
+  toast('Deleted');
+  goBack();
+}
+
+/* ---------- DOC VIEW (printable) ---------- */
+function renderDocView(type,id){
+  const list = type==='invoice'? S.invoices : S.quotes;
+  const d = list.find(x=>x.id===id);
+  if(!d) return topbar('Not found','',true)+`<div class="content">${emptyState('sales','Not found','This document may have been deleted.')}</div>`;
+  const t = calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct);
+  const statusOptions = type==='invoice' ? ['draft','sent','partial','paid','overdue'] : ['draft','sent','accepted'];
+  const paid = type==='invoice' ? paymentsSum(d) : 0;
+  const rem = type==='invoice' ? Math.max(0,t.total-paid) : 0;
+
+  return `
+  ${topbar(d.number, d.customer, true, `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="printDoc()">${ic('printer')}</button>`)}
+  <div class="content" id="printArea">
+    <div class="card">
+      <div class="row-between">
+        <div>
+          <div style="font-family:'Space Grotesk';font-weight:700;font-size:18px">${esc(S.settings.companyName)}</div>
+          <div class="tiny muted">${esc(S.settings.companyPhone||'')} ${S.settings.companyPhone&&S.settings.companyEmail?'·':''} ${esc(S.settings.companyEmail||'')}</div>
+          <div class="tiny muted">${esc(S.settings.companyAddress||'')}</div>
+        </div>
+        <span class="badge ${d.status}">${d.status}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="grid2">
+        <div>
+          <div class="tiny muted" style="text-transform:uppercase;font-weight:600">Bill to</div>
+          <div style="font-weight:600">${esc(d.customer)}</div>
+          <div class="tiny muted">${esc(d.phone||'')}</div>
+          <div class="tiny muted">${esc(d.email||'')}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="tiny muted" style="text-transform:uppercase;font-weight:600">${type==='invoice'?'Invoice':'Quote'} #</div>
+          <div class="mono" style="font-weight:600">${d.number}</div>
+          <div class="tiny muted">${fmtDate(d.date)}</div>
+          ${d.dueDate?`<div class="tiny muted">${type==='invoice'?'Due':'Valid till'} ${fmtDate(d.dueDate)}</div>`:''}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      ${t.calced.map(it=>`
+        <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div class="row-between"><div style="font-weight:600;font-size:14px">${esc(it.desc)}</div><div class="mono">${fmtMoney(it.net)}</div></div>
+          <div class="tiny muted mono">${it.qty} × ${fmtMoney(it.price)}${it.discountPct?` · -${it.discountPct}%`:''}</div>
+        </div>`).join('')}
+      <div class="totals">
+        <div class="line"><span class="muted">Subtotal</span><span class="mono">${fmtMoney(t.subtotal)}</span></div>
+        ${t.overallDiscAmt?`<div class="line"><span class="muted">Discount (${d.discountPct}%)</span><span class="mono">-${fmtMoney(t.overallDiscAmt)}</span></div>`:''}
+        ${d.vatOn?`<div class="line"><span class="muted">VAT (${d.vatRate}%)</span><span class="mono">${fmtMoney(t.vatAmt)}</span></div>`:`<div class="line"><span class="muted">VAT</span><span class="mono">Not applied</span></div>`}
+        <div class="line grand"><span>Total due</span><span class="mono">${fmtMoney(t.total)}</span></div>
+      </div>
+    </div>
+    ${type==='invoice' ? `
+    <div class="card">
+      <div class="row-between">
+        <div style="font-weight:600;font-size:14px">Payments</div>
+        <button class="btn btn-teal btn-sm" onclick="showPaymentModal('invoice','${d.id}')">${ic('plus')} Record payment</button>
+      </div>
+      ${(d.payments&&d.payments.length)? d.payments.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(p=>`
+        <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--line)">
+          <div>
+            <div class="small" style="font-weight:600">${fmtMoney(p.amount)} <span class="tiny muted" style="font-weight:400">· ${esc(p.method)}</span></div>
+            <div class="tiny muted">${fmtDate(p.date)} · to ${esc(p.paidTo)}${p.note?' · '+esc(p.note):''}</div>
+          </div>
+          ${isAdmin()?`<button class="icon-btn" onclick="removePayment('invoice','${d.id}','${p.id}')">${ic('trash')}</button>`:''}
+        </div>`).join('') : `<div class="tiny muted" style="padding:8px 0">No payments recorded yet.</div>`}
+      <div class="totals">
+        <div class="line"><span class="muted">Paid so far</span><span class="mono">${fmtMoney(paid)}</span></div>
+        <div class="line grand"><span>Remaining</span><span class="mono" style="color:${rem>0?'var(--red)':'var(--green)'}">${fmtMoney(rem)}</span></div>
+      </div>
+    </div>` : ''}
+    ${d.notes?`<div class="card"><div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:4px">Notes</div><div class="small">${esc(d.notes)}</div></div>`:''}
+  </div>
+  <div class="content" style="padding-top:0">
+    <label>Update status</label>
+    <select onchange="quickStatus('${type}','${d.id}',this.value)">
+      ${statusOptions.map(s=>`<option value="${s}" ${d.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join('')}
+    </select>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-ghost btn-block" onclick="go('${type}-form',{id:'${d.id}'})">${ic('edit')} Edit</button>
+      ${type==='quote' && d.status!=='converted' ? `<button class="btn btn-teal btn-block" onclick="convertQuote('${d.id}')">${ic('sales')} Convert to invoice</button>`:''}
+    </div>
+  </div>`;
+}
+function quickStatus(type,id,val){
+  const list = type==='invoice'? S.invoices : S.quotes;
+  const d=list.find(x=>x.id===id); d.status=val;
+  persist(type==='invoice'?'invoices':'quotes');
+  render();
+  toast('Status updated');
+}
+function convertQuote(id){
+  const q = S.quotes.find(x=>x.id===id);
+  if(!q) return;
+  const inv = {...q, id:uid(), number: nextNumber('invoice'), status:'draft', stockApplied:false};
+  S.invoices.push(inv);
+  q.status='converted';
+  // apply stock for the new invoice
+  inv.items.forEach(it=>{ if(it.invId) adjustStock(it.invId, -Number(it.qty||0)); });
+  inv.stockApplied=true;
+  persist('invoices'); persist('quotes'); persist('inventory'); persist('settings');
+  toast('Converted to invoice');
+  go('invoice-view',{id:inv.id});
+}
+function printDoc(){ window.print(); }
+
+/* ---------- STOCK (Inventory / Purchases) ---------- */
+function renderStockList(){
+  if(STOCK_TAB==='inventory'){
+    const items=[...S.inventory].sort((a,b)=>a.name.localeCompare(b.name));
+    return `
+    ${topbar('Stock','Inventory & purchases')}
+    <div class="content">
+      <div class="segmented">
+        <button class="active" onclick="STOCK_TAB='inventory';render()">Inventory</button>
+        <button onclick="STOCK_TAB='purchases';render()">Purchases</button>
+      </div>
+      <div style="height:12px"></div>
+      ${items.length===0? emptyState('box','No items yet','Tap + to add your first product or SKU.') :
+        items.map(i=>{
+          const low = Number(i.stock) <= Number(i.lowStockThreshold||0);
+          return `<div class="card" onclick="goPush('item-form',{id:'${i.id}'})">
+            <div class="row-between">
+              <div>
+                <div style="font-weight:600">${esc(i.name)}</div>
+                <div class="tiny mono muted">${esc(i.sku||'—')} · ${fmtMoney(i.sellPrice)}</div>
+              </div>
+              <div style="text-align:right">
+                <div class="mono" style="font-weight:700;${low?'color:var(--red)':''}">${i.stock}</div>
+                <div class="tiny muted">${low?'low stock':'in stock'}</div>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+    </div>
+    <button class="fab" onclick="goPush('item-form',{id:null})">${ic('plus')}</button>`;
+  } else {
+    const list=[...S.purchases].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    return `
+    ${topbar('Stock','Inventory & purchases')}
+    <div class="content">
+      <div class="segmented">
+        <button onclick="STOCK_TAB='inventory';render()">Inventory</button>
+        <button class="active" onclick="STOCK_TAB='purchases';render()">Purchases</button>
+      </div>
+      <div style="height:12px"></div>
+      ${list.length===0? emptyState('cart','No purchases yet','Record a purchase to stock up your inventory.') :
+        list.map(p=>{
+          const total=p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+          return `<div class="card stripe ${p.status}" onclick="go('purchase-view',{id:'${p.id}'})">
+            <div class="row-between">
+              <div>
+                <div style="font-weight:600">${esc(p.supplier||'Untitled')}</div>
+                <div class="tiny mono muted">${p.number} · ${fmtDate(p.date)}</div>
+              </div>
+              <div style="text-align:right">
+                <div class="mono" style="font-weight:600">${fmtMoney(total)}</div>
+                <span class="badge ${p.status}">${p.status}</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+    </div>
+    <button class="fab" onclick="newPurchase()">${ic('plus')}</button>`;
+  }
+}
+
+function renderItemForm(id){
+  const editing = id ? S.inventory.find(i=>i.id===id) : null;
+  const i = editing || {id:null,name:'',sku:'',stock:0,costPrice:0,sellPrice:0,lowStockThreshold:2};
+  return `
+  ${topbar(editing?'Edit item':'New item','',true)}
+  <div class="content">
+    <div class="card">
+      <label>Item / service name</label>
+      <input id="i_name" value="${esc(i.name)}" placeholder="e.g. Cat6 Cable (m), Router config">
+      <label>SKU (optional)</label>
+      <input id="i_sku" value="${esc(i.sku)}" placeholder="SKU-001">
+      <div class="item-grid">
+        <div><label>Cost price</label><input id="i_cost" type="number" min="0" step="0.01" value="${i.costPrice}" ${isAdmin()?'':'disabled style="opacity:.6"'}></div>
+        <div><label>Sell price</label><input id="i_sell" type="number" min="0" step="0.01" value="${i.sellPrice}" ${isAdmin()?'':'disabled style="opacity:.6"'}></div>
+      </div>
+      <div class="item-grid">
+        <div><label>Current stock</label><input id="i_stock" type="number" step="1" value="${i.stock}"></div>
+        <div><label>Low stock alert at</label><input id="i_low" type="number" step="1" value="${i.lowStockThreshold}"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      ${editing && isAdmin() ?`<button class="btn btn-danger" onclick="deleteItem('${i.id}')">${ic('trash')}</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveItem('${i.id||''}')">${ic('check')} Save item</button>
+    </div>
+  </div>`;
+}
+function saveItem(id){
+  const name=document.getElementById('i_name').value.trim();
+  if(!name){ toast('Enter an item name'); return; }
+  let it;
+  if(!id){ it={id:uid()}; S.inventory.push(it); } else { it=S.inventory.find(x=>x.id===id); }
+  it.name=name;
+  it.sku=document.getElementById('i_sku').value.trim();
+  if(isAdmin()){
+    it.costPrice=Number(document.getElementById('i_cost').value)||0;
+    it.sellPrice=Number(document.getElementById('i_sell').value)||0;
+  } else {
+    it.costPrice = it.costPrice||0;
+    it.sellPrice = it.sellPrice||0;
+  }
+  it.stock=Number(document.getElementById('i_stock').value)||0;
+  it.lowStockThreshold=Number(document.getElementById('i_low').value)||0;
+  persist('inventory');
+  toast('Item saved');
+  goBack();
+}
+function deleteItem(id){
+  if(!isAdmin()){ toast('Only admins can delete'); return; }
+  if(!confirm('Delete this item from inventory?')) return;
+  S.inventory = S.inventory.filter(i=>i.id!==id);
+  persist('inventory');
+  toast('Item deleted');
+  goBack();
+}
+
+/* ---------- PURCHASES ---------- */
+function newPurchase(){ goPush('purchase-form',{id:null}); }
+function renderPurchaseForm(id){
+  const editing = id? S.purchases.find(p=>p.id===id): null;
+  const p = editing || {id:null,number:null,date:todayISO(),supplier:'',status:'pending',items:[{desc:'',qty:1,cost:0,invId:null}],notes:'',stockApplied:false};
+  return `
+  ${topbar(editing?'Edit purchase':'New purchase', editing?p.number:'', true)}
+  <div class="content">
+    <div class="card">
+      <label>Supplier</label>
+      <input id="p_supplier" value="${esc(p.supplier)}" placeholder="Supplier / vendor name">
+      <div class="item-grid">
+        <div><label>Date</label><input id="p_date" type="date" value="${p.date}"></div>
+        <div><label>Status</label>
+          <select id="p_status">
+            ${['pending','received'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="section-title">Items purchased</div>
+    <div id="pItemsWrap">${renderPurchaseRows(p.items)}</div>
+    <button class="btn btn-ghost btn-block" onclick="addPurchaseRow()">${ic('plus')} Add item</button>
+    <div class="card" style="margin-top:14px">
+      <div class="totals" id="pTotalsBox"></div>
+    </div>
+    <div class="card">
+      <label>Notes</label>
+      <textarea id="p_notes" rows="2">${esc(p.notes)}</textarea>
+    </div>
+    <div style="display:flex;gap:10px">
+      ${editing && isAdmin() ?`<button class="btn btn-danger" onclick="deletePurchase('${p.id}')">${ic('trash')}</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="savePurchase('${p.id||''}')">${ic('check')} Save purchase</button>
+    </div>
+  </div>`;
+}
+function renderPurchaseRows(items){
+  return items.map((it,idx)=>`
+    <div class="item-row-p" data-idx="${idx}">
+      <input list="invDatalist2" placeholder="Item description" value="${esc(it.desc)}" oninput="onPurchaseDescChange(${idx},this.value)" class="pDesc">
+      <div class="item-grid">
+        <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" oninput="purchaseLiveTotals()" class="pQty"></div>
+        <div><label style="margin-top:8px">Unit cost</label><input type="number" min="0" step="0.01" value="${it.cost}" oninput="purchaseLiveTotals()" class="pCost"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="removePurchaseRow(${idx})">${ic('trash')} Remove</button>
+    </div>`).join('') + `<datalist id="invDatalist2">${S.inventory.map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist>`;
+}
+function readPurchaseItemsFromDOM(){
+  return [...document.querySelectorAll('.item-row-p')].map(r=>{
+    const desc=r.querySelector('.pDesc').value.trim();
+    const match=findInventoryByName(desc);
+    return {desc, qty:Number(r.querySelector('.pQty').value)||0, cost:Number(r.querySelector('.pCost').value)||0, invId:match?match.id:null};
+  }).filter(r=>r.desc||r.qty||r.cost);
+}
+function onPurchaseDescChange(idx,val){
+  const match=findInventoryByName(val);
+  if(match){ const rows=[...document.querySelectorAll('.item-row-p')]; if(rows[idx]) rows[idx].querySelector('.pCost').value=match.costPrice; }
+  purchaseLiveTotals();
+}
+function addPurchaseRow(){
+  const items=readPurchaseItemsFromDOM(); items.push({desc:'',qty:1,cost:0,invId:null});
+  document.getElementById('pItemsWrap').innerHTML=renderPurchaseRows(items); purchaseLiveTotals();
+}
+function removePurchaseRow(idx){
+  const items=readPurchaseItemsFromDOM(); items.splice(idx,1);
+  if(items.length===0) items.push({desc:'',qty:1,cost:0,invId:null});
+  document.getElementById('pItemsWrap').innerHTML=renderPurchaseRows(items); purchaseLiveTotals();
+}
+function purchaseLiveTotals(){
+  const box=document.getElementById('pTotalsBox'); if(!box) return;
+  const items=readPurchaseItemsFromDOM();
+  const total=items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+  box.innerHTML=`<div class="line grand"><span>Total cost</span><span class="mono">${fmtMoney(total)}</span></div>`;
+}
+function applyPurchaseStock(p){
+  p.items.forEach(it=>{
+    if(it.invId){ adjustStock(it.invId, Number(it.qty||0)); const inv=S.inventory.find(x=>x.id===it.invId); if(inv) inv.costPrice=Number(it.cost)||inv.costPrice; }
+  });
+  p.stockApplied=true;
+}
+function reversePurchaseStock(p){
+  p.items.forEach(it=>{ if(it.invId) adjustStock(it.invId, -Number(it.qty||0)); });
+  p.stockApplied=false;
+}
+function savePurchase(id){
+  const supplier=document.getElementById('p_supplier').value.trim();
+  if(!supplier){ toast('Enter a supplier name'); return; }
+  const items=readPurchaseItemsFromDOM();
+  if(items.length===0){ toast('Add at least one item'); return; }
+  const isNew=!id; let p;
+  if(isNew){ p={id:uid(),number:nextNumber('purchase'),stockApplied:false}; S.purchases.push(p); }
+  else {
+    p=S.purchases.find(x=>x.id===id);
+    if(p.stockApplied) reversePurchaseStock(p); // undo old quantities before applying edited ones
+  }
+  p.supplier=supplier;
+  p.date=document.getElementById('p_date').value||todayISO();
+  p.status=document.getElementById('p_status').value;
+  p.items=items;
+  p.notes=document.getElementById('p_notes').value;
+  if(p.status==='received'){
+    applyPurchaseStock(p);
+    persist('inventory');
+  }
+  persist('purchases'); persist('settings');
+  toast(p.status==='received' ? 'Purchase saved — stock added to inventory' : 'Purchase saved');
+  goBack();
+}
+function deletePurchase(id){
+  if(!isAdmin()){ toast('Only admins can delete'); return; }
+  if(!confirm('Delete this purchase?')) return;
+  const p=S.purchases.find(x=>x.id===id);
+  if(p && p.stockApplied){ reversePurchaseStock(p); persist('inventory'); }
+  S.purchases=S.purchases.filter(x=>x.id!==id);
+  persist('purchases');
+  toast('Deleted');
+  goBack();
+}
+function renderPurchaseView(id){
+  const p=S.purchases.find(x=>x.id===id);
+  if(!p) return topbar('Not found','',true)+`<div class="content">${emptyState('cart','Not found','')}</div>`;
+  const total=p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+  return `
+  ${topbar(p.number,p.supplier,true)}
+  <div class="content">
+    <div class="card">
+      <div class="row-between"><div style="font-weight:600">${esc(p.supplier)}</div><span class="badge ${p.status}">${p.status}</span></div>
+      <div class="tiny muted">${fmtDate(p.date)}</div>
+    </div>
+    <div class="card">
+      ${p.items.map(it=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
+        <div class="small">${esc(it.desc)} <span class="muted tiny mono">×${it.qty}</span></div>
+        <div class="mono">${fmtMoney(it.qty*it.cost)}</div></div>`).join('')}
+      <div class="totals"><div class="line grand"><span>Total</span><span class="mono">${fmtMoney(total)}</span></div></div>
+    </div>
+    ${p.notes?`<div class="card"><div class="small">${esc(p.notes)}</div></div>`:''}
+    <select onchange="quickPurchaseStatus('${p.id}',this.value)">
+      ${['pending','received'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join('')}
+    </select>
+    <div style="height:10px"></div>
+    <button class="btn btn-ghost btn-block" onclick="go('purchase-form',{id:'${p.id}'})">${ic('edit')} Edit</button>
+  </div>`;
+}
+function quickPurchaseStatus(id,val){
+  const p=S.purchases.find(x=>x.id===id);
+  p.status=val;
+  if(val==='received' && !p.stockApplied){ applyPurchaseStock(p); persist('inventory'); toast('Stock added to inventory'); }
+  else if(val!=='received' && p.stockApplied){ reversePurchaseStock(p); persist('inventory'); }
+  persist('purchases');
+  render();
+}
+
+/* ---------- PROJECTS ---------- */
+function newProject(){ goPush('project-form',{id:null}); }
+function renderProjectsList(){
+  const list=[...S.projects].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return `
+  ${topbar('Projects','Bill of quantities & site progress')}
+  <div class="content">
+    ${list.length===0? emptyState('box','No projects yet','Tap + to start a project with a bill of quantities.') :
+      list.map(p=>{
+        const val=projectValue(p), adv=projectAdvances(p), bal=projectBalance(p);
+        return `<div class="card stripe ${p.status}" onclick="go('project-view',{id:'${p.id}'})">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:600">${esc(p.name||'Untitled project')}</div>
+              <div class="tiny mono muted">${p.number} · ${esc(p.customer||'—')}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="mono" style="font-weight:600">${fmtMoney(val)}</div>
+              <span class="badge ${p.status}">${p.status}</span>
+            </div>
+          </div>
+          ${val>0?`<div class="bar-wrap" style="margin-top:9px;margin-bottom:0">
+            <div style="width:70px" class="tiny muted">Installed</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${boqProgressPct(p,'installedQty')}%"></div></div>
+            <div class="tiny mono" style="width:36px;text-align:right">${Math.round(boqProgressPct(p,'installedQty'))}%</div>
+          </div>`:''}
+        </div>`;
+      }).join('')}
+  </div>
+  <button class="fab" onclick="newProject()">${ic('plus')}</button>`;
+}
+function renderProjectForm(id){
+  const editing = id? S.projects.find(p=>p.id===id): null;
+  const p = editing || {id:null,number:null,name:'',customer:'',phone:'',email:'',date:todayISO(),status:'planning',notes:'',boq:[],payments:[]};
+  return `
+  ${topbar(editing?'Edit project':'New project', editing?p.number:'', true)}
+  <div class="content">
+    <div class="card">
+      <label>Project name</label>
+      <input id="pj_name" value="${esc(p.name)}" placeholder="e.g. Al Habtoor Villa — Networking Fit-out">
+      <label>Customer</label>
+      <input id="pj_customer" value="${esc(p.customer)}" placeholder="Customer or company name">
+      <div class="item-grid">
+        <div><label>Phone</label><input id="pj_phone" value="${esc(p.phone)}"></div>
+        <div><label>Email</label><input id="pj_email" value="${esc(p.email)}"></div>
+      </div>
+      <div class="item-grid">
+        <div><label>Start date</label><input id="pj_date" type="date" value="${p.date}"></div>
+        <div><label>Status</label>
+          <select id="pj_status">
+            ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1).replace('-',' ')}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <label>Notes</label>
+      <textarea id="pj_notes" rows="3" placeholder="Scope notes, site contact, access instructions...">${esc(p.notes)}</textarea>
+    </div>
+    <div style="display:flex;gap:10px">
+      ${editing && isAdmin() ?`<button class="btn btn-danger" onclick="deleteProject('${p.id}')">${ic('trash')}</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveProject('${p.id||''}')">${ic('check')} Save project</button>
+    </div>
+  </div>`;
+}
+function saveProject(id){
+  const name=document.getElementById('pj_name').value.trim();
+  const customer=document.getElementById('pj_customer').value.trim();
+  if(!name||!customer){ toast('Enter a project name and customer'); return; }
+  const isNew=!id; let p;
+  if(isNew){ p={id:uid(), number:nextNumber('project'), boq:[], payments:[]}; S.projects.push(p); }
+  else { p=S.projects.find(x=>x.id===id); }
+  p.name=name; p.customer=customer;
+  p.phone=document.getElementById('pj_phone').value.trim();
+  p.email=document.getElementById('pj_email').value.trim();
+  p.date=document.getElementById('pj_date').value||todayISO();
+  p.status=document.getElementById('pj_status').value;
+  p.notes=document.getElementById('pj_notes').value;
+  persist('projects'); persist('settings');
+  toast('Project saved');
+  goBack();
+}
+function deleteProject(id){
+  if(!isAdmin()){ toast('Only admins can delete'); return; }
+  if(!confirm('Delete this project? This cannot be undone.')) return;
+  S.projects=S.projects.filter(p=>p.id!==id);
+  persist('projects');
+  toast('Deleted');
+  goBack();
+}
+function renderProjectView(id){
+  const p=S.projects.find(x=>x.id===id);
+  if(!p) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This project may have been deleted.')}</div>`;
+  const val=projectValue(p), adv=projectAdvances(p), bal=projectBalance(p);
+  const purchasedPct=boqProgressPct(p,'purchasedQty'), installedPct=boqProgressPct(p,'installedQty');
+  return `
+  ${topbar(p.number, p.name, true)}
+  <div class="content">
+    <div class="card">
+      <div class="row-between">
+        <div>
+          <div style="font-weight:700;font-size:16px">${esc(p.name)}</div>
+          <div class="tiny muted">${esc(p.customer)} · ${fmtDate(p.date)}</div>
+        </div>
+        <span class="badge ${p.status}">${p.status}</span>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="stat"><div class="num">${fmtMoney(val)}</div><div class="lbl">BOQ value</div></div>
+      <div class="stat"><div class="num">${fmtMoney(adv)}</div><div class="lbl">Advances received</div></div>
+      <div class="stat"><div class="num" style="color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div><div class="lbl">Balance due</div></div>
+      <div class="stat"><div class="num">${Math.round(installedPct)}%</div><div class="lbl">Installed</div></div>
+    </div>
+
+    <div class="section-title">Bill of quantities</div>
+    <div class="card">
+      <div class="bar-wrap"><div style="width:74px" class="tiny muted">Purchased</div><div class="bar-track"><div class="bar-fill" style="width:${purchasedPct}%;background:var(--navy-2)"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(purchasedPct)}%</div></div>
+      <div class="bar-wrap" style="margin-bottom:0"><div style="width:74px" class="tiny muted">Installed</div><div class="bar-track"><div class="bar-fill" style="width:${installedPct}%"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(installedPct)}%</div></div>
+    </div>
+    ${(p.boq&&p.boq.length)? p.boq.map(item=>`
+      <div class="card" data-boqid="${item.id}">
+        <div class="row-between">
+          <div style="font-weight:600;font-size:14px">${esc(item.desc)}</div>
+          <div class="mono tiny muted">${fmtMoney(boqLineTotal(item))}</div>
+        </div>
+        <div class="tiny muted mono" style="margin-bottom:8px">${item.qty} ${esc(item.unit||'')} × ${fmtMoney(item.unitPrice)}</div>
+        <div class="item-grid">
+          <div>
+            <label style="margin-top:0">Purchased</label>
+            <input type="number" min="0" step="1" value="${item.purchasedQty||0}" onchange="updateBoqProgress('${p.id}','${item.id}','purchasedQty',this.value)">
+          </div>
+          <div>
+            <label style="margin-top:0">Installed</label>
+            <input type="number" min="0" step="1" value="${item.installedQty||0}" onchange="updateBoqProgress('${p.id}','${item.id}','installedQty',this.value)">
+          </div>
+        </div>
+        ${isAdmin()?`<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="removeBoqLine('${p.id}','${item.id}')">${ic('trash')} Remove line</button>`:''}
+      </div>`).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet — add the scope of work below.</div></div>`}
+    <button class="btn btn-ghost btn-block" onclick="showBoqLineForm('${p.id}')">${ic('plus')} Add BOQ line</button>
+
+    <div class="section-title">Advance payments</div>
+    <div class="card">
+      <div class="row-between">
+        <div style="font-weight:600;font-size:14px">Advances received</div>
+        <button class="btn btn-teal btn-sm" onclick="showPaymentModal('project','${p.id}')">${ic('plus')} Record advance</button>
+      </div>
+      ${(p.payments&&p.payments.length)? p.payments.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(pay=>`
+        <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--line)">
+          <div>
+            <div class="small" style="font-weight:600">${fmtMoney(pay.amount)} <span class="tiny muted" style="font-weight:400">· ${esc(pay.method)}</span></div>
+            <div class="tiny muted">${fmtDate(pay.date)} · to ${esc(pay.paidTo)}${pay.note?' · '+esc(pay.note):''}</div>
+          </div>
+          ${isAdmin()?`<button class="icon-btn" onclick="removePayment('project','${p.id}','${pay.id}')">${ic('trash')}</button>`:''}
+        </div>`).join('') : `<div class="tiny muted" style="padding:8px 0">No advances recorded yet.</div>`}
+    </div>
+
+    ${p.notes?`<div class="card"><div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:4px">Notes</div><div class="small">${esc(p.notes)}</div></div>`:''}
+
+    <label>Update status</label>
+    <select onchange="quickProjectStatus('${p.id}',this.value)">
+      ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1).replace('-',' ')}</option>`).join('')}
+    </select>
+    <div style="height:10px"></div>
+    <button class="btn btn-ghost btn-block" onclick="go('project-form',{id:'${p.id}'})">${ic('edit')} Edit project details</button>
+  </div>`;
+}
+function quickProjectStatus(id,val){ const p=S.projects.find(x=>x.id===id); p.status=val; persist('projects'); render(); }
+function updateBoqProgress(projId,itemId,field,val){
+  const p=S.projects.find(x=>x.id===projId); if(!p) return;
+  const item=(p.boq||[]).find(i=>i.id===itemId); if(!item) return;
+  item[field]=Math.max(0,Number(val)||0);
+  persist('projects');
+  render();
+}
+function removeBoqLine(projId,itemId){
+  if(!isAdmin()){ toast('Only admins can remove BOQ lines'); return; }
+  if(!confirm('Remove this BOQ line?')) return;
+  const p=S.projects.find(x=>x.id===projId); if(!p) return;
+  p.boq=(p.boq||[]).filter(i=>i.id!==itemId);
+  persist('projects');
+  render();
+}
+function showBoqLineForm(projId){
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:10px">Add BOQ line</div>
+      <label>Description</label>
+      <input id="boq_desc" placeholder="e.g. Cat6 outlet — supply &amp; install">
+      <div class="item-grid">
+        <div><label>Unit</label><input id="boq_unit" placeholder="pcs, m, hrs..."></div>
+        <div><label>Quantity</label><input id="boq_qty" type="number" min="0" step="1" value="1"></div>
+      </div>
+      <label>Unit price</label>
+      <input id="boq_price" type="number" min="0" step="0.01" value="0">
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary btn-block" onclick="saveBoqLine('${projId}')">${ic('check')} Add line</button>
+      </div>
+    </div>
+  </div>`;
+}
+function saveBoqLine(projId){
+  const desc=document.getElementById('boq_desc').value.trim();
+  if(!desc){ toast('Enter a description'); return; }
+  const p=S.projects.find(x=>x.id===projId); if(!p) return;
+  if(!p.boq) p.boq=[];
+  p.boq.push({
+    id:uid(), desc,
+    unit:document.getElementById('boq_unit').value.trim(),
+    qty:Number(document.getElementById('boq_qty').value)||0,
+    unitPrice:Number(document.getElementById('boq_price').value)||0,
+    purchasedQty:0, installedQty:0
+  });
+  persist('projects');
+  closeModal();
+  toast('BOQ line added');
+  render();
+}
+
+/* ---------- REPORTS ---------- */
+let REPORT_RANGE='month';
+function rangeDates(){
+  const now=new Date(); let start,end;
+  if(REPORT_RANGE==='month'){ start=new Date(now.getFullYear(),now.getMonth(),1); end=new Date(now.getFullYear(),now.getMonth()+1,0); }
+  else if(REPORT_RANGE==='lastmonth'){ start=new Date(now.getFullYear(),now.getMonth()-1,1); end=new Date(now.getFullYear(),now.getMonth(),0); }
+  else if(REPORT_RANGE==='year'){ start=new Date(now.getFullYear(),0,1); end=new Date(now.getFullYear(),11,31); }
+  else { start=new Date(2000,0,1); end=new Date(2100,0,1); }
+  return {start:start.toISOString().slice(0,10), end:end.toISOString().slice(0,10)};
+}
+function inRange(dateStr,start,end){ return dateStr>=start && dateStr<=end; }
+
+function renderReports(){
+  const {start,end} = rangeDates();
+  const invs = S.invoices.filter(i=>inRange(i.date,start,end));
+  const purs = S.purchases.filter(p=>inRange(p.date,start,end));
+
+  let sales=0, vatCollected=0, outstanding=0, discountGiven=0;
+  const itemTotals={};
+  invs.forEach(i=>{
+    const t=calcTotals(i.items,i.vatOn,i.vatRate,i.discountPct);
+    sales+=t.total; vatCollected+=t.vatAmt; discountGiven+=t.overallDiscAmt;
+    outstanding+=remaining(i);
+    t.calced.forEach(it=>{ itemTotals[it.desc]=(itemTotals[it.desc]||0)+it.net; });
+  });
+  const paid = S.invoices.reduce((a,i)=> a + (i.payments||[]).filter(p=>inRange(p.date,start,end)).reduce((x,p)=>x+(Number(p.amount)||0),0), 0);
+  const purchaseTotal = purs.reduce((a,p)=>a+p.items.reduce((x,y)=>x+(Number(y.qty)||0)*(Number(y.cost)||0),0),0);
+  const grossMargin = sales - purchaseTotal;
+  const topItems = Object.entries(itemTotals).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxTop = topItems.length? topItems[0][1] : 1;
+  const lowStock = S.inventory.filter(i=>Number(i.stock)<=Number(i.lowStockThreshold||0));
+  const outstandingInvoices = S.invoices.filter(i=>remaining(i)>0);
+
+  return `
+  ${topbar('Reports','Business overview')}
+  <div class="content">
+    <div class="chip-row">
+      ${[['month','This month'],['lastmonth','Last month'],['year','This year'],['all','All time']].map(([k,l])=>
+        `<div class="chip ${REPORT_RANGE===k?'active':''}" onclick="REPORT_RANGE='${k}';render()">${l}</div>`).join('')}
+    </div>
+    <div style="height:12px"></div>
+    <div class="grid2">
+      <div class="stat"><div class="num">${fmtMoney(sales)}</div><div class="lbl">Total sales</div></div>
+      <div class="stat"><div class="num">${fmtMoney(vatCollected)}</div><div class="lbl">VAT collected</div></div>
+      <div class="stat"><div class="num">${fmtMoney(paid)}</div><div class="lbl">Paid</div></div>
+      <div class="stat"><div class="num" style="color:${outstanding>0?'var(--amber)':'inherit'}">${fmtMoney(outstanding)}</div><div class="lbl">Outstanding</div></div>
+      <div class="stat"><div class="num">${fmtMoney(purchaseTotal)}</div><div class="lbl">Purchases</div></div>
+      <div class="stat"><div class="num" style="color:${grossMargin>=0?'var(--green)':'var(--red)'}">${fmtMoney(grossMargin)}</div><div class="lbl">Gross margin</div></div>
+    </div>
+
+    <div class="section-title">Top items / services</div>
+    <div class="card">
+      ${topItems.length===0? `<div class="tiny muted">No sales in this period yet.</div>` :
+        topItems.map(([name,val])=>`
+          <div class="bar-wrap">
+            <div style="width:96px;font-size:12px" class="muted">${esc(name.slice(0,16))}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.max(4,(val/maxTop)*100)}%"></div></div>
+            <div class="mono tiny" style="width:70px;text-align:right">${fmtMoney(val)}</div>
+          </div>`).join('')}
+    </div>
+
+    <div class="section-title">Outstanding invoices</div>
+    ${outstandingInvoices.length===0? `<div class="card"><div class="tiny muted">All caught up — nothing outstanding.</div></div>` :
+      `<div class="card" style="padding:6px 14px">
+        ${outstandingInvoices.map(i=>{
+          return `<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)" onclick="go('invoice-view',{id:'${i.id}'})">
+            <div><div class="small" style="font-weight:600">${esc(i.customer)}</div><div class="tiny muted mono">${i.number}${paymentsSum(i)>0?' · partly paid':''}</div></div>
+            <div class="mono">${fmtMoney(remaining(i))}</div>
+          </div>`;
+        }).join('')}
+      </div>`}
+
+    <div class="section-title">Low stock</div>
+    ${lowStock.length===0? `<div class="card"><div class="tiny muted">Stock levels look healthy.</div></div>` :
+      `<div class="card">${lowStock.map(i=>`<div class="row-between" style="padding:5px 0"><div class="small">${esc(i.name)}</div><div class="mono tiny" style="color:var(--red)">${i.stock} left</div></div>`).join('')}</div>`}
+
+    <div class="section-title">Discounts given</div>
+    <div class="card"><div class="row-between"><div class="small muted">Total discounted this period</div><div class="mono">${fmtMoney(discountGiven)}</div></div></div>
+  </div>`;
+}
+
+/* ---------- MORE / SETTINGS ---------- */
+function renderMore(){
+  return `
+  ${topbar('More','Settings & tools')}
+  <div class="content">
+    <div class="card">
+      <div class="row-between">
+        <div>
+          <div style="font-weight:600">${esc(CURRENT_USER.name)}</div>
+          <div class="tiny muted">@${esc(CURRENT_USER.username)} · ${CURRENT_USER.role==='admin'?'Admin':'Staff'}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="logout()">Log out</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      ${isAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('settings-form')">
+        <div class="small" style="font-weight:600">Business settings</div>${ic('chev')}
+      </div>`:''}
+      ${isAdmin()?`<div class="row-between" style="padding:14px" onclick="goPush('team-form')">
+        <div class="small" style="font-weight:600">Team & logins</div>${ic('chev')}
+      </div>`:`<div class="row-between" style="padding:14px">
+        <div class="small muted">Business settings — admin only</div>
+      </div>`}
+    </div>
+    <div class="card">
+      <div class="row-between">
+        <div class="tiny muted" style="font-weight:600;text-transform:uppercase">Sync</div>
+        <span class="badge ${FIREBASE_ENABLED?'accepted':(STORAGE_MODE==='none'?'overdue':'draft')}">${FIREBASE_ENABLED?'Firebase — real-time':(STORAGE_MODE==='none'?'Not saving — see banner above':'Built-in — every 6s')}</span>
+      </div>
+      ${STORAGE_MODE==='none'?`<div class="tiny muted" style="margin-top:8px">This page isn't connected to Claude's storage. Open it from the Claude conversation itself, or configure Firebase below for standalone hosting.</div>`:''}
+    </div>
+    <div class="card">
+      <div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:6px">About this app</div>
+      <div class="small">Ledger keeps invoices, quotes, purchases and inventory in sync across your team. Staff accounts can't delete records, edit item prices, or change business settings.</div>
+    </div>
+  </div>`;
+}
+function renderTeamForm(){
+  const staff = S.users.filter(u=>u.id!==CURRENT_USER.id);
+  return `
+  ${topbar('Team & logins','',true)}
+  <div class="content">
+    <div class="section-title">Add a team member</div>
+    <div class="card">
+      <label>Name</label><input id="t_name" placeholder="Full name">
+      <label>Username</label><input id="t_user" placeholder="username" autocapitalize="off">
+      <label>PIN / passcode (min 4 characters)</label><input id="t_pin" type="password" placeholder="••••">
+      <label>Role</label>
+      <select id="t_role">
+        <option value="staff">Staff — can't delete, edit prices, or change settings</option>
+        <option value="admin">Admin — full access</option>
+      </select>
+      <div id="t_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:6px" onclick="addTeamMember()">${ic('plus')} Add member</button>
+    </div>
+    <div class="section-title">Team</div>
+    ${staff.length===0? `<div class="card"><div class="tiny muted">Just you so far — add teammates above.</div></div>` :
+      staff.map(u=>`<div class="card row-between">
+        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':'Staff'}</div></div>
+        <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
+      </div>`).join('')}
+  </div>`;
+}
+async function addTeamMember(){
+  const name=document.getElementById('t_name').value.trim();
+  const username=document.getElementById('t_user').value.trim().toLowerCase();
+  const pin=document.getElementById('t_pin').value;
+  const role=document.getElementById('t_role').value;
+  const err=document.getElementById('t_err');
+  if(!name||!username||pin.length<4){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
+  if(S.users.some(u=>u.username===username)){ err.textContent='That username is already taken.'; return; }
+  const passHash=await sha256(username+':'+pin);
+  S.users.push({id:uid(), name, username, passHash, role});
+  await persist('users');
+  toast('Team member added');
+  render();
+}
+function removeTeamMember(id){
+  if(!confirm('Remove this team member? They will no longer be able to sign in.')) return;
+  S.users=S.users.filter(u=>u.id!==id);
+  persist('users');
+  toast('Removed');
+  render();
+}
+function renderSettingsForm(){
+  const s=S.settings;
+  return `
+  ${topbar('Business settings','',true)}
+  <div class="content">
+    <div class="card">
+      <label>Company name</label><input id="s_name" value="${esc(s.companyName)}">
+      <label>Phone</label><input id="s_phone" value="${esc(s.companyPhone)}">
+      <label>Email</label><input id="s_email" value="${esc(s.companyEmail)}">
+      <label>Address</label><textarea id="s_addr" rows="2">${esc(s.companyAddress)}</textarea>
+    </div>
+    <div class="card">
+      <div class="item-grid">
+        <div><label>Currency code</label><input id="s_cur" value="${esc(s.currency)}" placeholder="AED"></div>
+        <div><label>Default VAT rate (%)</label><input id="s_vat" type="number" min="0" step="0.5" value="${s.vatRate}"></div>
+      </div>
+      <div class="toggle-row">
+        <div class="small" style="font-weight:600">VAT on by default</div>
+        <label class="switch"><input type="checkbox" id="s_vatdef" ${s.vatDefaultOn?'checked':''}><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="card">
+      <label>Invoice prefix</label><input id="s_pinv" value="${esc(s.invoicePrefix)}">
+      <label>Quote prefix</label><input id="s_pquo" value="${esc(s.quotePrefix)}">
+      <label>Purchase order prefix</label><input id="s_ppo" value="${esc(s.poPrefix)}">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="saveSettings()">${ic('check')} Save settings</button>
+  </div>`;
+}
+function saveSettings(){
+  if(!isAdmin()){ toast('Only admins can change settings'); return; }
+  const s=S.settings;
+  s.companyName=document.getElementById('s_name').value.trim()||'The H IT Solutions';
+  s.companyPhone=document.getElementById('s_phone').value.trim();
+  s.companyEmail=document.getElementById('s_email').value.trim();
+  s.companyAddress=document.getElementById('s_addr').value.trim();
+  s.currency=document.getElementById('s_cur').value.trim()||'AED';
+  s.vatRate=Number(document.getElementById('s_vat').value)||0;
+  s.vatDefaultOn=document.getElementById('s_vatdef').checked;
+  s.invoicePrefix=document.getElementById('s_pinv').value.trim()||'INV';
+  s.quotePrefix=document.getElementById('s_pquo').value.trim()||'QT';
+  s.poPrefix=document.getElementById('s_ppo').value.trim()||'PO';
+  persist('settings');
+  toast('Settings saved');
+  goBack();
+}
+
+/* ---------- AFTER RENDER HOOKS ---------- */
+function afterRender(){
+  if(['invoice-form','quote-form'].includes(VIEW.name)) liveTotals();
+  if(VIEW.name==='purchase-form') purchaseLiveTotals();
+}
+
+loadAll();
+window.addEventListener('focus', ()=>{ syncPull(); });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncPull(); });
+</script>
+</body>
+</html>
