@@ -1,196 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>Ledger — IT Business Suite</title>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-<script>
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyAYmF5reAR-0gvV55LZ7I5bhrTkMumRL9Y",
-    authDomain: "the-h-it-solutions.firebaseapp.com",
-    projectId: "the-h-it-solutions",
-    storageBucket: "the-h-it-solutions.firebasestorage.app",
-    messagingSenderId: "685988905127",
-    appId: "1:685988905127:web:51b2d4f0c83bcb88745b82",
-    measurementId: "G-K8K14QV2N9"
-  };
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The H IT Solutions</title>
 
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#F4F6F8;
-    --surface:#FFFFFF;
-    --ink:#152033;
-    --ink-soft:#5B6B82;
-    --line:#E3E8EE;
-    --navy:#152A4D;
-    --navy-2:#1F3A63;
-    --teal:#0E9C90;
-    --teal-soft:#E3F5F3;
-    --amber:#C77F16;
-    --amber-soft:#FBF0DD;
-    --red:#C4383D;
-    --red-soft:#FBE7E7;
-    --green:#2E8B4F;
-    --green-soft:#E7F5EC;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background:var(--bg);
-    color:var(--ink);
-    font-family:'IBM Plex Sans',sans-serif;
-    -webkit-tap-highlight-color:transparent;
-    overscroll-behavior-y:none;
-  }
-  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
-  .mono{font-family:'IBM Plex Mono',monospace;}
-  #app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:84px;}
-  .topbar{
-    position:sticky;top:0;z-index:20;
-    background:var(--navy);
-    color:#fff;
-    padding:14px 16px calc(14px + env(safe-area-inset-top,0px));
-    padding-top:calc(14px + env(safe-area-inset-top,0px));
-    display:flex;align-items:center;gap:10px;
-  }
-  .topbar .back{
-    width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.08);
-    display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;border:none;color:#fff;
-  }
-  .topbar .title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .topbar .sub{font-size:11px;color:rgba(255,255,255,.55);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
-  .content{padding:14px 14px 8px;}
-  .card{
-    background:var(--surface);
-    border:1px solid var(--line);
-    border-radius:14px;
-    padding:14px;
-    margin-bottom:12px;
-  }
-  .stripe{
-    border-left:4px solid var(--line);
-    padding-left:12px;
-  }
-  .stripe.paid,.stripe.received,.stripe.accepted{border-left-color:var(--green);}
-  .stripe.sent,.stripe.draft{border-left-color:var(--ink-soft);}
-  .stripe.overdue{border-left-color:var(--red);}
-  .stripe.pending{border-left-color:var(--amber);}
-  .stripe.partial{border-left-color:var(--amber);}
-  .stripe.planning{border-left-color:var(--ink-soft);}
-  .stripe.active{border-left-color:var(--teal);}
-  .stripe.completed{border-left-color:var(--green);}
-  .stripe.on-hold{border-left-color:var(--amber);}
-  .badge{
-    display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;
-    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
-    font-family:'IBM Plex Mono',monospace;
-  }
-  .badge.paid,.badge.received,.badge.accepted{background:var(--green-soft);color:var(--green);}
-  .badge.sent{background:var(--teal-soft);color:var(--teal);}
-  .badge.draft{background:#EEF1F5;color:var(--ink-soft);}
-  .badge.overdue{background:var(--red-soft);color:var(--red);}
-  .badge.pending{background:var(--amber-soft);color:var(--amber);}
-  .badge.partial{background:var(--amber-soft);color:var(--amber);}
-  .badge.converted{background:#EEF1F5;color:var(--ink-soft);}
-  .badge.planning{background:#EEF1F5;color:var(--ink-soft);}
-  .badge.active{background:var(--teal-soft);color:var(--teal);}
-  .badge.completed{background:var(--green-soft);color:var(--green);}
-  .badge.on-hold{background:var(--amber-soft);color:var(--amber);}
-  .row-between{display:flex;align-items:center;justify-content:space-between;}
-  .muted{color:var(--ink-soft);}
-  .small{font-size:12.5px;}
-  .tiny{font-size:11px;}
-  .btn{
-    border:none;border-radius:11px;padding:12px 16px;font-weight:600;font-size:14.5px;
-    cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    font-family:'IBM Plex Sans',sans-serif;
-  }
-  .btn-primary{background:var(--navy);color:#fff;}
-  .btn-teal{background:var(--teal);color:#fff;}
-  .btn-ghost{background:var(--surface);color:var(--navy);border:1px solid var(--line);}
-  .btn-danger{background:var(--red-soft);color:var(--red);}
-  .btn-block{width:100%;}
-  .btn-sm{padding:8px 12px;font-size:13px;border-radius:9px;}
-  input,select,textarea{
-    width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;
-    padding:10px 11px;font-size:14.5px;color:var(--ink);font-family:'IBM Plex Sans',sans-serif;
-    outline:none;
-  }
-  input:focus,select:focus,textarea:focus{border-color:var(--navy-2);}
-  label{font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:5px;margin-top:12px;}
-  label:first-child{margin-top:0;}
-  .field{margin-bottom:2px;}
-  .item-row{
-    border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#FAFBFC;
-  }
-  .item-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
-  .totals{border-top:1px dashed var(--line);margin-top:12px;padding-top:10px;}
-  .totals .line{display:flex;justify-content:space-between;padding:3px 0;font-size:14px;}
-  .totals .line.grand{font-weight:700;font-size:17px;font-family:'Space Grotesk',sans-serif;border-top:1px solid var(--line);margin-top:6px;padding-top:8px;}
-  .tabbar{
-    position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;
-    background:var(--surface);border-top:1px solid var(--line);
-    display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));
-    z-index:30;
-  }
-  .tabbtn{
-    flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;
-    background:none;border:none;color:var(--ink-soft);font-size:10.5px;font-weight:600;
-    cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
-  }
-  .tabbtn.active{color:var(--navy);}
-  .tabbtn svg{width:20px;height:20px;}
-  .fab{
-    position:fixed;bottom:78px;left:50%;transform:translateX(calc(-50% + 200px));
-    width:52px;height:52px;border-radius:16px;background:var(--teal);color:#fff;
-    display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;
-    box-shadow:0 8px 20px rgba(14,156,144,.35);z-index:25;
-  }
-  @media (max-width:520px){.fab{transform:translateX(calc(-50vw + 200px));left:50vw;}}
-  .empty{text-align:center;padding:40px 16px;color:var(--ink-soft);}
-  .empty svg{width:40px;height:40px;margin-bottom:10px;opacity:.5;}
-  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;}
-  .stat .num{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;}
-  .stat .lbl{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-soft);}
-  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);}
-  .toggle-row:last-child{border-bottom:none;}
-  .switch{position:relative;width:42px;height:24px;flex-shrink:0;}
-  .switch input{opacity:0;width:0;height:0;}
-  .slider{position:absolute;inset:0;background:#D7DDE5;border-radius:24px;cursor:pointer;transition:.15s;}
-  .slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;}
-  input:checked + .slider{background:var(--teal);}
-  input:checked + .slider:before{transform:translateX(18px);}
-  .bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
-  .bar-track{flex:1;height:9px;background:#EEF1F5;border-radius:6px;overflow:hidden;}
-  .bar-fill{height:100%;background:var(--teal);border-radius:6px;}
-  .section-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin:18px 0 10px;color:var(--ink);}
-  .section-title:first-child{margin-top:0;}
-  .divider{height:1px;background:var(--line);margin:14px 0;}
-  .modal-bg{position:fixed;inset:0;background:rgba(15,20,30,.5);z-index:40;display:flex;align-items:flex-end;}
-  .modal-sheet{background:var(--surface);width:100%;max-width:520px;margin:0 auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:88vh;overflow-y:auto;}
-  .modal-handle{width:36px;height:4px;background:var(--line);border-radius:3px;margin:0 auto 12px;}
-  .segmented{display:flex;background:#EEF1F5;border-radius:10px;padding:3px;gap:3px;}
-  .segmented button{flex:1;border:none;background:none;padding:8px 4px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
-  .segmented button.active{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.08);}
-  .chip-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
-  .chip{flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12.5px;font-weight:600;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
-  .chip.active{background:var(--navy);border-color:var(--navy);color:#fff;}
-  ::-webkit-scrollbar{display:none;}
-  .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
-  .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
-</style>
+  <!-- 1. کتابخانه‌های فایربیس -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <!-- 2. تنظیمات و اتصال فایربیس -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYmF5reAR-0gvV55LZ7I5bhrTkMumRL9Y",
+      authDomain: "the-h-it-solutions.firebaseapp.com",
+      projectId: "the-h-it-solutions",
+      storageBucket: "the-h-it-solutions.firebasestorage.app",
+      messagingSenderId: "685988905127",
+      appId: "1:685988905127:web:51b2d4f0c83bcb88745b82",
+      measurementId: "G-K8K14QV2N9"
+    };
+
+    // فعال‌سازی فایربیس
+    firebase.initializeApp(firebaseConfig);
+  </script>
 </head>
+<body>
+  <h1>The H IT Solutions</h1>
+</body>
+</html>
 <body>
 <div id="app"></div>
 <script>
