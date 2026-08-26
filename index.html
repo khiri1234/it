@@ -175,6 +175,24 @@
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
   .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
 </style>
+<!-- 1. کتابخانه‌های فایربیس -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <!-- 2. کانفیگ و اتصال فایربیس -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYmF5reAR-0gvV55LZ7I5bhrTkMumRL9Y",
+      authDomain: "the-h-it-solutions.firebaseapp.com",
+      projectId: "the-h-it-solutions",
+      storageBucket: "the-h-it-solutions.firebasestorage.app",
+      messagingSenderId: "685988905127",
+      appId: "1:685988905127:web:51b2d4f0c83bcb88745b82",
+      measurementId: "G-K8K14QV2N9"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+  </script>
 </head>
 <body>
 <div id="app"></div>
