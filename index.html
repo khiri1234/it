@@ -571,6 +571,20 @@ function removePayment(kind, id, payId){
   render();
 }
 
+/* ---------- SAVED CONTACT NAMES (so customer/supplier names don't need retyping) ---------- */
+function allCustomerNames(){
+  return [...new Set([...S.invoices, ...S.quotes, ...S.projects].map(x=>x.customer).filter(Boolean))].sort();
+}
+function allSupplierNames(){
+  return [...new Set(S.purchases.map(p=>p.supplier).filter(Boolean))].sort();
+}
+function customerDatalist(){
+  return `<datalist id="customerDatalist">${allCustomerNames().map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+}
+function supplierDatalist(){
+  return `<datalist id="supplierDatalist">${allSupplierNames().map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
+}
+
 /* ---------- BULK PAYMENT (one payment across several invoices) ---------- */
 function bulkCustomers(){
   return [...new Set(S.invoices.filter(i=>remaining(i)>0).map(i=>i.customer))].sort();
@@ -948,7 +962,8 @@ function renderDocForm(type, id){
   <div class="content">
     <div class="card">
       <label>Customer name</label>
-      <input id="f_customer" value="${esc(d.customer)}" placeholder="Customer or company name">
+      <input id="f_customer" list="customerDatalist" value="${esc(d.customer)}" placeholder="Customer or company name">
+      ${customerDatalist()}
       <div class="item-grid">
         <div><label>Phone</label><input id="f_phone" value="${esc(d.phone)}" placeholder="+971 ..."></div>
         <div><label>Email</label><input id="f_email" value="${esc(d.email)}" placeholder="client@email.com"></div>
@@ -1421,7 +1436,8 @@ function renderPurchaseForm(id){
   <div class="content">
     <div class="card">
       <label>Supplier</label>
-      <input id="p_supplier" value="${esc(p.supplier)}" placeholder="Supplier / vendor name">
+      <input id="p_supplier" list="supplierDatalist" value="${esc(p.supplier)}" placeholder="Supplier / vendor name">
+      ${supplierDatalist()}
       <div class="item-grid">
         <div><label>Date</label><input id="p_date" type="date" value="${p.date}"></div>
         <div><label>Status</label>
@@ -1657,7 +1673,8 @@ function renderProjectForm(id){
       <label>Project name</label>
       <input id="pj_name" value="${esc(p.name)}" placeholder="e.g. Al Habtoor Villa — Networking Fit-out">
       <label>Customer</label>
-      <input id="pj_customer" value="${esc(p.customer)}" placeholder="Customer or company name">
+      <input id="pj_customer" list="customerDatalist" value="${esc(p.customer)}" placeholder="Customer or company name">
+      ${customerDatalist()}
       <div class="item-grid">
         <div><label>Phone</label><input id="pj_phone" value="${esc(p.phone)}"></div>
         <div><label>Email</label><input id="pj_email" value="${esc(p.email)}"></div>
