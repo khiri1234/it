@@ -580,6 +580,20 @@ function removePayment(kind, id, payId){
   render();
 }
 
+/* ---------- SAVED CONTACT NAMES (so customer/supplier names don't need retyping) ---------- */
+function allCustomerNames(){
+  return [...new Set([...S.invoices, ...S.quotes, ...S.projects].map(x=>x.customer).filter(Boolean))].sort();
+}
+function allSupplierNames(){
+  return [...new Set(S.purchases.map(p=>p.supplier).filter(Boolean))].sort();
+}
+function customerDatalist(){
+  return `<datalist id="customerDatalist">${allCustomerNames().map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+}
+function supplierDatalist(){
+  return `<datalist id="supplierDatalist">${allSupplierNames().map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
+}
+
 /* ---------- BULK PAYMENT (one payment across several invoices) ---------- */
 function bulkCustomers(){
   return [...new Set(S.invoices.filter(i=>remaining(i)>0).map(i=>i.customer))].sort();
@@ -684,37 +698,6 @@ function saveBulkPayment(){
 
 function findInventoryByName(name){
   return S.inventory.find(i=>i.name.toLowerCase()===String(name||'').toLowerCase());
-}
-function collectCustomerNames(){
-  const set=new Set();
-  S.invoices.forEach(d=>{ if(d.customer) set.add(d.customer); });
-  S.quotes.forEach(d=>{ if(d.customer) set.add(d.customer); });
-  S.projects.forEach(p=>{ if(p.customer) set.add(p.customer); });
-  return [...set].sort();
-}
-function collectSupplierNames(){
-  const set=new Set();
-  S.purchases.forEach(p=>{ if(p.supplier) set.add(p.supplier); });
-  return [...set].sort();
-}
-function findCustomerContact(name){
-  const key=String(name||'').trim().toLowerCase();
-  if(!key) return null;
-  const all=[
-    ...S.invoices.map(d=>({name:d.customer,phone:d.phone,email:d.email,date:d.date})),
-    ...S.quotes.map(d=>({name:d.customer,phone:d.phone,email:d.email,date:d.date})),
-    ...S.projects.map(p=>({name:p.customer,phone:p.phone,email:p.email,date:p.date}))
-  ].filter(c=>c.name && c.name.trim().toLowerCase()===key && (c.phone||c.email));
-  all.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return all[0]||null;
-}
-function onCustomerNameChange(val, phoneFieldId, emailFieldId){
-  const match=findCustomerContact(val);
-  if(!match) return;
-  const phoneEl=document.getElementById(phoneFieldId);
-  const emailEl=document.getElementById(emailFieldId);
-  if(phoneEl && !phoneEl.value && match.phone) phoneEl.value=match.phone;
-  if(emailEl && !emailEl.value && match.email) emailEl.value=match.email;
 }
 function adjustStock(id, delta){
   const it = S.inventory.find(i=>i.id===id);
@@ -988,8 +971,8 @@ function renderDocForm(type, id){
   <div class="content">
     <div class="card">
       <label>Customer name</label>
-      <input id="f_customer" list="customerDatalist" value="${esc(d.customer)}" placeholder="Customer or company name" oninput="onCustomerNameChange(this.value,'f_phone','f_email')">
-      <datalist id="customerDatalist">${collectCustomerNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+      <input id="f_customer" list="customerDatalist" value="${esc(d.customer)}" placeholder="Customer or company name">
+      ${customerDatalist()}
       <div class="item-grid">
         <div><label>Phone</label><input id="f_phone" value="${esc(d.phone)}" placeholder="+971 ..."></div>
         <div><label>Email</label><input id="f_email" value="${esc(d.email)}" placeholder="client@email.com"></div>
@@ -1580,7 +1563,7 @@ function renderPurchaseForm(id){
     <div class="card">
       <label>Supplier</label>
       <input id="p_supplier" list="supplierDatalist" value="${esc(p.supplier)}" placeholder="Supplier / vendor name">
-      <datalist id="supplierDatalist">${collectSupplierNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+      ${supplierDatalist()}
       <div class="item-grid">
         <div><label>Date</label><input id="p_date" type="date" value="${p.date}"></div>
         <div><label>Status</label>
@@ -1842,8 +1825,8 @@ function renderProjectForm(id){
       <label>Project name</label>
       <input id="pj_name" value="${esc(p.name)}" placeholder="e.g. Al Habtoor Villa — Networking Fit-out">
       <label>Customer</label>
-      <input id="pj_customer" list="customerDatalist" value="${esc(p.customer)}" placeholder="Customer or company name" oninput="onCustomerNameChange(this.value,'pj_phone','pj_email')">
-      <datalist id="customerDatalist">${collectCustomerNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+      <input id="pj_customer" list="customerDatalist" value="${esc(p.customer)}" placeholder="Customer or company name">
+      ${customerDatalist()}
       <div class="item-grid">
         <div><label>Phone</label><input id="pj_phone" value="${esc(p.phone)}"></div>
         <div><label>Email</label><input id="pj_email" value="${esc(p.email)}"></div>
