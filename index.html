@@ -176,6 +176,47 @@
     #app{ padding-bottom:0 !important; max-width:none !important; }
     body{ background:#fff !important; }
   }
+
+  /* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
+  #pdfPrintRoot{ display:none; }
+  .pdf-page{
+    width:210mm; min-height:297mm; margin:0 auto; background:#fff; color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif; font-size:12px; line-height:1.5;
+    padding:16mm 16mm 14mm; box-sizing:border-box; display:flex; flex-direction:column;
+  }
+  .pdf-topbar{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; border-bottom:3px solid var(--navy); padding-bottom:16px; margin-bottom:22px; }
+  .pdf-company-name{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; color:var(--navy); }
+  .pdf-company-meta{ font-size:11px; color:var(--ink-soft); margin-top:6px; line-height:1.6; }
+  .pdf-doc-title{ text-align:right; flex-shrink:0; }
+  .pdf-doc-title .kind{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:21px; letter-spacing:.03em; color:var(--navy); text-transform:uppercase; }
+  .pdf-doc-title .num{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; margin-top:5px; color:var(--ink-soft); }
+  .pdf-doc-title .badge{ margin-top:9px; font-size:10.5px; padding:5px 13px; }
+  .pdf-meta-grid{ display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:22px; }
+  .pdf-meta-block .label{ font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); font-weight:600; margin-bottom:5px; }
+  .pdf-meta-block .name{ font-weight:700; font-size:13.5px; }
+  .pdf-meta-block .row{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .pdf-meta-block .kv{ display:flex; justify-content:space-between; font-size:11.5px; padding:3px 0; gap:16px; }
+  .pdf-table{ width:100%; border-collapse:collapse; margin-bottom:4px; }
+  .pdf-table th{ background:var(--navy); color:#fff; font-size:10px; text-transform:uppercase; letter-spacing:.04em; padding:9px 10px; text-align:left; font-weight:600; }
+  .pdf-table th.num, .pdf-table td.num{ text-align:right; }
+  .pdf-table td{ padding:8px 10px; border-bottom:1px solid var(--line); font-size:11.5px; vertical-align:top; }
+  .pdf-table tbody tr:nth-child(even) td{ background:#F7F9FB; }
+  .pdf-totals{ width:280px; margin-left:auto; margin-top:12px; }
+  .pdf-totals .line{ display:flex; justify-content:space-between; padding:5px 0; font-size:12px; }
+  .pdf-totals .line.muted{ color:var(--ink-soft); }
+  .pdf-totals .grand{ border-top:2px solid var(--navy); margin-top:5px; padding-top:9px; font-weight:700; font-size:14.5px; }
+  .pdf-totals .balance{ background:var(--red-soft); color:var(--red); border-radius:8px; padding:9px 11px; margin-top:8px; font-weight:700; display:flex; justify-content:space-between; }
+  .pdf-totals .balance.zero{ background:var(--green-soft); color:var(--green); }
+  .pdf-notes{ margin-top:26px; padding-top:14px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-soft); }
+  .pdf-notes .label{ font-weight:700; text-transform:uppercase; font-size:10px; letter-spacing:.05em; color:var(--ink); margin-bottom:5px; }
+  .pdf-footer{ margin-top:auto; padding-top:22px; text-align:center; font-size:10px; color:var(--ink-soft); }
+  @media print{
+    body *{ visibility:hidden; }
+    #pdfPrintRoot, #pdfPrintRoot *{ visibility:visible; }
+    #pdfPrintRoot{ display:block; position:absolute; inset:0; margin:0; }
+    .pdf-page{ width:auto; min-height:0; margin:0; padding:0; }
+    @page{ size:A4; margin:14mm; }
+  }
 </style>
 </head>
 <body>
@@ -218,7 +259,7 @@ const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px
 /* ---------- STORAGE ---------- */
 const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog'];
 const DEFAULT_SETTINGS={
-  companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'',
+  companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1
@@ -1248,7 +1289,165 @@ function convertQuote(id){
   toast('Converted to invoice');
   go('invoice-view',{id:inv.id});
 }
-function printDoc(){ window.print(); }
+/* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
+function pdfStatusBadge(status){
+  const label = status.charAt(0).toUpperCase()+status.slice(1).replace('-',' ');
+  return `<span class="badge ${status}">${label}</span>`;
+}
+function pdfHeader(kindLabel, number, status){
+  const s = S.settings;
+  return `
+  <div class="pdf-topbar">
+    <div>
+      <div class="pdf-company-name">${esc(s.companyName)}</div>
+      <div class="pdf-company-meta">
+        ${esc(s.companyAddress||'')}${s.companyAddress?'<br>':''}
+        ${[s.companyPhone,s.companyEmail].filter(Boolean).map(esc).join(' · ')}
+        ${s.companyTRN?`<br>TRN: ${esc(s.companyTRN)}`:''}
+      </div>
+    </div>
+    <div class="pdf-doc-title">
+      <div class="kind">${esc(kindLabel)}</div>
+      <div class="num">${esc(number)}</div>
+      <div>${pdfStatusBadge(status)}</div>
+    </div>
+  </div>`;
+}
+function pdfFooter(extra){
+  const genLine = `Generated ${new Date().toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'})} · ${esc(S.settings.companyName)}`;
+  return `<div class="pdf-footer">${extra?esc(extra)+'<br>':''}${genLine}</div>`;
+}
+function buildPdfHTML(kind, id){
+  const s = S.settings;
+  if(kind==='invoice' || kind==='quote'){
+    const list = kind==='invoice' ? S.invoices : S.quotes;
+    const d = list.find(x=>x.id===id); if(!d) return '';
+    const t = calcTotals(d.items, d.vatOn, d.vatRate, d.discountPct);
+    const paid = kind==='invoice' ? paymentsSum(d) : 0;
+    const rem = kind==='invoice' ? Math.max(0,t.total-paid) : 0;
+    const rows = t.calced.map((it,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${esc(it.desc)}</td>
+        <td class="num">${it.qty}</td>
+        <td class="num">${fmtMoney(it.price)}</td>
+        <td class="num">${it.discountPct?it.discountPct+'%':'—'}</td>
+        <td class="num">${fmtMoney(it.net)}</td>
+      </tr>`).join('');
+    return `
+    <div class="pdf-page">
+      ${pdfHeader(kind==='invoice'?'Tax Invoice':'Quotation', d.number, d.status)}
+      <div class="pdf-meta-grid">
+        <div class="pdf-meta-block">
+          <div class="label">${kind==='invoice'?'Bill to':'Prepared for'}</div>
+          <div class="name">${esc(d.customer)}</div>
+          ${d.phone?`<div class="row">${esc(d.phone)}</div>`:''}
+          ${d.email?`<div class="row">${esc(d.email)}</div>`:''}
+        </div>
+        <div class="pdf-meta-block">
+          <div class="label">${kind==='invoice'?'Invoice details':'Quote details'}</div>
+          <div class="kv"><span class="muted">Date issued</span><span>${fmtDate(d.date)}</span></div>
+          ${d.dueDate?`<div class="kv"><span class="muted">${kind==='invoice'?'Due date':'Valid until'}</span><span>${fmtDate(d.dueDate)}</span></div>`:''}
+          <div class="kv"><span class="muted">Currency</span><span>${esc(s.currency)}</span></div>
+        </div>
+      </div>
+      <table class="pdf-table">
+        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:90px">Unit price</th><th class="num" style="width:60px">Disc.</th><th class="num" style="width:100px">Amount</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="pdf-totals">
+        <div class="line muted"><span>Subtotal</span><span>${fmtMoney(t.subtotal)}</span></div>
+        ${t.overallDiscAmt?`<div class="line muted"><span>Discount (${d.discountPct}%)</span><span>-${fmtMoney(t.overallDiscAmt)}</span></div>`:''}
+        <div class="line muted"><span>VAT${d.vatOn?` (${d.vatRate}%)`:''}</span><span>${d.vatOn?fmtMoney(t.vatAmt):'Not applied'}</span></div>
+        <div class="line grand"><span>Total</span><span>${fmtMoney(t.total)}</span></div>
+        ${kind==='invoice' && paid>0 ? `
+        <div class="line muted"><span>Paid</span><span>${fmtMoney(paid)}</span></div>
+        <div class="balance ${rem<=0?'zero':''}"><span>Balance due</span><span>${fmtMoney(rem)}</span></div>` : ''}
+      </div>
+      ${d.notes?`<div class="pdf-notes"><div class="label">Notes</div>${esc(d.notes).replace(/\n/g,'<br>')}</div>`:''}
+      ${pdfFooter('Thank you for your business.')}
+    </div>`;
+  }
+  if(kind==='purchase'){
+    const p = S.purchases.find(x=>x.id===id); if(!p) return '';
+    const total = p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+    const rows = p.items.map((it,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${esc(it.desc)}</td>
+        <td class="num">${it.qty}</td>
+        <td class="num">${fmtMoney(it.cost)}</td>
+        <td class="num">${fmtMoney((Number(it.qty)||0)*(Number(it.cost)||0))}</td>
+      </tr>`).join('');
+    return `
+    <div class="pdf-page">
+      ${pdfHeader('Purchase Order', p.number, p.status)}
+      <div class="pdf-meta-grid">
+        <div class="pdf-meta-block">
+          <div class="label">Supplier</div>
+          <div class="name">${esc(p.supplier)}</div>
+        </div>
+        <div class="pdf-meta-block">
+          <div class="label">Order details</div>
+          <div class="kv"><span class="muted">Date</span><span>${fmtDate(p.date)}</span></div>
+          <div class="kv"><span class="muted">Currency</span><span>${esc(s.currency)}</span></div>
+        </div>
+      </div>
+      <table class="pdf-table">
+        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Qty</th><th class="num" style="width:100px">Unit cost</th><th class="num" style="width:110px">Amount</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="pdf-totals">
+        <div class="line grand"><span>Total</span><span>${fmtMoney(total)}</span></div>
+      </div>
+      ${p.notes?`<div class="pdf-notes"><div class="label">Notes</div>${esc(p.notes).replace(/\n/g,'<br>')}</div>`:''}
+      ${pdfFooter('')}
+    </div>`;
+  }
+  if(kind==='project'){
+    const p = S.projects.find(x=>x.id===id); if(!p) return '';
+    const val = projectValue(p), adv = projectAdvances(p), bal = projectBalance(p);
+    const rows = (p.boq||[]).map((b,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${esc(b.desc)}</td>
+        <td class="num">${b.unit?esc(b.unit):'—'}</td>
+        <td class="num">${b.qty}</td>
+        <td class="num">${fmtMoney(b.unitPrice)}</td>
+        <td class="num">${fmtMoney(boqLineTotal(b))}</td>
+      </tr>`).join('');
+    return `
+    <div class="pdf-page">
+      ${pdfHeader('Project Summary', p.number, p.status)}
+      <div class="pdf-meta-grid">
+        <div class="pdf-meta-block">
+          <div class="label">Client</div>
+          <div class="name">${esc(p.customer)}</div>
+          ${p.phone?`<div class="row">${esc(p.phone)}</div>`:''}
+          ${p.email?`<div class="row">${esc(p.email)}</div>`:''}
+        </div>
+        <div class="pdf-meta-block">
+          <div class="label">Project details</div>
+          <div class="kv"><span class="muted">Project</span><span>${esc(p.name||'—')}</span></div>
+          <div class="kv"><span class="muted">Start date</span><span>${fmtDate(p.date)}</span></div>
+        </div>
+      </div>
+      <table class="pdf-table">
+        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Unit</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:90px">Rate</th><th class="num" style="width:100px">Amount</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="pdf-totals">
+        <div class="line grand"><span>Total value</span><span>${fmtMoney(val)}</span></div>
+        ${adv>0?`
+        <div class="line muted"><span>Advances received</span><span>${fmtMoney(adv)}</span></div>
+        <div class="balance ${bal<=0?'zero':''}"><span>Balance due</span><span>${fmtMoney(bal)}</span></div>` : ''}
+      </div>
+      ${p.notes?`<div class="pdf-notes"><div class="label">Notes</div>${esc(p.notes).replace(/\n/g,'<br>')}</div>`:''}
+      ${pdfFooter('')}
+    </div>`;
+  }
+  return '';
+}
 
 /* ---------- SHARE MENU (Print / PDF / Email / Link / WhatsApp) ---------- */
 function buildShareSummary(kind,id){
@@ -1294,7 +1493,7 @@ function showShareMenu(kind,id){
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:12px">Share</div>
-      <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuPrint()">${ic('printer')} Print</button>
+      <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuPrint('${kind}','${id}')">${ic('printer')} Print</button>
       <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuPDF('${kind}','${id}')">${ic('download')} Export PDF</button>
       <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuEmail('${kind}','${id}')">${ic('mail')} Email</button>
       <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuLink('${kind}','${id}')">${ic('share')} Share link</button>
@@ -1303,10 +1502,19 @@ function showShareMenu(kind,id){
     </div>
   </div>`;
 }
-function shareMenuPrint(){
+function shareMenuPrint(kind,id){
   closeModal();
-  setTimeout(()=>window.print(), 200);
+  const html = buildPdfHTML(kind,id);
+  if(!html){ toast('Could not prepare document'); return; }
+  let root = document.getElementById('pdfPrintRoot');
+  if(!root){ root=document.createElement('div'); root.id='pdfPrintRoot'; document.body.appendChild(root); }
+  root.innerHTML = html;
+  setTimeout(()=>window.print(), 150);
 }
+window.addEventListener('afterprint', ()=>{
+  const root = document.getElementById('pdfPrintRoot');
+  if(root) root.innerHTML='';
+});
 function shareMenuEmail(kind,id){
   const s=buildShareSummary(kind,id); if(!s) return;
   window.location.href=`mailto:?subject=${encodeURIComponent(s.title)}&body=${encodeURIComponent(s.text)}`;
@@ -1346,12 +1554,19 @@ function shareMenuPDF(kind,id){
   closeModal();
   toast('Preparing PDF…');
   ensureHtml2Pdf().then(()=>{
-    const s=buildShareSummary(kind,id); if(!s) return;
+    const html = buildPdfHTML(kind,id);
+    const s = buildShareSummary(kind,id);
+    if(!html || !s){ toast('Could not generate PDF'); return; }
     const wrap=document.createElement('div');
-    wrap.style.cssText='padding:28px;font-family:"IBM Plex Sans",sans-serif;color:#152033;max-width:700px';
-    wrap.innerHTML = `<div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;margin-bottom:14px">${esc(s.title)}</div><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.7;margin:0">${esc(s.text)}</pre>`;
+    wrap.style.cssText='position:fixed;left:-9999px;top:0;';
+    wrap.innerHTML = html;
     document.body.appendChild(wrap);
-    window.html2pdf().set({filename:`${s.number}.pdf`, margin:10, html2canvas:{scale:2}}).from(wrap).save()
+    window.html2pdf().set({
+      filename:`${s.number}.pdf`, margin:0,
+      image:{type:'jpeg',quality:0.98},
+      html2canvas:{scale:2,useCORS:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).from(wrap).save()
       .then(()=>document.body.removeChild(wrap))
       .catch(()=>{ document.body.removeChild(wrap); toast('Could not generate PDF'); });
   }).catch(()=>{ toast('Could not load PDF tool — check your connection'); });
@@ -2300,6 +2515,7 @@ function renderSettingsForm(){
       <label>Phone</label><input id="s_phone" value="${esc(s.companyPhone)}">
       <label>Email</label><input id="s_email" value="${esc(s.companyEmail)}">
       <label>Address</label><textarea id="s_addr" rows="2">${esc(s.companyAddress)}</textarea>
+      <label>Tax registration number (TRN)</label><input id="s_trn" value="${esc(s.companyTRN)}" placeholder="Optional — shown on invoice/quote PDFs">
     </div>
     <div class="card">
       <div class="item-grid">
@@ -2326,6 +2542,7 @@ function saveSettings(){
   s.companyPhone=document.getElementById('s_phone').value.trim();
   s.companyEmail=document.getElementById('s_email').value.trim();
   s.companyAddress=document.getElementById('s_addr').value.trim();
+  s.companyTRN=document.getElementById('s_trn').value.trim();
   s.currency=document.getElementById('s_cur').value.trim()||'AED';
   s.vatRate=Number(document.getElementById('s_vat').value)||0;
   s.vatDefaultOn=document.getElementById('s_vatdef').checked;
