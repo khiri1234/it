@@ -878,13 +878,20 @@ async function doSetupAdmin(){
   toast('Welcome, '+name+'!');
   render();
 }
+function rememberedUserId(){ try{ return localStorage.getItem('rememberedUserId'); }catch(e){ return null; } }
+function setRememberedUserId(id){ try{ if(id) localStorage.setItem('rememberedUserId', id); else localStorage.removeItem('rememberedUserId'); }catch(e){} }
 function renderLogin(){
+  const rid = rememberedUserId();
+  const rememberedUser = rid ? S.users.find(u=>u.id===rid) : null;
   return `
   <div class="content" style="padding-top:60px">
     <div style="text-align:center;margin-bottom:22px">
       <div class="display" style="font-size:22px;font-weight:700">${esc(S.settings.companyName||'Ledger')}</div>
       <div class="tiny muted">Sign in to continue</div>
     </div>
+    ${rememberedUser?`
+    <button class="btn btn-primary btn-block" style="margin-bottom:14px" onclick="requestFaceIDLogin()">${ic('check')} Welcome back, ${esc(rememberedUser.name)} — Use Face ID</button>
+    <div class="tiny muted" style="text-align:center;margin-bottom:14px">or sign in with username &amp; PIN</div>`:''}
     <div class="card">
       <label>Username</label><input id="li_user" placeholder="Username" autocapitalize="off">
       <label>PIN / passcode</label><input id="li_pin" type="password" placeholder="••••">
@@ -901,9 +908,36 @@ async function doLogin(){
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
   CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
   AUTH_ERR='';
+  setRememberedUserId(user.id);
   if(!applyHashRoute()) render();
 }
-function logout(){ CURRENT_USER=null; go('dashboard'); }
+function logout(){ CURRENT_USER=null; setRememberedUserId(null); go('dashboard'); }
+
+/* ---------- FACE ID (native app shell only — no-ops in a plain browser) ----------
+   The native iOS wrapper calls window.__faceIDUnlock() after Face ID succeeds.
+   It looks up the last signed-in user on this device and signs them back in
+   without needing the PIN again. requestFaceIDLogin() lets the login screen's
+   button ask the native shell to trigger the Face ID prompt on demand. */
+function __faceIDUnlock(){
+  const rid = rememberedUserId();
+  if(!rid) return false;
+  const user = S.users.find(u=>u.id===rid);
+  if(!user) return false;
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+  AUTH_ERR='';
+  if(!applyHashRoute()) render();
+  return true;
+}
+window.__faceIDUnlock = __faceIDUnlock;
+function requestFaceIDLogin(){
+  try{
+    if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.faceID){
+      window.webkit.messageHandlers.faceID.postMessage('unlock');
+    } else {
+      toast('Face ID isn’t available in this browser — use the iOS app.');
+    }
+  }catch(e){ toast('Face ID isn’t available here.'); }
+}
 
 
 function go(name, params={}){ closeModal(); VIEW={name,params}; window.scrollTo(0,0); render(); }
