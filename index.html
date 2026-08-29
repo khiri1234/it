@@ -1317,8 +1317,9 @@ function pdfFooter(extra){
   const genLine = `Generated ${new Date().toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'})} · ${esc(S.settings.companyName)}`;
   return `<div class="pdf-footer">${extra?esc(extra)+'<br>':''}${genLine}</div>`;
 }
-function buildPdfHTML(kind, id){
+function buildPdfHTML(kind, id, opts){
   const s = S.settings;
+  const showPrices = !opts || opts.showPrices!==false;
   if(kind==='invoice' || kind==='quote'){
     const list = kind==='invoice' ? S.invoices : S.quotes;
     const d = list.find(x=>x.id===id); if(!d) return '';
@@ -1376,8 +1377,8 @@ function buildPdfHTML(kind, id){
         <td>${i+1}</td>
         <td>${esc(it.desc)}</td>
         <td class="num">${it.qty}</td>
-        <td class="num">${fmtMoney(it.cost)}</td>
-        <td class="num">${fmtMoney((Number(it.qty)||0)*(Number(it.cost)||0))}</td>
+        ${showPrices?`<td class="num">${fmtMoney(it.cost)}</td>
+        <td class="num">${fmtMoney((Number(it.qty)||0)*(Number(it.cost)||0))}</td>`:''}
       </tr>`).join('');
     return `
     <div class="pdf-page">
@@ -1390,16 +1391,16 @@ function buildPdfHTML(kind, id){
         <div class="pdf-meta-block">
           <div class="label">Order details</div>
           <div class="kv"><span class="muted">Date</span><span>${fmtDate(p.date)}</span></div>
-          <div class="kv"><span class="muted">Currency</span><span>${esc(s.currency)}</span></div>
+          ${showPrices?`<div class="kv"><span class="muted">Currency</span><span>${esc(s.currency)}</span></div>`:''}
         </div>
       </div>
       <table class="pdf-table">
-        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Qty</th><th class="num" style="width:100px">Unit cost</th><th class="num" style="width:110px">Amount</th></tr></thead>
+        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Qty</th>${showPrices?`<th class="num" style="width:100px">Unit cost</th><th class="num" style="width:110px">Amount</th>`:''}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="pdf-totals">
+      ${showPrices?`<div class="pdf-totals">
         <div class="line grand"><span>Total</span><span>${fmtMoney(total)}</span></div>
-      </div>
+      </div>`:''}
       ${p.notes?`<div class="pdf-notes"><div class="label">Notes</div>${esc(p.notes).replace(/\n/g,'<br>')}</div>`:''}
       ${pdfFooter('')}
     </div>`;
@@ -1493,6 +1494,11 @@ function showShareMenu(kind,id){
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:12px">Share</div>
+      ${kind==='purchase'?`
+      <div class="toggle-row" style="margin-bottom:12px">
+        <div class="small" style="font-weight:600">Include prices in PDF</div>
+        <label class="switch"><input type="checkbox" id="share_purchase_prices" checked><span class="slider"></span></label>
+      </div>`:''}
       <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuPrint('${kind}','${id}')">${ic('printer')} Print</button>
       <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuPDF('${kind}','${id}')">${ic('download')} Export PDF</button>
       <button class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start" onclick="shareMenuEmail('${kind}','${id}')">${ic('mail')} Email</button>
@@ -1503,8 +1509,10 @@ function showShareMenu(kind,id){
   </div>`;
 }
 function shareMenuPrint(kind,id){
+  const pricesEl = document.getElementById('share_purchase_prices');
+  const opts = pricesEl ? {showPrices: pricesEl.checked} : undefined;
   closeModal();
-  const html = buildPdfHTML(kind,id);
+  const html = buildPdfHTML(kind,id,opts);
   if(!html){ toast('Could not prepare document'); return; }
   let root = document.getElementById('pdfPrintRoot');
   if(!root){ root=document.createElement('div'); root.id='pdfPrintRoot'; document.body.appendChild(root); }
@@ -1551,10 +1559,12 @@ function ensureHtml2Pdf(){
   return _html2pdfLoading;
 }
 function shareMenuPDF(kind,id){
+  const pricesEl = document.getElementById('share_purchase_prices');
+  const opts = pricesEl ? {showPrices: pricesEl.checked} : undefined;
   closeModal();
   toast('Preparing PDF…');
   ensureHtml2Pdf().then(()=>{
-    const html = buildPdfHTML(kind,id);
+    const html = buildPdfHTML(kind,id,opts);
     const s = buildShareSummary(kind,id);
     if(!html || !s){ toast('Could not generate PDF'); return; }
     // html2pdf.js deep-clones the element passed to .from() and re-parents the clone
