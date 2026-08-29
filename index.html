@@ -601,6 +601,25 @@ function ensureModalRoot(){
   return m;
 }
 function closeModal(){ const m=document.getElementById('modalRoot'); if(m) m.innerHTML=''; }
+/* In-app confirm dialog — native window.confirm() doesn't fire in some app
+   wrappers (e.g. a WKWebView-based iOS shell built in Xcode without the
+   confirm-panel delegate implemented), which makes buttons that rely on it
+   look completely unresponsive. This never depends on the browser/OS. */
+function showConfirm(message, onYes, opts){
+  opts = opts || {};
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="font-size:14.5px;line-height:1.5;margin-bottom:18px">${esc(message)}</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+        <button class="btn ${opts.danger===false?'btn-primary':'btn-danger'} btn-block" onclick="__confirmYes()">${esc(opts.label||'Delete')}</button>
+      </div>
+    </div>
+  </div>`;
+  window.__confirmYes = ()=>{ closeModal(); onYes(); };
+}
 function payKindStore(kind){ return kind==='project'? S.projects : S.invoices; }
 function payKindKey(kind){ return kind==='project'? 'projects' : 'invoices'; }
 function payKindRemaining(kind,d){ return kind==='project'? projectBalance(d) : remaining(d); }
@@ -692,7 +711,7 @@ function savePayments(kind, id){
 }
 function removePayment(kind, id, payId){
   if(!isAdmin()){ toast('Only admins can remove payments'); return; }
-  if(!confirm('Remove this payment record?')) return;
+  showConfirm('Remove this payment record?', ()=>{
   const d=payKindStore(kind).find(x=>x.id===id); if(!d) return;
   const pay=(d.payments||[]).find(p=>p.id===payId);
   d.payments=(d.payments||[]).filter(p=>p.id!==payId);
@@ -700,6 +719,7 @@ function removePayment(kind, id, payId){
   persist(payKindKey(kind));
   logActivity(`Removed a ${pay?fmtMoney(pay.amount)+' ':''}payment from ${kind} ${d.number}`);
   render();
+  });
 }
 
 /* ---------- SAVED CONTACT NAMES (so customer/supplier names don't need retyping) ---------- */
@@ -1287,7 +1307,7 @@ function saveDoc(type,id){
 }
 function deleteDoc(type,id){
   if(!isAdmin()){ toast('Only admins can delete'); return; }
-  if(!confirm('Delete this document? This cannot be undone.')) return;
+  showConfirm('Delete this document? This cannot be undone.', ()=>{
   const key = type==='invoice'?'invoices':'quotes';
   const list = S[key];
   const item = list.find(d=>d.id===id);
@@ -1304,6 +1324,7 @@ function deleteDoc(type,id){
   logActivity(`Deleted ${type} ${item?item.number:''} — ${item?item.customer:''}`);
   toast('Deleted');
   goBack();
+  });
 }
 
 /* ---------- DOC VIEW (printable) ---------- */
@@ -1832,13 +1853,14 @@ function saveItem(id){
 }
 function deleteItem(id){
   if(!isAdmin()){ toast('Only admins can delete'); return; }
-  if(!confirm('Delete this item from inventory?')) return;
+  showConfirm('Delete this item from inventory?', ()=>{
   const it=S.inventory.find(i=>i.id===id);
   S.inventory = S.inventory.filter(i=>i.id!==id);
   persist('inventory');
   logActivity(`Deleted inventory item "${it?it.name:''}"`);
   toast('Item deleted');
   goBack();
+  });
 }
 
 /* ---------- IMPORT BOQ ITEMS INTO INVENTORY (across all projects) ---------- */
@@ -2093,7 +2115,7 @@ function savePurchase(id){
 }
 function deletePurchase(id){
   if(!isAdmin()){ toast('Only admins can delete'); return; }
-  if(!confirm('Delete this purchase?')) return;
+  showConfirm('Delete this purchase?', ()=>{
   const p=S.purchases.find(x=>x.id===id);
   if(p && p.stockApplied){ reversePurchaseStock(p); persist('inventory'); }
   S.purchases=S.purchases.filter(x=>x.id!==id);
@@ -2101,6 +2123,7 @@ function deletePurchase(id){
   logActivity(`Deleted purchase ${p?p.number:''} — ${p?p.supplier:''}`);
   toast('Deleted');
   goBack();
+  });
 }
 function renderPurchaseView(id){
   const p=S.purchases.find(x=>x.id===id);
@@ -2223,13 +2246,14 @@ function saveProject(id){
 }
 function deleteProject(id){
   if(!isAdmin()){ toast('Only admins can delete'); return; }
-  if(!confirm('Delete this project? This cannot be undone.')) return;
+  showConfirm('Delete this project? This cannot be undone.', ()=>{
   const p=S.projects.find(x=>x.id===id);
   S.projects=S.projects.filter(x=>x.id!==id);
   persist('projects');
   logActivity(`Deleted project ${p?p.number:''} — ${p?p.name:''}`);
   toast('Deleted');
   goBack();
+  });
 }
 function renderProjectView(id){
   const p=S.projects.find(x=>x.id===id);
@@ -2341,7 +2365,7 @@ function quickProjectStatus(id,val){
   logActivity(`Marked project ${p.number} as ${val}`);
   render();
   if(val==='completed' && !wasCompleted && !p.invoiceId && isAdmin()){
-    setTimeout(()=>{ if(confirm('Project marked completed. Generate an invoice for the BOQ value now?')) generateProjectInvoice(id); }, 150);
+    setTimeout(()=>{ showConfirm('Project marked completed. Generate an invoice for the BOQ value now?', ()=>generateProjectInvoice(id), {danger:false, label:'Generate'}); }, 150);
   }
 }
 function generateProjectInvoice(projId){
@@ -2353,7 +2377,7 @@ function generateProjectInvoice(projId){
     p.invoiceId=null; // the linked invoice no longer exists — allow generating a new one
   }
   if(!p.boq || p.boq.length===0){ toast('Add BOQ lines before generating an invoice'); return; }
-  if(!confirm('Generate an invoice for the full BOQ value? Advances already received will be carried over as payments.')) return;
+  showConfirm('Generate an invoice for the full BOQ value? Advances already received will be carried over as payments.', ()=>{
   const inv = {
     id:uid(), number:nextNumber('invoice'), date:todayISO(), dueDate:'',
     customer:p.customer, phone:p.phone||'', email:p.email||'',
@@ -2369,6 +2393,7 @@ function generateProjectInvoice(projId){
   logActivity(`Generated invoice ${inv.number} from project ${p.number}`);
   toast('Invoice generated');
   go('invoice-view',{id:inv.id});
+  }, {danger:false, label:'Generate'});
 }
 function updateBoqProgress(projId,itemId,field,val){
   const p=S.projects.find(x=>x.id===projId); if(!p) return;
@@ -2379,13 +2404,14 @@ function updateBoqProgress(projId,itemId,field,val){
 }
 function removeBoqLine(projId,itemId){
   if(!isAdmin()){ toast('Only admins can remove BOQ lines'); return; }
-  if(!confirm('Remove this BOQ line?')) return;
+  showConfirm('Remove this BOQ line?', ()=>{
   const p=S.projects.find(x=>x.id===projId); if(!p) return;
   const item=(p.boq||[]).find(i=>i.id===itemId);
   p.boq=(p.boq||[]).filter(i=>i.id!==itemId);
   persist('projects');
   logActivity(`Removed BOQ line "${item?item.desc:''}" from project ${p.number}`);
   render();
+  });
 }
 function showBoqLineForm(projId, itemId){
   const p=S.projects.find(x=>x.id===projId); if(!p) return;
@@ -2638,13 +2664,14 @@ async function addTeamMember(){
   render();
 }
 function removeTeamMember(id){
-  if(!confirm('Remove this team member? They will no longer be able to sign in.')) return;
+  showConfirm('Remove this team member? They will no longer be able to sign in.', ()=>{
   const u=S.users.find(x=>x.id===id);
   S.users=S.users.filter(u=>u.id!==id);
   persist('users');
   logActivity(`Removed team member "${u?u.name:''}"`);
   toast('Removed');
   render();
+  });
 }
 function renderSettingsForm(){
   const s=S.settings;
