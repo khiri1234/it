@@ -180,7 +180,7 @@
   /* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
   #pdfPrintRoot{ display:none; }
   .pdf-page{
-    width:210mm; min-height:297mm; margin:0 auto; background:#fff; color:var(--ink);
+    width:210mm; min-height:285mm; margin:0 auto; background:#fff; color:var(--ink);
     font-family:'IBM Plex Sans',sans-serif; font-size:12px; line-height:1.5;
     padding:16mm 16mm 14mm; box-sizing:border-box; display:flex; flex-direction:column;
   }
@@ -1557,18 +1557,25 @@ function shareMenuPDF(kind,id){
     const html = buildPdfHTML(kind,id);
     const s = buildShareSummary(kind,id);
     if(!html || !s){ toast('Could not generate PDF'); return; }
+    // html2pdf.js deep-clones the element passed to .from() and re-parents the clone
+    // into its own (correctly hidden/positioned) render container — so any inline
+    // position:fixed/absolute set directly on that element gets cloned too and makes
+    // the clone escape html2pdf's container, capturing a blank page. Keep the element
+    // we hand to html2pdf unpositioned, and hide it via a plain zero-size ancestor instead.
+    const hider=document.createElement('div');
+    hider.style.cssText='position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;';
     const wrap=document.createElement('div');
-    wrap.style.cssText='position:fixed;left:-9999px;top:0;';
     wrap.innerHTML = html;
-    document.body.appendChild(wrap);
+    hider.appendChild(wrap);
+    document.body.appendChild(hider);
     window.html2pdf().set({
       filename:`${s.number}.pdf`, margin:0,
       image:{type:'jpeg',quality:0.98},
       html2canvas:{scale:2,useCORS:true},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
     }).from(wrap).save()
-      .then(()=>document.body.removeChild(wrap))
-      .catch(()=>{ document.body.removeChild(wrap); toast('Could not generate PDF'); });
+      .then(()=>document.body.removeChild(hider))
+      .catch(()=>{ document.body.removeChild(hider); toast('Could not generate PDF'); });
   }).catch(()=>{ toast('Could not load PDF tool — check your connection'); });
 }
 /* Deep-link routing: #invoice=ID / #quote=ID / #purchase=ID / #project=ID opens that record directly after sign-in */
