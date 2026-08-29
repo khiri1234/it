@@ -87,6 +87,11 @@
   .badge.active{background:var(--teal-soft);color:var(--teal);}
   .badge.completed{background:var(--green-soft);color:var(--green);}
   .badge.on-hold{background:var(--amber-soft);color:var(--amber);}
+  .activity-avatar.paid,.activity-avatar.received,.activity-avatar.accepted{background:var(--green-soft);color:var(--green);}
+  .activity-avatar.sent{background:var(--teal-soft);color:var(--teal);}
+  .activity-avatar.draft{background:#EEF1F5;color:var(--ink-soft);}
+  .activity-avatar.overdue{background:var(--red-soft);color:var(--red);}
+  .activity-avatar.pending,.activity-avatar.partial{background:var(--amber-soft);color:var(--amber);}
   .row-between{display:flex;align-items:center;justify-content:space-between;}
   .muted{color:var(--ink-soft);}
   .small{font-size:12.5px;}
@@ -175,6 +180,64 @@
   .bar-fill{height:100%;background:var(--teal);border-radius:6px;}
   .section-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin:18px 0 10px;color:var(--ink);}
   .section-title:first-child{margin-top:0;}
+
+  /* ---------- DASHBOARD (Home) ---------- */
+  @keyframes dashRise{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+  .dash-hero{
+    position:relative;overflow:hidden;isolation:isolate;
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 55%,#204a80 100%);
+    color:#fff;padding:16px 16px 50px;
+    padding-top:calc(16px + env(safe-area-inset-top,0px));
+  }
+  .dash-hero::before{
+    content:'';position:absolute;top:-70px;right:-50px;width:210px;height:210px;z-index:-1;
+    background:radial-gradient(circle,rgba(14,156,144,.4),transparent 70%);border-radius:50%;
+  }
+  .dash-hero::after{
+    content:'';position:absolute;bottom:-90px;left:-50px;width:190px;height:190px;z-index:-1;
+    background:radial-gradient(circle,rgba(255,255,255,.08),transparent 70%);border-radius:50%;
+  }
+  .dash-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;animation:dashRise .5s ease both;}
+  .dash-hero-menu{
+    width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.1);border:none;color:#fff;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;
+  }
+  .dash-hero-menu svg{width:17px;height:17px;}
+  .dash-greeting{font-size:11px;color:rgba(255,255,255,.62);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.06em;}
+  .dash-company{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;margin-top:2px;line-height:1.25;}
+  .dash-date{font-size:11px;color:rgba(255,255,255,.6);text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap;margin-top:2px;}
+  .dash-stats{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;
+    margin:-36px 14px 0;position:relative;animation:dashRise .55s ease .05s both;
+  }
+  .dash-stat{
+    background:var(--surface);border-radius:16px;padding:13px;
+    box-shadow:0 14px 28px rgba(21,32,51,.14);
+    display:flex;flex-direction:column;gap:9px;transition:transform .18s ease;
+  }
+  .dash-stat:active{transform:scale(.96);}
+  .dash-stat-icon{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .dash-stat-icon svg{width:15px;height:15px;}
+  .dash-stat .num{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
+  .dash-stat .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+  .dash-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;animation:dashRise .55s ease .1s both;}
+  .dash-action{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:13px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;
+    cursor:pointer;transition:transform .15s ease;text-align:left;width:100%;
+    font-family:'IBM Plex Sans',sans-serif;color:var(--ink);
+  }
+  .dash-action:active{transform:scale(.95);}
+  .dash-action.primary{background:linear-gradient(135deg,var(--navy),var(--navy-2));border-color:transparent;color:#fff;}
+  .dash-action .ic-wrap{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--navy);}
+  .dash-action.primary .ic-wrap{background:rgba(255,255,255,.16);color:#fff;}
+  .dash-action .ic-wrap svg{width:16px;height:16px;}
+  .dash-action .lbl{font-weight:600;font-size:13.5px;}
+  .dash-section{animation:dashRise .55s ease .15s both;}
+  .activity-row{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;}
+  .activity-row:last-child{border-bottom:none;}
+  .activity-avatar{width:36px;height:36px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .activity-avatar svg{width:16px;height:16px;}
   .divider{height:1px;background:var(--line);margin:14px 0;}
   .modal-bg{position:fixed;inset:0;background:rgba(15,20,30,.5);z-index:40;display:flex;align-items:flex-end;}
   .modal-sheet{background:var(--surface);width:100%;max-width:520px;margin:0 auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:88vh;overflow-y:auto;}
@@ -918,6 +981,10 @@ function renderTabbar(){
 }
 
 /* ---------- DASHBOARD ---------- */
+function greeting(){
+  const h = new Date().getHours();
+  return h<5?'Good night':h<12?'Good morning':h<17?'Good afternoon':h<21?'Good evening':'Good night';
+}
 function renderDashboard(){
   const inv = S.invoices;
   const outstanding = inv.reduce((a,b)=>a+remaining(b),0);
@@ -933,29 +1000,57 @@ function renderDashboard(){
   ].sort((a,b)=> (b.date||'').localeCompare(a.date||'')).slice(0,6);
 
   return `
-  ${topbar(S.settings.companyName||'Dashboard', 'Overview')}
-  <div class="content">
-    <div class="grid2">
-      <div class="stat"><div class="num">${fmtMoney(outstanding)}</div><div class="lbl">Outstanding</div></div>
-      <div class="stat"><div class="num">${fmtMoney(paidThisMonth)}</div><div class="lbl">Paid — this month</div></div>
-      <div class="stat"><div class="num">${draftQuotes}</div><div class="lbl">Open quotes</div></div>
-      <div class="stat" style="${lowStock.length?'border-color:#F1C4A8':''}">
-        <div class="num" style="${lowStock.length?'color:var(--red)':''}">${lowStock.length}</div>
-        <div class="lbl">Low stock items</div>
+  <div class="dash-hero">
+    <div class="dash-hero-top">
+      <div>
+        <div class="dash-greeting">${greeting()}</div>
+        <div class="dash-company">${esc(S.settings.companyName||'Dashboard')}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="dash-date">${now.toLocaleDateString(undefined,{weekday:'short',day:'2-digit',month:'short'})}</div>
+        <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:8px">
+          <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
+          <button class="dash-hero-menu" onclick="go('more')">${ic('more')}</button>
+        </div>
       </div>
     </div>
+  </div>
 
-    <div class="section-title">Quick actions</div>
-    <div class="grid2">
-      <button class="btn btn-primary" onclick="newInvoice()">${ic('plus')} New invoice</button>
-      <button class="btn btn-ghost" onclick="newQuote()">${ic('sales')} New quote</button>
-      <button class="btn btn-ghost" onclick="newPurchase()">${ic('cart')} New purchase</button>
-      <button class="btn btn-ghost" onclick="newProject()">${ic('box')} New project</button>
+  <div class="dash-stats">
+    <div class="dash-stat">
+      <div class="dash-stat-icon" style="background:${outstanding>0?'var(--red-soft)':'var(--green-soft)'};color:${outstanding>0?'var(--red)':'var(--green)'}">${ic('sales')}</div>
+      <div class="num">${fmtMoney(outstanding)}</div>
+      <div class="lbl">Outstanding</div>
+    </div>
+    <div class="dash-stat">
+      <div class="dash-stat-icon" style="background:var(--green-soft);color:var(--green)">${ic('check')}</div>
+      <div class="num">${fmtMoney(paidThisMonth)}</div>
+      <div class="lbl">Paid — this month</div>
+    </div>
+    <div class="dash-stat">
+      <div class="dash-stat-icon" style="background:var(--teal-soft);color:var(--teal)">${ic('reports')}</div>
+      <div class="num">${draftQuotes}</div>
+      <div class="lbl">Open quotes</div>
+    </div>
+    <div class="dash-stat">
+      <div class="dash-stat-icon" style="background:${lowStock.length?'var(--red-soft)':'var(--green-soft)'};color:${lowStock.length?'var(--red)':'var(--green)'}">${ic('box')}</div>
+      <div class="num">${lowStock.length}</div>
+      <div class="lbl">Low stock items</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="section-title dash-section">Quick actions</div>
+    <div class="dash-actions">
+      <button class="dash-action primary" onclick="newInvoice()"><span class="ic-wrap">${ic('plus')}</span><span class="lbl">New invoice</span></button>
+      <button class="dash-action" onclick="newQuote()"><span class="ic-wrap">${ic('sales')}</span><span class="lbl">New quote</span></button>
+      <button class="dash-action" onclick="newPurchase()"><span class="ic-wrap">${ic('cart')}</span><span class="lbl">New purchase</span></button>
+      <button class="dash-action" onclick="newProject()"><span class="ic-wrap">${ic('box')}</span><span class="lbl">New project</span></button>
     </div>
 
     ${lowStock.length? `
-    <div class="section-title">Low stock</div>
-    <div class="card">
+    <div class="section-title dash-section">Low stock</div>
+    <div class="card dash-section">
       ${lowStock.slice(0,5).map(i=>`
         <div class="row-between" style="padding:6px 0">
           <div class="small"><span class="low-dot"></span>${esc(i.name)}</div>
@@ -963,17 +1058,18 @@ function renderDashboard(){
         </div>`).join('')}
     </div>`:''}
 
-    <div class="section-title">Recent activity</div>
+    <div class="section-title dash-section">Recent activity</div>
     ${recent.length===0? emptyState('sales','Nothing yet','Create your first invoice or quote to see it here.') :
-      `<div class="card" style="padding:6px 14px">
+      `<div class="card dash-section" style="padding:6px 14px">
         ${recent.map(d=>`
-          <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--line)" onclick="${d.kind==='purchase'?`go('purchase-view',{id:'${d.id}'})`:`go('${d.kind}-view',{id:'${d.id}'})`}">
-            <div>
+          <div class="activity-row" onclick="${d.kind==='purchase'?`go('purchase-view',{id:'${d.id}'})`:`go('${d.kind}-view',{id:'${d.id}'})`}">
+            <div class="activity-avatar ${d.status}">${ic(d.kind==='purchase'?'cart':'sales')}</div>
+            <div style="flex:1;min-width:0">
               <div class="small" style="font-weight:600">${esc(d.customer||d.supplier||'—')}</div>
               <div class="tiny mono muted">${d.number} · ${fmtDate(d.date)}</div>
             </div>
             <span class="badge ${d.status}">${d.status}</span>
-          </div>`).join('').replace(/border-bottom:1px solid var\(--line\)(?=[^]*?$)/,'')}
+          </div>`).join('')}
       </div>`}
   </div>`;
 }
