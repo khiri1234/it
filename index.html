@@ -135,9 +135,24 @@
     flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;
     background:none;border:none;color:var(--ink-soft);font-size:10.5px;font-weight:600;
     cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+    transition:transform .15s cubic-bezier(.34,1.56,.64,1);
   }
+  .tabbtn:active{transform:scale(.88);}
   .tabbtn.active{color:var(--navy);}
-  .tabbtn svg{width:20px;height:20px;}
+  .tabbtn svg{width:20px;height:20px;position:relative;z-index:1;}
+  .tab-icon-wrap{
+    position:relative;display:flex;align-items:center;justify-content:center;
+    width:42px;height:26px;border-radius:14px;margin-bottom:1px;
+  }
+  .tabbtn.active .tab-icon-wrap{
+    background:var(--teal-soft);
+    animation:tabPillIn .32s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes tabPillIn{0%{transform:scale(.55);opacity:0;}100%{transform:scale(1);opacity:1;}}
+  .tabbtn.active svg{animation:tabIconPop .4s cubic-bezier(.34,1.56,.64,1);}
+  @keyframes tabIconPop{0%{transform:scale(1);}45%{transform:scale(1.22);}100%{transform:scale(1);}}
+  .tabbtn.active span:last-child{animation:tabLabelIn .3s ease;}
+  @keyframes tabLabelIn{0%{opacity:0;transform:translateY(2px);}100%{opacity:1;transform:translateY(0);}}
   .tabbtn-home{position:relative;justify-content:flex-end;}
   .tabbtn-home span:last-child{font-weight:700;}
   .home-circle{
@@ -213,6 +228,13 @@
     width:52px;height:52px;border-radius:16px;background:var(--teal);color:#fff;
     display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;
     box-shadow:0 8px 20px rgba(14,156,144,.35);z-index:25;
+    transition:transform .15s cubic-bezier(.34,1.56,.64,1);
+    animation:fabPulse 2.8s ease-in-out infinite;
+  }
+  .fab:active{transform:scale(.85);}
+  @keyframes fabPulse{
+    0%,100%{box-shadow:0 8px 20px rgba(14,156,144,.35),0 0 0 0 rgba(14,156,144,.4);}
+    50%{box-shadow:0 8px 20px rgba(14,156,144,.35),0 0 0 8px rgba(14,156,144,0);}
   }
   .empty{text-align:center;padding:40px 16px;color:var(--ink-soft);}
   .empty svg{width:40px;height:40px;margin-bottom:10px;opacity:.5;}
@@ -1126,7 +1148,7 @@ function renderTabbar(){
             <span class="home-circle"><img src="${HOME_LOGO_DATA_URI}" alt="Home"></span><span>${label}</span>
           </button>`
         : `<button class="tabbtn ${activeCls}" onclick="switchTab('${id}')">
-            ${ic(icon)}<span>${label}</span>
+            <span class="tab-icon-wrap">${ic(icon)}</span><span>${label}</span>
           </button>`;
     }).join('')}
   </div>`;
