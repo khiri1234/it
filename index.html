@@ -161,45 +161,46 @@
   .faceid-frame{
     position:relative;width:76px;height:76px;border-radius:22px;
     background:linear-gradient(135deg,var(--navy),var(--navy-2));
-    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
     box-shadow:0 10px 24px rgba(21,32,51,.25);
-    transition:transform .15s ease;
+    transition:transform .15s ease,background .35s ease,box-shadow .35s ease;
   }
   .faceid-wrap:active .faceid-frame{transform:scale(.94);}
-  .faceid-corner{position:absolute;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.85);transition:border-color .2s;}
-  .faceid-corner.tl{top:9px;left:9px;border-right:none;border-bottom:none;border-top-left-radius:6px;}
-  .faceid-corner.tr{top:9px;right:9px;border-left:none;border-bottom:none;border-top-right-radius:6px;}
-  .faceid-corner.bl{bottom:9px;left:9px;border-right:none;border-top:none;border-bottom-left-radius:6px;}
-  .faceid-corner.br{bottom:9px;right:9px;border-left:none;border-top:none;border-bottom-right-radius:6px;}
-  .faceid-face{width:26px;height:26px;color:#fff;position:relative;z-index:1;transition:opacity .25s ease,transform .25s ease;}
-  .faceid-check{
-    position:absolute;width:30px;height:30px;color:#fff;
-    opacity:0;transform:scale(.5);
-    transition:opacity .3s ease,transform .3s cubic-bezier(.34,1.56,.64,1);
+  .faceid-svg{width:46px;height:46px;overflow:visible;}
+  .fi-corner{stroke:rgba(255,255,255,.9);fill:none;stroke-dasharray:1;stroke-dashoffset:1;animation:fiDraw .5s ease forwards;transition:stroke .25s ease;}
+  .fi-tl{animation-delay:.05s;} .fi-tr{animation-delay:.12s;}
+  .fi-bl{animation-delay:.19s;} .fi-br{animation-delay:.26s;}
+  @keyframes fiDraw{to{stroke-dashoffset:0;}}
+  .fi-face{transform-origin:50px 50px;transition:opacity .25s ease,transform .3s ease;}
+  .fi-eye{fill:#fff;opacity:0;animation:fiFadeIn .3s ease forwards;animation-delay:.42s;}
+  .fi-mouth{stroke:#fff;fill:none;stroke-dasharray:1;stroke-dashoffset:1;opacity:0;animation:fiMouthDraw .4s ease forwards;animation-delay:.48s;}
+  @keyframes fiFadeIn{to{opacity:1;}}
+  @keyframes fiMouthDraw{to{opacity:1;stroke-dashoffset:0;}}
+  .fi-check{
+    stroke:#fff;fill:none;stroke-dasharray:1;stroke-dashoffset:1;opacity:0;
+    transition:stroke-dashoffset .45s cubic-bezier(.34,1.56,.64,1),opacity .2s ease;
   }
-  .faceid-scanline{
-    position:absolute;left:8px;right:8px;height:2px;border-radius:2px;
-    background:linear-gradient(90deg,transparent,#3DDC97,transparent);
-    top:14px;opacity:0;pointer-events:none;
-  }
-  .faceid-frame.idle{animation:faceidPulse 2.4s ease-in-out infinite;}
+  .fi-scanline{stroke:#3DDC97;opacity:0;}
+  .faceid-frame.idle{animation:faceidPulse 2.4s ease-in-out infinite;animation-delay:.6s;}
   @keyframes faceidPulse{
     0%,100%{box-shadow:0 10px 24px rgba(21,32,51,.25),0 0 0 0 rgba(14,156,144,.4);}
     50%{box-shadow:0 10px 24px rgba(21,32,51,.25),0 0 0 10px rgba(14,156,144,0);}
   }
-  .faceid-frame.scanning .faceid-scanline{opacity:1;animation:faceidScan 1.1s ease-in-out infinite;}
-  .faceid-frame.scanning .faceid-corner{animation:faceidCornerGlow 1.1s ease-in-out infinite;}
-  @keyframes faceidScan{
-    0%{top:12px;opacity:0;} 15%{opacity:1;} 85%{opacity:1;} 100%{top:58px;opacity:0;}
+  .faceid-frame.scanning .fi-scanline{opacity:1;animation:fiScan 1.1s ease-in-out infinite;}
+  .faceid-frame.scanning .fi-corner{animation:fiCornerGlow 1.1s ease-in-out infinite;}
+  @keyframes fiScan{
+    0%{transform:translateY(-22px);opacity:0;} 15%{opacity:1;} 85%{opacity:1;} 100%{transform:translateY(22px);opacity:0;}
   }
-  @keyframes faceidCornerGlow{
-    0%,100%{border-color:rgba(255,255,255,.6);} 50%{border-color:#3DDC97;}
+  @keyframes fiCornerGlow{
+    0%,100%{stroke:rgba(255,255,255,.65);} 50%{stroke:#3DDC97;}
   }
-  .faceid-frame.success .faceid-face{opacity:0;transform:scale(.6);}
-  .faceid-frame.success .faceid-check{opacity:1;transform:scale(1);}
-  .faceid-frame.success{animation:none;box-shadow:0 10px 24px rgba(21,32,51,.25),0 0 0 8px rgba(61,220,151,.25);}
-  .faceid-frame.failed{animation:faceidShake .4s ease;}
-  @keyframes faceidShake{
+  .faceid-frame.success{animation:none;background:linear-gradient(135deg,#0E9C90,#166B54);box-shadow:0 10px 24px rgba(21,32,51,.25),0 0 0 8px rgba(61,220,151,.28);}
+  .faceid-frame.success .fi-face{opacity:0;transform:scale(.5);}
+  .faceid-frame.success .fi-corner{stroke:#fff;}
+  .faceid-frame.success .fi-check{opacity:1;stroke-dashoffset:0;}
+  .faceid-frame.failed{animation:fiShake .4s ease;background:linear-gradient(135deg,var(--red),#7a2323);}
+  .faceid-frame.failed .fi-corner{stroke:#fff;}
+  @keyframes fiShake{
     10%,90%{transform:translateX(-2px);} 20%,80%{transform:translateX(4px);}
     30%,50%,70%{transform:translateX(-6px);} 40%,60%{transform:translateX(6px);}
   }
@@ -944,15 +945,19 @@ function renderLogin(){
     ${rememberedUser?`
     <div class="faceid-wrap" id="faceidWrap" onclick="requestFaceIDLogin()">
       <div class="faceid-frame idle" id="faceidBadge">
-        <span class="faceid-corner tl"></span><span class="faceid-corner tr"></span>
-        <span class="faceid-corner bl"></span><span class="faceid-corner br"></span>
-        <svg class="faceid-face" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <circle cx="8.5" cy="10" r=".9" fill="currentColor" stroke="none"/>
-          <circle cx="15.5" cy="10" r=".9" fill="currentColor" stroke="none"/>
-          <path d="M8.5 15c1.5 1.3 5.5 1.3 7 0"/>
+        <svg class="faceid-svg" viewBox="0 0 100 100" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path class="fi-corner fi-tl" pathLength="1" d="M18,34 L18,20 Q18,18 20,18 L34,18"/>
+          <path class="fi-corner fi-tr" pathLength="1" d="M66,18 L80,18 Q82,18 82,20 L82,34"/>
+          <path class="fi-corner fi-bl" pathLength="1" d="M18,66 L18,80 Q18,82 20,82 L34,82"/>
+          <path class="fi-corner fi-br" pathLength="1" d="M82,66 L82,80 Q82,82 80,82 L66,82"/>
+          <g class="fi-face">
+            <circle class="fi-eye" cx="38" cy="45" r="3.4"/>
+            <circle class="fi-eye" cx="62" cy="45" r="3.4"/>
+            <path class="fi-mouth" pathLength="1" stroke-width="4.5" d="M36,60 Q50,68 64,60"/>
+          </g>
+          <path class="fi-check" pathLength="1" stroke-width="7" d="M30,52 L44,66 L72,36"/>
+          <line class="fi-scanline" x1="15" y1="30" x2="85" y2="30" stroke-width="3"/>
         </svg>
-        <svg class="faceid-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-        <div class="faceid-scanline"></div>
       </div>
       <div class="faceid-label">Welcome back, ${esc(rememberedUser.name)}</div>
       <div class="faceid-sub" id="faceidSub">Tap to unlock with Face ID</div>
