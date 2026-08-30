@@ -328,9 +328,57 @@
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
   .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
   @media print{
-    .topbar, .tabbar, .fab, .btn, #modalRoot, .toast, select{ display:none !important; }
-    #app{ padding-bottom:0 !important; max-width:none !important; }
+    .topbar, .tabbar, .fab, .btn, #modalRoot, .toast, select, .desktop-sidebar{ display:none !important; }
+    #app{ padding-bottom:0 !important; max-width:none !important; margin-left:0 !important; }
     body{ background:#fff !important; }
+  }
+
+  /* ---------- DESKTOP SHELL ---------- */
+  .desktop-sidebar{display:none;}
+  @media (min-width:960px){
+    .desktop-sidebar{
+      display:flex;flex-direction:column;justify-content:space-between;
+      position:fixed;top:0;left:0;bottom:0;width:248px;
+      background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#fff;
+      padding:20px 14px;z-index:50;
+    }
+    .desktop-sidebar:empty{display:none;}
+    .ds-head{display:flex;align-items:center;gap:10px;margin-bottom:26px;padding:0 6px;}
+    .ds-logo{width:38px;height:38px;border-radius:50%;background:#0A4174;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 10px rgba(0,0,0,.3);}
+    .ds-logo img{width:24px;height:24px;object-fit:contain;}
+    .ds-company{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;line-height:1.2;}
+    .ds-sub{font-size:10px;color:rgba(255,255,255,.5);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+    .ds-nav{display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto;}
+    .ds-navbtn{
+      display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;border:none;
+      background:none;color:rgba(255,255,255,.7);font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;
+      cursor:pointer;text-align:left;transition:background .15s,color .15s;width:100%;
+    }
+    .ds-navbtn svg{width:17px;height:17px;flex-shrink:0;}
+    .ds-navbtn:hover{background:rgba(255,255,255,.07);color:#fff;}
+    .ds-navbtn.active{background:rgba(255,255,255,.14);color:#fff;}
+    .ds-foot{border-top:1px solid rgba(255,255,255,.12);padding-top:14px;margin-top:14px;}
+    .ds-user{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:0 6px;}
+    .ds-avatar{width:30px;height:30px;border-radius:9px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;}
+    .ds-uname{font-size:12.5px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ds-urole{font-size:10.5px;color:rgba(255,255,255,.5);}
+    .ds-logout{width:100%;background:rgba(255,255,255,.08);border:none;color:#fff;border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif;}
+    .ds-logout svg{width:12px;height:12px;}
+    .ds-logout:hover{background:rgba(255,255,255,.16);}
+
+    .desktop-sidebar:not(:empty) ~ #app{max-width:1200px;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;}
+    .desktop-sidebar:not(:empty) ~ #app .tabbar,.desktop-sidebar:not(:empty) ~ #app .fab{display:none !important;}
+    .topbar{padding-left:28px;padding-right:28px;}
+    .content{padding-left:28px;padding-right:28px;max-width:936px;margin:0 auto;}
+    .dash-hero{padding-left:28px;padding-right:28px;}
+    .dash-stats{grid-template-columns:repeat(4,1fr);margin:-36px auto 0;max-width:936px;padding:0 28px;}
+    .dash-actions{grid-template-columns:repeat(4,1fr);}
+    .modal-bg{align-items:center;}
+    .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
+  }
+  @media (min-width:1280px){
+    .desktop-sidebar{width:264px;}
+    .desktop-sidebar:not(:empty) ~ #app{margin-left:264px;}
   }
 
   /* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
@@ -376,6 +424,7 @@
 </style>
 </head>
 <body>
+<div id="desktopSidebar" class="desktop-sidebar"></div>
 <div id="app"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:10px;color:#5B6B82;font-family:'IBM Plex Sans',sans-serif">
   <div style="width:28px;height:28px;border:3px solid #E3E8EE;border-top-color:#0E9C90;border-radius:50%;animation:spin .8s linear infinite"></div>
   <div style="font-size:13px">Loading Ledger…</div>
@@ -410,6 +459,7 @@ const ICO = {
   mail:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg>',
   download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
   chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
+  logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
 };
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
@@ -1080,9 +1130,10 @@ function renderConnectionError(){
 }
 function render(){
   const app = document.getElementById('app');
-  if(STORAGE_MODE==='error'){ app.innerHTML = renderConnectionError(); return; }
-  if(!S.users || S.users.length===0){ app.innerHTML = noStorageBanner() + renderSetup(); return; }
-  if(!CURRENT_USER){ app.innerHTML = noStorageBanner() + renderLogin(); return; }
+  const sidebar = document.getElementById('desktopSidebar');
+  if(STORAGE_MODE==='error'){ app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
+  if(!S.users || S.users.length===0){ app.innerHTML = noStorageBanner() + renderSetup(); sidebar.innerHTML=''; return; }
+  if(!CURRENT_USER){ app.innerHTML = noStorageBanner() + renderLogin(); sidebar.innerHTML=''; return; }
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
   let body='';
@@ -1110,6 +1161,7 @@ function render(){
     default: body = renderDashboard();
   }
   app.innerHTML = noStorageBanner() + body + renderTabbar();
+  sidebar.innerHTML = renderSidebar();
   afterRender();
 }
 
@@ -1136,6 +1188,39 @@ const TAB_SECTIONS={
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){ STACK=[]; go(id); }
+function openReportsFromSidebar(){ switchTab('more'); goPush('reports'); }
+function renderSidebar(){
+  if(!CURRENT_USER) return '';
+  const tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['reports','reports','Reports'],['more','more','More']];
+  const activeId = VIEW.name==='reports' ? 'reports' : (TAB_SECTIONS[VIEW.name] || 'dashboard');
+  return `
+  <div class="ds-head">
+    <span class="ds-logo"><img src="${HOME_LOGO_DATA_URI}" alt="Home"></span>
+    <div style="min-width:0">
+      <div class="ds-company">${esc(S.settings.companyName||'Ledger')}</div>
+      <div class="ds-sub">IT Business Suite</div>
+    </div>
+  </div>
+  <div class="ds-nav">
+    ${tabs.map(([id,icon,label])=>{
+      const activeCls = activeId===id?'active':'';
+      const onclick = id==='reports' ? 'openReportsFromSidebar()' : `switchTab('${id}')`;
+      return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}">
+        <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
+      </button>`;
+    }).join('')}
+  </div>
+  <div class="ds-foot">
+    <div class="ds-user">
+      <div class="ds-avatar">${esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
+      <div style="min-width:0">
+        <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
+        <div class="ds-urole">${CURRENT_USER.role==='admin'?'Admin':'Staff'}</div>
+      </div>
+    </div>
+    <button class="ds-logout" onclick="logout()">${ic('logout')} Log out</button>
+  </div>`;
+}
 function renderTabbar(){
   const tabs=[['sales','sales','Sales'],['stock','stock','Stock'],['dashboard','home','Home'],['projects','box','Projects'],['more','more','More']];
   const active = TAB_SECTIONS[VIEW.name] || 'dashboard';
