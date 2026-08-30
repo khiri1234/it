@@ -155,6 +155,58 @@
     0%,100%{box-shadow:0 10px 22px rgba(14,156,144,.4),0 0 0 5px var(--surface),0 0 0 0 rgba(14,156,144,.45);}
     50%{box-shadow:0 10px 22px rgba(14,156,144,.4),0 0 0 5px var(--surface),0 0 0 9px rgba(14,156,144,0);}
   }
+
+  /* ---------- FACE ID LOGIN ---------- */
+  .faceid-wrap{display:flex;flex-direction:column;align-items:center;gap:9px;margin-bottom:20px;cursor:pointer;user-select:none;}
+  .faceid-frame{
+    position:relative;width:76px;height:76px;border-radius:22px;
+    background:linear-gradient(135deg,var(--navy),var(--navy-2));
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    box-shadow:0 10px 24px rgba(21,32,51,.25);
+    transition:transform .15s ease;
+  }
+  .faceid-wrap:active .faceid-frame{transform:scale(.94);}
+  .faceid-corner{position:absolute;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.85);transition:border-color .2s;}
+  .faceid-corner.tl{top:9px;left:9px;border-right:none;border-bottom:none;border-top-left-radius:6px;}
+  .faceid-corner.tr{top:9px;right:9px;border-left:none;border-bottom:none;border-top-right-radius:6px;}
+  .faceid-corner.bl{bottom:9px;left:9px;border-right:none;border-top:none;border-bottom-left-radius:6px;}
+  .faceid-corner.br{bottom:9px;right:9px;border-left:none;border-top:none;border-bottom-right-radius:6px;}
+  .faceid-face{width:26px;height:26px;color:#fff;position:relative;z-index:1;transition:opacity .25s ease,transform .25s ease;}
+  .faceid-check{
+    position:absolute;width:30px;height:30px;color:#fff;
+    opacity:0;transform:scale(.5);
+    transition:opacity .3s ease,transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .faceid-scanline{
+    position:absolute;left:8px;right:8px;height:2px;border-radius:2px;
+    background:linear-gradient(90deg,transparent,#3DDC97,transparent);
+    top:14px;opacity:0;pointer-events:none;
+  }
+  .faceid-frame.idle{animation:faceidPulse 2.4s ease-in-out infinite;}
+  @keyframes faceidPulse{
+    0%,100%{box-shadow:0 10px 24px rgba(21,32,51,.25),0 0 0 0 rgba(14,156,144,.4);}
+    50%{box-shadow:0 10px 24px rgba(21,32,51,.25),0 0 0 10px rgba(14,156,144,0);}
+  }
+  .faceid-frame.scanning .faceid-scanline{opacity:1;animation:faceidScan 1.1s ease-in-out infinite;}
+  .faceid-frame.scanning .faceid-corner{animation:faceidCornerGlow 1.1s ease-in-out infinite;}
+  @keyframes faceidScan{
+    0%{top:12px;opacity:0;} 15%{opacity:1;} 85%{opacity:1;} 100%{top:58px;opacity:0;}
+  }
+  @keyframes faceidCornerGlow{
+    0%,100%{border-color:rgba(255,255,255,.6);} 50%{border-color:#3DDC97;}
+  }
+  .faceid-frame.success .faceid-face{opacity:0;transform:scale(.6);}
+  .faceid-frame.success .faceid-check{opacity:1;transform:scale(1);}
+  .faceid-frame.success{animation:none;box-shadow:0 10px 24px rgba(21,32,51,.25),0 0 0 8px rgba(61,220,151,.25);}
+  .faceid-frame.failed{animation:faceidShake .4s ease;}
+  @keyframes faceidShake{
+    10%,90%{transform:translateX(-2px);} 20%,80%{transform:translateX(4px);}
+    30%,50%,70%{transform:translateX(-6px);} 40%,60%{transform:translateX(6px);}
+  }
+  .faceid-label{font-weight:700;font-size:15px;color:var(--ink);}
+  .faceid-sub{font-size:12px;color:var(--ink-soft);transition:color .2s;}
+  .faceid-sub.error{color:var(--red);font-weight:600;}
+  .faceid-divider{font-size:11px;color:var(--ink-soft);text-align:center;margin-bottom:14px;}
   .fab{
     position:fixed;bottom:calc(78px + 1cm);right:max(16px,calc(50vw - 260px + 16px));
     width:52px;height:52px;border-radius:16px;background:var(--teal);color:#fff;
@@ -890,8 +942,22 @@ function renderLogin(){
       <div class="tiny muted">Sign in to continue</div>
     </div>
     ${rememberedUser?`
-    <button class="btn btn-primary btn-block" style="margin-bottom:14px" onclick="requestFaceIDLogin()">${ic('check')} Welcome back, ${esc(rememberedUser.name)} — Use Face ID</button>
-    <div class="tiny muted" style="text-align:center;margin-bottom:14px">or sign in with username &amp; PIN</div>`:''}
+    <div class="faceid-wrap" id="faceidWrap" onclick="requestFaceIDLogin()">
+      <div class="faceid-frame idle" id="faceidBadge">
+        <span class="faceid-corner tl"></span><span class="faceid-corner tr"></span>
+        <span class="faceid-corner bl"></span><span class="faceid-corner br"></span>
+        <svg class="faceid-face" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="8.5" cy="10" r=".9" fill="currentColor" stroke="none"/>
+          <circle cx="15.5" cy="10" r=".9" fill="currentColor" stroke="none"/>
+          <path d="M8.5 15c1.5 1.3 5.5 1.3 7 0"/>
+        </svg>
+        <svg class="faceid-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <div class="faceid-scanline"></div>
+      </div>
+      <div class="faceid-label">Welcome back, ${esc(rememberedUser.name)}</div>
+      <div class="faceid-sub" id="faceidSub">Tap to unlock with Face ID</div>
+    </div>
+    <div class="faceid-divider">or sign in with username &amp; PIN</div>`:''}
     <div class="card">
       <label>Username</label><input id="li_user" placeholder="Username" autocapitalize="off">
       <label>PIN / passcode</label><input id="li_pin" type="password" placeholder="••••">
@@ -914,29 +980,54 @@ async function doLogin(){
 function logout(){ CURRENT_USER=null; setRememberedUserId(null); go('dashboard'); }
 
 /* ---------- FACE ID (native app shell only — no-ops in a plain browser) ----------
-   The native iOS wrapper calls window.__faceIDUnlock() after Face ID succeeds.
-   It looks up the last signed-in user on this device and signs them back in
-   without needing the PIN again. requestFaceIDLogin() lets the login screen's
-   button ask the native shell to trigger the Face ID prompt on demand. */
+   The native iOS wrapper calls window.__faceIDUnlock() after Face ID succeeds,
+   or window.__faceIDFailed() if it fails/is cancelled. requestFaceIDLogin() asks
+   the native shell (via a WKScriptMessageHandler) to trigger the Face ID prompt,
+   and drives the scan/success/error animation on the badge while it waits. */
 function __faceIDUnlock(){
   const rid = rememberedUserId();
   if(!rid) return false;
   const user = S.users.find(u=>u.id===rid);
   if(!user) return false;
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
-  AUTH_ERR='';
-  if(!applyHashRoute()) render();
+  const badge = document.getElementById('faceidBadge');
+  const finish = ()=>{
+    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+    AUTH_ERR='';
+    if(!applyHashRoute()) render();
+  };
+  if(badge){
+    badge.classList.remove('idle','scanning','failed');
+    badge.classList.add('success');
+    setTimeout(finish, 550); // let the checkmark animation land before switching screens
+  } else {
+    finish();
+  }
   return true;
 }
 window.__faceIDUnlock = __faceIDUnlock;
+function __faceIDFailed(message){
+  const badge = document.getElementById('faceidBadge');
+  const sub = document.getElementById('faceidSub');
+  if(badge){
+    badge.classList.remove('scanning');
+    badge.classList.add('idle','failed');
+    setTimeout(()=>badge.classList.remove('failed'), 400);
+  }
+  if(sub){ sub.textContent = message || 'Face ID failed — tap to try again'; sub.classList.add('error'); }
+}
+window.__faceIDFailed = __faceIDFailed;
 function requestFaceIDLogin(){
+  const badge = document.getElementById('faceidBadge');
+  const sub = document.getElementById('faceidSub');
+  if(badge){ badge.classList.remove('idle','failed'); badge.classList.add('scanning'); }
+  if(sub){ sub.textContent='Scanning…'; sub.classList.remove('error'); }
   try{
     if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.faceID){
       window.webkit.messageHandlers.faceID.postMessage('unlock');
     } else {
-      toast('Face ID isn’t available in this browser — use the iOS app.');
+      setTimeout(()=>__faceIDFailed('Face ID isn’t available in this browser — use the iOS app.'), 500);
     }
-  }catch(e){ toast('Face ID isn’t available here.'); }
+  }catch(e){ __faceIDFailed('Face ID isn’t available here.'); }
 }
 
 
