@@ -327,6 +327,21 @@
   ::-webkit-scrollbar{display:none;}
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
   .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
+  /* ---------- TEAM CHAT ---------- */
+  .chat-msg{display:flex;gap:8px;margin-bottom:14px;align-items:flex-end;}
+  .chat-msg.mine{flex-direction:row-reverse;}
+  .chat-avatar{width:28px;height:28px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;font-family:'Space Grotesk',sans-serif;}
+  .chat-bubble-wrap{max-width:78%;display:flex;flex-direction:column;}
+  .chat-msg.mine .chat-bubble-wrap{align-items:flex-end;}
+  .chat-sender{font-size:10.5px;font-weight:600;color:var(--ink-soft);margin-bottom:2px;margin-left:2px;}
+  .chat-bubble{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
+  .chat-msg.mine .chat-bubble{background:var(--navy);color:#fff;border-color:var(--navy);border-bottom-right-radius:4px;}
+  .chat-msg:not(.mine) .chat-bubble{border-bottom-left-radius:4px;}
+  .chat-time{font-size:9.5px;color:var(--ink-soft);margin-top:3px;}
+  .chat-composer{display:flex;gap:8px;margin-top:14px;}
+  .chat-composer input{flex:1;}
+  .chat-composer .chat-send{width:44px;height:44px;border-radius:50%;background:var(--teal);color:#fff;border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;}
+  .chat-composer .chat-send svg{width:18px;height:18px;}
   @media print{
     .topbar, .tabbar, .fab, .btn, #modalRoot, .toast, select, .desktop-sidebar{ display:none !important; }
     #app{ padding-bottom:0 !important; max-width:none !important; margin-left:0 !important; }
@@ -465,16 +480,18 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[] };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory';
+let CHAT_DRAFT='';
+let CHAT_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
 let CURRENT_USER=null; // {id,name,username,role} — session only, not persisted
 let AUTH_ERR='';
@@ -1159,8 +1176,10 @@ function render(){
     case 'settings-form': body = renderSettingsForm(); break;
     case 'team-form': body = renderTeamForm(); break;
     case 'activity-log': body = renderActivityLog(); break;
+    case 'chat': body = renderChat(); break;
     default: body = renderDashboard();
   }
+  CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='chatInput';
   app.innerHTML = noStorageBanner() + body + renderTabbar();
   sidebar.innerHTML = renderSidebar();
   afterRender();
@@ -1186,14 +1205,16 @@ const TAB_SECTIONS={
   'stock':'stock','item-form':'stock','purchase-form':'stock','purchase-view':'stock','inventory-import':'stock',
   'projects':'projects','project-form':'projects','project-view':'projects',
   'reports':'more',
+  'chat':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){ STACK=[]; go(id); }
 function openReportsFromSidebar(){ switchTab('more'); goPush('reports'); }
+function openChatFromSidebar(){ switchTab('more'); goPush('chat'); }
 function renderSidebar(){
   if(!CURRENT_USER) return '';
-  const tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['reports','reports','Reports'],['more','more','More']];
-  const activeId = VIEW.name==='reports' ? 'reports' : (TAB_SECTIONS[VIEW.name] || 'dashboard');
+  const tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['reports','reports','Reports'],['more','more','More']];
+  const activeId = ['reports','chat'].includes(VIEW.name) ? VIEW.name : (TAB_SECTIONS[VIEW.name] || 'dashboard');
   return `
   <div class="ds-head">
     <span class="ds-logo"><img src="${HOME_LOGO_DATA_URI}" alt="Home"></span>
@@ -1205,7 +1226,7 @@ function renderSidebar(){
   <div class="ds-nav">
     ${tabs.map(([id,icon,label])=>{
       const activeCls = activeId===id?'active':'';
-      const onclick = id==='reports' ? 'openReportsFromSidebar()' : `switchTab('${id}')`;
+      const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : `switchTab('${id}')`;
       return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}">
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`;
@@ -2809,6 +2830,9 @@ function renderMore(){
       </div>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('chat')">
+        <div class="small" style="font-weight:600">Team chat</div>${ic('chev')}
+      </div>
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('reports')">
         <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
       </div>
@@ -2860,6 +2884,42 @@ function renderActivityLog(){
           </div>`).join('')}
       </div>`}
   </div>`;
+}
+
+/* ---------- TEAM CHAT ---------- */
+function renderChat(){
+  const msgs = S.chat||[];
+  return `
+  ${topbar('Team chat','Comments, to-dos, requests', true)}
+  <div class="content">
+    ${msgs.length===0? emptyState('chat','No messages yet','Say hello to the team below.') :
+      `<div id="chatScroll">${msgs.map(m=>{
+        const mine = CURRENT_USER && m.userId===CURRENT_USER.id;
+        return `<div class="chat-msg ${mine?'mine':''}">
+          ${!mine?`<div class="chat-avatar">${esc((m.userName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+          <div class="chat-bubble-wrap">
+            ${!mine?`<div class="chat-sender">${esc(m.userName)}</div>`:''}
+            <div class="chat-bubble">${esc(m.text)}</div>
+            <div class="chat-time">${fmtLogTime(m.ts)}</div>
+          </div>
+        </div>`;
+      }).join('')}</div>`}
+    <div class="chat-composer">
+      <input id="chatInput" placeholder="Message the team…" value="${esc(CHAT_DRAFT)}" oninput="CHAT_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatMessage();}">
+      <button class="chat-send" onclick="sendChatMessage()">${ic('check')}</button>
+    </div>
+  </div>`;
+}
+function sendChatMessage(){
+  const input = document.getElementById('chatInput');
+  const text = (input?input.value:CHAT_DRAFT).trim();
+  if(!text) return;
+  if(!S.chat) S.chat=[];
+  S.chat.push({id:uid(), ts:Date.now(), userId:CURRENT_USER.id, userName:CURRENT_USER.name, text});
+  if(S.chat.length>500) S.chat = S.chat.slice(S.chat.length-500);
+  CHAT_DRAFT='';
+  persist('chat');
+  render();
 }
 function renderTeamForm(){
   const staff = S.users.filter(u=>u.id!==CURRENT_USER.id);
@@ -2966,6 +3026,16 @@ function saveSettings(){
 function afterRender(){
   if(['invoice-form','quote-form'].includes(VIEW.name)) liveTotals();
   if(VIEW.name==='purchase-form') purchaseLiveTotals();
+  if(VIEW.name==='chat'){
+    const scroller = document.getElementById('chatScroll');
+    if(scroller) scroller.scrollIntoView({block:'end'});
+    const input = document.getElementById('chatInput');
+    if(input && CHAT_INPUT_WAS_FOCUSED){
+      input.focus();
+      const len = input.value.length;
+      input.setSelectionRange(len,len);
+    }
+  }
 }
 
 loadAll();
