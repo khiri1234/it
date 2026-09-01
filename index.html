@@ -72,6 +72,9 @@
   .stripe.active{border-left-color:var(--teal);}
   .stripe.completed{border-left-color:var(--green);}
   .stripe.on-hold{border-left-color:var(--amber);}
+  .stripe.boq-installed{border-left-color:var(--green);}
+  .stripe.boq-purchased{border-left-color:var(--teal);}
+  .stripe.boq-over{border-left-color:var(--amber);}
   .badge{
     display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;
     font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
@@ -88,6 +91,9 @@
   .badge.active{background:var(--teal-soft);color:var(--teal);}
   .badge.completed{background:var(--green-soft);color:var(--green);}
   .badge.on-hold{background:var(--amber-soft);color:var(--amber);}
+  .badge.boq-installed{background:var(--green-soft);color:var(--green);}
+  .badge.boq-purchased{background:var(--teal-soft);color:var(--teal);}
+  .badge.boq-over{background:var(--amber-soft);color:var(--amber);}
   .activity-avatar.paid,.activity-avatar.received,.activity-avatar.accepted{background:var(--green-soft);color:var(--green);}
   .activity-avatar.sent{background:var(--teal-soft);color:var(--teal);}
   .activity-avatar.draft{background:#EEF1F5;color:var(--ink-soft);}
@@ -812,6 +818,20 @@ function refreshPaymentStatus(d){
 /* ---------- PROJECTS ---------- */
 function boqLineTotal(item){ return (Number(item.qty)||0)*(Number(item.unitPrice)||0); }
 function boqLineCost(item){ return (Number(item.qty)||0)*(Number(item.unitCost)||0); }
+// Which color-coded state a BOQ line is in, for the highlight on the project page:
+// over-purchased beats installed beats purchased-in-full, so an excess order still
+// stands out even once the item has gone in, rather than being hidden by "done".
+function boqLineStatus(item){
+  const qty = Number(item.qty)||0;
+  const purchased = Number(item.purchasedQty)||0;
+  const installed = Number(item.installedQty)||0;
+  if(qty<=0) return '';
+  if(purchased>qty) return 'boq-over';
+  if(installed>=qty) return 'boq-installed';
+  if(purchased>=qty) return 'boq-purchased';
+  return '';
+}
+const BOQ_STATUS_LABEL={'boq-over':'Over-purchased','boq-installed':'Installed','boq-purchased':'Purchased'};
 function projectValue(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineTotal(b),0); }
 function projectCost(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineCost(b),0); }
 function projectProfit(p){ return projectValue(p)-projectCost(p); }
@@ -2893,13 +2913,18 @@ function renderProjectView(id){
       <div class="bar-wrap"><div style="width:74px" class="tiny muted">Purchased</div><div class="bar-track"><div class="bar-fill" style="width:${purchasedPct}%;background:var(--navy-2)"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(purchasedPct)}%</div></div>
       <div class="bar-wrap" style="margin-bottom:0"><div style="width:74px" class="tiny muted">Installed</div><div class="bar-track"><div class="bar-fill" style="width:${installedPct}%"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(installedPct)}%</div></div>
     </div>
-    ${(p.boq&&p.boq.length)? p.boq.map(item=>`
-      <div class="card" data-boqid="${item.id}">
+    ${(p.boq&&p.boq.length)? p.boq.map(item=>{
+      const boqStatus = boqLineStatus(item);
+      return `
+      <div class="card stripe ${boqStatus}" data-boqid="${item.id}">
         <div class="row-between">
           <div style="font-weight:600;font-size:14px">${esc(item.desc)}</div>
           <div class="mono tiny muted">${fmtMoney(boqLineTotal(item))}</div>
         </div>
-        <div class="tiny muted mono" style="margin-bottom:8px">${item.qty} ${esc(item.unit||'')} × ${fmtMoney(item.unitPrice)}</div>
+        <div class="row-between" style="margin-bottom:8px">
+          <div class="tiny muted mono">${item.qty} ${esc(item.unit||'')} × ${fmtMoney(item.unitPrice)}</div>
+          ${boqStatus?`<span class="badge ${boqStatus}">${BOQ_STATUS_LABEL[boqStatus]}</span>`:''}
+        </div>
         <div class="item-grid">
           <div>
             <label style="margin-top:0">Purchased</label>
@@ -2914,7 +2939,8 @@ function renderProjectView(id){
           <button class="btn btn-ghost btn-sm" style="flex:1" onclick="showBoqLineForm('${p.id}','${item.id}')">${ic('edit')} Edit</button>
           ${isAdmin()?`<button class="btn btn-ghost btn-sm" style="flex:1" onclick="removeBoqLine('${p.id}','${item.id}')">${ic('trash')} Remove</button>`:''}
         </div>
-      </div>`).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet — add the scope of work below.</div></div>`}
+      </div>`;
+    }).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet — add the scope of work below.</div></div>`}
     <button class="btn btn-ghost btn-block" onclick="showBoqLineForm('${p.id}')">${ic('plus')} Add BOQ line</button>
 
     <div class="section-title">Advance payments</div>
