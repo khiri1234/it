@@ -2055,24 +2055,22 @@ window.addEventListener('afterprint', ()=>{
 });
 function shareMenuEmail(kind,id){
   const s=buildShareSummary(kind,id); if(!s) return;
-  // mailto: is a system scheme — iOS (Safari and, once the app's
-  // WKNavigationDelegate hands it to UIApplication.open, the wrapped app too)
-  // opens Mail directly for it. No picker needed on either platform.
+  if(isWrappedApp() && navigator.share){
+    navigator.share({title:s.title, text:s.text}).catch(()=>{});
+    closeModal();
+    return;
+  }
   window.location.href=`mailto:?subject=${encodeURIComponent(s.title)}&body=${encodeURIComponent(s.text)}`;
   closeModal();
 }
 function shareMenuWhatsapp(kind,id){
   const s=buildShareSummary(kind,id); if(!s) return;
-  const url='https://wa.me/?text='+encodeURIComponent(s.text);
-  if(isWrappedApp()){
-    // A plain top-level navigation reaches the native WKNavigationDelegate,
-    // which hands wa.me off to the WhatsApp app via its Universal Link.
-    // window.open() wouldn't get that far — new-window requests need a
-    // separate WKUIDelegate hook the wrapper doesn't implement.
-    window.location.href = url;
-  } else {
-    window.open(url,'_blank');
+  if(isWrappedApp() && navigator.share){
+    navigator.share({title:s.title, text:s.text}).catch(()=>{});
+    closeModal();
+    return;
   }
+  window.open('https://wa.me/?text='+encodeURIComponent(s.text),'_blank');
   closeModal();
 }
 function shareMenuLink(kind,id){
