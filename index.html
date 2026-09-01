@@ -725,7 +725,7 @@ function acPosition(inputEl){
 }
 function acOpen(inputEl, options){
   const val = (inputEl.value||'').toLowerCase();
-  const matches = (options||[]).filter(o=>o && o.toLowerCase().includes(val)).slice(0,8);
+  const matches = (options||[]).filter(o=>o && o.toLowerCase().includes(val));
   if(!matches.length){ acClose(); return; }
   const panel = ensureAcPanel();
   panel.innerHTML = matches.map(o=>`<div class="ac-item" data-val="${esc(o)}">${esc(o)}</div>`).join('');
