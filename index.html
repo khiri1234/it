@@ -1396,16 +1396,6 @@ function renderDashboard(){
       <button class="dash-action" onclick="newProject()"><span class="ic-wrap">${ic('box')}</span><span class="lbl">New project</span></button>
     </div>
 
-    ${lowStock.length? `
-    <div class="section-title dash-section">Low stock</div>
-    <div class="card dash-section">
-      ${lowStock.slice(0,5).map(i=>`
-        <div class="row-between" style="padding:6px 0">
-          <div class="small"><span class="low-dot"></span>${esc(i.name)}</div>
-          <div class="tiny mono muted">${i.stock} left</div>
-        </div>`).join('')}
-    </div>`:''}
-
     <div class="section-title dash-section">Recent activity</div>
     ${recent.length===0? emptyState('sales','Nothing yet','Create your first invoice or quote to see it here.') :
       `<div class="card dash-section" style="padding:6px 14px">
@@ -1419,6 +1409,16 @@ function renderDashboard(){
             <span class="badge ${d.status}">${d.status}</span>
           </div>`).join('')}
       </div>`}
+
+    ${lowStock.length? `
+    <div class="section-title dash-section">Low stock</div>
+    <div class="card dash-section">
+      ${lowStock.slice(0,5).map(i=>`
+        <div class="row-between" style="padding:6px 0">
+          <div class="small"><span class="low-dot"></span>${esc(i.name)}</div>
+          <div class="tiny mono muted">${i.stock} left</div>
+        </div>`).join('')}
+    </div>`:''}
   </div>`;
 }
 
