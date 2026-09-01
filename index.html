@@ -327,6 +327,15 @@
   ::-webkit-scrollbar{display:none;}
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
   .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
+  /* ---------- AUTOCOMPLETE (custom scrollable dropdown, replaces native <datalist> —
+     iOS renders datalist suggestions in the keyboard's QuickType bar, not a real list) ---------- */
+  .ac-panel{
+    position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 12px 28px rgba(21,32,51,.18);max-height:220px;overflow-y:auto;display:none;
+  }
+  .ac-item{padding:10px 12px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--line);}
+  .ac-item:last-child{border-bottom:none;}
+  .ac-item:active{background:var(--bg);}
   /* ---------- TEAM CHAT ---------- */
   .chat-msg{display:flex;gap:8px;margin-bottom:14px;align-items:flex-end;}
   .chat-msg.mine{flex-direction:row-reverse;}
@@ -687,6 +696,51 @@ function toast(msg){
   toastTimer = setTimeout(()=>{ el.style.display='none'; },2200);
 }
 
+/* ---------- AUTOCOMPLETE (scrollable dropdown, not native <datalist>) ---------- */
+window.AC_OPTS = {};
+let AC_TARGET = null;
+function ensureAcPanel(){
+  let panel = document.getElementById('acPanel');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'acPanel';
+    panel.className = 'ac-panel';
+    panel.addEventListener('mousedown', e=>{
+      const item = e.target.closest('.ac-item');
+      if(!item) return;
+      e.preventDefault(); // keep the input focused so no blur fires before we set its value
+      acPick(item.dataset.val);
+    });
+    document.body.appendChild(panel);
+  }
+  return panel;
+}
+function acOpen(inputEl, options){
+  const val = (inputEl.value||'').toLowerCase();
+  const matches = (options||[]).filter(o=>o && o.toLowerCase().includes(val)).slice(0,8);
+  if(!matches.length){ acClose(); return; }
+  const panel = ensureAcPanel();
+  const rect = inputEl.getBoundingClientRect();
+  panel.style.left = rect.left+'px';
+  panel.style.top = (rect.bottom+4)+'px';
+  panel.style.width = rect.width+'px';
+  panel.innerHTML = matches.map(o=>`<div class="ac-item" data-val="${esc(o)}">${esc(o)}</div>`).join('');
+  panel.style.display = 'block';
+  AC_TARGET = inputEl;
+}
+function acPick(val){
+  if(!AC_TARGET) return;
+  AC_TARGET.value = val;
+  AC_TARGET.dispatchEvent(new Event('input', {bubbles:true}));
+  acClose();
+}
+function acClose(){
+  const panel = document.getElementById('acPanel');
+  if(panel) panel.style.display='none';
+  AC_TARGET = null;
+}
+document.addEventListener('scroll', acClose, true);
+
 function nextNumber(type){
   const s=S.settings;
   if(type==='invoice'){ const n=s.invoiceNext||1; s.invoiceNext=n+1; return `${s.invoicePrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
@@ -776,7 +830,7 @@ function paymentRowHtml(idx, r){
     </div>
     <div class="item-grid">
       <div><label style="margin-top:8px">Paid via</label><select class="pr_method">${PAY_METHODS.map(m=>`<option value="${m}" ${r.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
-      <div><label style="margin-top:8px">Received by</label><input class="pr_to" list="teamNames" value="${esc(r.paidTo||CURRENT_USER.name)}"></div>
+      <div><label style="margin-top:8px">Received by</label><input class="pr_to" value="${esc(r.paidTo||CURRENT_USER.name)}" oninput="acOpen(this,AC_OPTS.team)" onfocus="acOpen(this,AC_OPTS.team)" onblur="acClose()" autocomplete="off"></div>
     </div>
     <label style="margin-top:8px">Reference / note (optional)</label>
     <input class="pr_note" value="${esc(r.note||'')}" placeholder="e.g. transfer ref, cheque no.">
@@ -795,7 +849,7 @@ function readPaymentRowsFromDOM(){
 function showPaymentModal(kind, id){
   const d=payKindStore(kind).find(x=>x.id===id); if(!d) return;
   const rem=payKindRemaining(kind,d);
-  const names=[...new Set(S.users.map(u=>u.name))];
+  AC_OPTS.team=[...new Set(S.users.map(u=>u.name))];
   PAYMENT_ROWS=[{amount: rem>0?rem.toFixed(2):'', date:todayISO(), method:PAY_METHODS[0], paidTo:CURRENT_USER.name, note:''}];
   ensureModalRoot().innerHTML = `
   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
@@ -803,7 +857,6 @@ function showPaymentModal(kind, id){
       <div class="modal-handle"></div>
       <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:2px">Record ${kind==='project'?'advance ':''}payment(s)</div>
       <div class="tiny muted" style="margin-bottom:10px">Remaining: <span class="mono">${fmtMoney(rem)}</span></div>
-      <datalist id="teamNames">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
       <div id="paymentRowsWrap">${PAYMENT_ROWS.map((r,i)=>paymentRowHtml(i,r)).join('')}</div>
       <button class="btn btn-ghost btn-block" onclick="addPaymentRow()">${ic('plus')} Add another payment</button>
       <div class="totals" id="paymentRowsTotals"></div>
@@ -874,10 +927,12 @@ function allSupplierNames(){
   return [...new Set(S.purchases.map(p=>p.supplier).filter(Boolean))].sort();
 }
 function customerDatalist(){
-  return `<datalist id="customerDatalist">${allCustomerNames().map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+  AC_OPTS.customers = allCustomerNames();
+  return '';
 }
 function supplierDatalist(){
-  return `<datalist id="supplierDatalist">${allSupplierNames().map(s=>`<option value="${esc(s)}">`).join('')}</datalist>`;
+  AC_OPTS.suppliers = allSupplierNames();
+  return '';
 }
 
 /* ---------- BULK PAYMENT (one payment across several invoices) ---------- */
@@ -886,7 +941,7 @@ function bulkCustomers(){
 }
 function renderBulkPayment(){
   const customers = bulkCustomers();
-  const names=[...new Set(S.users.map(u=>u.name))];
+  AC_OPTS.team=[...new Set(S.users.map(u=>u.name))];
   return `
   ${topbar('Bulk payment','One payment across several invoices', true)}
   <div class="content">
@@ -908,8 +963,7 @@ function renderBulkPayment(){
         <div><label>Paid via</label><select id="bp_method">${PAY_METHODS.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
       </div>
       <label>Received by (paid to whom)</label>
-      <input id="bp_to" list="teamNames2" value="${esc(CURRENT_USER.name)}" placeholder="Who took the payment">
-      <datalist id="teamNames2">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+      <input id="bp_to" value="${esc(CURRENT_USER.name)}" placeholder="Who took the payment" oninput="acOpen(this,AC_OPTS.team)" onfocus="acOpen(this,AC_OPTS.team)" onblur="acClose()" autocomplete="off">
       <label>Reference / note (optional)</label>
       <input id="bp_note" placeholder="e.g. transfer ref, cheque no.">
       <div class="totals" id="bulkTotalsBox"></div>
@@ -1413,7 +1467,7 @@ function renderDocForm(type, id){
   <div class="content">
     <div class="card">
       <label>Customer name</label>
-      <input id="f_customer" list="customerDatalist" value="${esc(d.customer)}" placeholder="Customer or company name">
+      <input id="f_customer" value="${esc(d.customer)}" placeholder="Customer or company name" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" onblur="acClose()" autocomplete="off">
       ${customerDatalist()}
       <div class="item-grid">
         <div><label>Phone</label><input id="f_phone" value="${esc(d.phone)}" placeholder="+971 ..."></div>
@@ -1459,10 +1513,11 @@ function renderDocForm(type, id){
 }
 
 function renderItemRows(items){
+  AC_OPTS.inventoryNames = S.inventory.map(i=>i.name);
   return items.map((it,idx)=>`
     <div class="item-row" data-idx="${idx}">
-      <input list="invDatalist" placeholder="Item / service description" value="${esc(it.desc)}"
-        oninput="onItemDescChange(${idx}, this.value)" class="rowDesc">
+      <input placeholder="Item / service description" value="${esc(it.desc)}"
+        oninput="onItemDescChange(${idx}, this.value);acOpen(this,AC_OPTS.inventoryNames)" onfocus="acOpen(this,AC_OPTS.inventoryNames)" onblur="acClose()" autocomplete="off" class="rowDesc">
       <div class="item-grid">
         <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" oninput="liveTotals()" class="rowQty"></div>
         <div><label style="margin-top:8px">Unit price</label><input type="number" min="0" step="0.01" value="${it.price}" oninput="liveTotals()" class="rowPrice"></div>
@@ -1473,8 +1528,7 @@ function renderItemRows(items){
           <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="removeItemRow(${idx})">${ic('trash')} Remove</button>
         </div>
       </div>
-    </div>`).join('') +
-    `<datalist id="invDatalist">${S.inventory.map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist>`;
+    </div>`).join('');
 }
 function readItemsFromDOM(){
   const rows=[...document.querySelectorAll('.item-row')];
@@ -2197,7 +2251,7 @@ function renderPurchaseForm(id){
   <div class="content">
     <div class="card">
       <label>Supplier</label>
-      <input id="p_supplier" list="supplierDatalist" value="${esc(p.supplier)}" placeholder="Supplier / vendor name">
+      <input id="p_supplier" value="${esc(p.supplier)}" placeholder="Supplier / vendor name" oninput="acOpen(this,AC_OPTS.suppliers)" onfocus="acOpen(this,AC_OPTS.suppliers)" onblur="acClose()" autocomplete="off">
       ${supplierDatalist()}
       <div class="item-grid">
         <div><label>Date</label><input id="p_date" type="date" value="${p.date}"></div>
@@ -2232,16 +2286,17 @@ function renderPurchaseForm(id){
   </div>`;
 }
 function renderPurchaseRows(items){
+  AC_OPTS.inventoryNames = S.inventory.map(i=>i.name);
   return items.map((it,idx)=>`
     <div class="item-row-p" data-idx="${idx}" data-boqid="${it.boqItemId||''}">
-      <input list="invDatalist2" placeholder="Item description" value="${esc(it.desc)}" oninput="onPurchaseDescChange(${idx},this.value)" class="pDesc">
+      <input placeholder="Item description" value="${esc(it.desc)}" oninput="onPurchaseDescChange(${idx},this.value);acOpen(this,AC_OPTS.inventoryNames)" onfocus="acOpen(this,AC_OPTS.inventoryNames)" onblur="acClose()" autocomplete="off" class="pDesc">
       <div class="item-grid">
         <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" oninput="purchaseLiveTotals()" class="pQty"></div>
         <div><label style="margin-top:8px">Unit cost</label><input type="number" min="0" step="0.01" value="${it.cost}" oninput="purchaseLiveTotals()" class="pCost"></div>
       </div>
       ${it.boqItemId?`<div class="tiny muted" style="margin-top:6px">${ic('box')} Linked to project BOQ line</div>`:''}
       <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="removePurchaseRow(${idx})">${ic('trash')} Remove</button>
-    </div>`).join('') + `<datalist id="invDatalist2">${S.inventory.map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist>`;
+    </div>`).join('');
 }
 function readPurchaseItemsFromDOM(){
   return [...document.querySelectorAll('.item-row-p')].map(r=>{
@@ -2461,7 +2516,7 @@ function renderProjectForm(id){
       <label>Project name</label>
       <input id="pj_name" value="${esc(p.name)}" placeholder="e.g. Al Habtoor Villa — Networking Fit-out">
       <label>Customer</label>
-      <input id="pj_customer" list="customerDatalist" value="${esc(p.customer)}" placeholder="Customer or company name">
+      <input id="pj_customer" value="${esc(p.customer)}" placeholder="Customer or company name" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" onblur="acClose()" autocomplete="off">
       ${customerDatalist()}
       <div class="item-grid">
         <div><label>Phone</label><input id="pj_phone" value="${esc(p.phone)}"></div>
@@ -2681,14 +2736,14 @@ function showBoqLineForm(projId, itemId){
     ...S.inventory.map(i=>[i.name.toLowerCase(),{desc:i.name, unitPrice:i.sellPrice, unitCost:i.costPrice}]),
     ...collectBoqCandidates().map(c=>[c.desc.toLowerCase(),{desc:c.desc, unit:c.unit, unitPrice:c.unitPrice, unitCost:c.unitCost}])
   ]).values()];
+  AC_OPTS.boq = suggestions.map(s=>s.desc);
   ensureModalRoot().innerHTML = `
   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:10px">${editing?'Edit':'Add'} BOQ line</div>
       <label>Description</label>
-      <input id="boq_desc" list="boqDescList" value="${esc(item.desc)}" placeholder="e.g. Cat6 outlet — supply &amp; install" oninput="onBoqDescChange(this.value)">
-      <datalist id="boqDescList">${suggestions.map(s=>`<option value="${esc(s.desc)}">`).join('')}</datalist>
+      <input id="boq_desc" value="${esc(item.desc)}" placeholder="e.g. Cat6 outlet — supply &amp; install" oninput="onBoqDescChange(this.value);acOpen(this,AC_OPTS.boq)" onfocus="acOpen(this,AC_OPTS.boq)" onblur="acClose()" autocomplete="off">
       <div class="item-grid">
         <div><label>Unit</label><input id="boq_unit" value="${esc(item.unit)}" placeholder="pcs, m, hrs..."></div>
         <div><label>Quantity</label><input id="boq_qty" type="number" min="0" step="1" value="${item.qty}"></div>
