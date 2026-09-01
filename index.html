@@ -2149,8 +2149,8 @@ function renderStockList(){
     ${topbar('Stock','Inventory & purchases')}
     <div class="content">
       <div class="segmented">
-        <button class="active" onclick="STOCK_TAB='inventory';render()">Inventory</button>
         <button onclick="STOCK_TAB='purchases';render()">Purchases</button>
+        <button class="active" onclick="STOCK_TAB='inventory';render()">Inventory</button>
       </div>
       ${S.projects.length?`<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('inventory-import',{})">${ic('box')} Import items from projects' BOQs</button></div>`:''}
       <div style="height:12px"></div>
@@ -2178,8 +2178,8 @@ function renderStockList(){
     ${topbar('Stock','Inventory & purchases')}
     <div class="content">
       <div class="segmented">
-        <button onclick="STOCK_TAB='inventory';render()">Inventory</button>
         <button class="active" onclick="STOCK_TAB='purchases';render()">Purchases</button>
+        <button onclick="STOCK_TAB='inventory';render()">Inventory</button>
       </div>
       <div style="height:12px"></div>
       ${list.length===0? emptyState('cart','No purchases yet','Record a purchase to stock up your inventory.') :
