@@ -1977,9 +1977,70 @@ function showShareMenu(kind,id){
     </div>
   </div>`;
 }
+// The Xcode-wrapped app is a bare WKWebView: window.print(), <a download> blob
+// clicks, mailto: navigation and window.open() are Safari browser-chrome features
+// with no built-in WKWebView equivalent (they need native delegate code we don't
+// have here). navigator.share() is the one exception — WebKit implements the Web
+// Share API inside any WKWebView automatically, no native code required — so
+// inside the wrapped app we route everything through the OS share sheet instead,
+// which itself offers Print/Save to Files/Mail/WhatsApp/AirDrop.
+function isWrappedApp(){
+  return !!(window.webkit && window.webkit.messageHandlers);
+}
+window.__pendingShareFile = null;
+window.__pendingShareTitle = '';
+function retrySharePdf(){
+  if(!window.__pendingShareFile) return;
+  navigator.share({files:[window.__pendingShareFile], title:window.__pendingShareTitle}).catch(()=>{ toast('Could not open the share sheet'); });
+  closeModal();
+}
+function shareNativePdf(kind,id,opts){
+  const sheet = document.querySelector('.modal-sheet');
+  if(sheet) sheet.innerHTML = `<div class="modal-handle"></div><div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:8px">Preparing PDF…</div><div class="small muted">This only takes a moment.</div>`;
+  ensureHtml2Pdf().then(()=>{
+    const html = buildPdfHTML(kind,id,opts);
+    const s = buildShareSummary(kind,id);
+    if(!html || !s){ toast('Could not generate PDF'); closeModal(); return; }
+    const hider=document.createElement('div');
+    hider.style.cssText='position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;';
+    const wrap=document.createElement('div');
+    wrap.innerHTML = html;
+    hider.appendChild(wrap);
+    document.body.appendChild(hider);
+    window.html2pdf().set({
+      margin:0,
+      html2canvas:{scale:2,useCORS:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).from(wrap).outputPdf('blob').then(blob=>{
+      document.body.removeChild(hider);
+      const file = new File([blob], `${s.number}.pdf`, {type:'application/pdf'});
+      if(!(navigator.canShare && navigator.canShare({files:[file]}))){
+        closeModal();
+        toast('Sharing PDFs needs a newer iOS version — try the web version instead');
+        return;
+      }
+      // Try sharing right away — if iOS still counts this as part of the tap
+      // that opened the menu, it goes straight to the share sheet.
+      navigator.share({files:[file], title:s.title}).then(closeModal).catch(()=>{
+        // Generating the PDF took long enough that iOS revoked the gesture —
+        // offer one more tap so the share call runs inside a fresh one.
+        window.__pendingShareFile = file;
+        window.__pendingShareTitle = s.title;
+        const sheet2 = document.querySelector('.modal-sheet');
+        if(sheet2){
+          sheet2.innerHTML = `<div class="modal-handle"></div>
+            <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:14px">PDF ready</div>
+            <button class="btn btn-primary btn-block" style="margin-bottom:8px" onclick="retrySharePdf()">${ic('share')} Tap to print, save, or share</button>
+            <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>`;
+        }
+      });
+    }).catch(()=>{ document.body.removeChild(hider); toast('Could not generate PDF'); closeModal(); });
+  }).catch(()=>{ toast('Could not load PDF tool — check your connection'); closeModal(); });
+}
 function shareMenuPrint(kind,id){
   const pricesEl = document.getElementById('share_purchase_prices');
   const opts = pricesEl ? {showPrices: pricesEl.checked} : undefined;
+  if(isWrappedApp()){ shareNativePdf(kind,id,opts); return; }
   closeModal();
   const html = buildPdfHTML(kind,id,opts);
   if(!html){ toast('Could not prepare document'); return; }
@@ -1994,11 +2055,21 @@ window.addEventListener('afterprint', ()=>{
 });
 function shareMenuEmail(kind,id){
   const s=buildShareSummary(kind,id); if(!s) return;
+  if(isWrappedApp() && navigator.share){
+    navigator.share({title:s.title, text:s.text}).catch(()=>{});
+    closeModal();
+    return;
+  }
   window.location.href=`mailto:?subject=${encodeURIComponent(s.title)}&body=${encodeURIComponent(s.text)}`;
   closeModal();
 }
 function shareMenuWhatsapp(kind,id){
   const s=buildShareSummary(kind,id); if(!s) return;
+  if(isWrappedApp() && navigator.share){
+    navigator.share({title:s.title, text:s.text}).catch(()=>{});
+    closeModal();
+    return;
+  }
   window.open('https://wa.me/?text='+encodeURIComponent(s.text),'_blank');
   closeModal();
 }
@@ -2030,6 +2101,7 @@ function ensureHtml2Pdf(){
 function shareMenuPDF(kind,id){
   const pricesEl = document.getElementById('share_purchase_prices');
   const opts = pricesEl ? {showPrices: pricesEl.checked} : undefined;
+  if(isWrappedApp()){ shareNativePdf(kind,id,opts); return; }
   closeModal();
   toast('Preparing PDF…');
   ensureHtml2Pdf().then(()=>{
