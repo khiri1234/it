@@ -1135,12 +1135,79 @@ async function doLogin(){
   const passHash = await sha256(username+':'+pin);
   const user = S.users.find(u=>u.username===username && u.passHash===passHash);
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null};
   AUTH_ERR='';
   setRememberedUserId(user.id);
   if(!applyHashRoute()) render();
 }
 function logout(){ CURRENT_USER=null; setRememberedUserId(null); go('dashboard'); }
+
+/* ---------- CLIENT PORTAL (read-only — one customer's own projects/invoices/quotes,
+   no cost prices, no profit margins, no edit controls of any kind) ---------- */
+function renderClientPortal(){
+  const customer = CURRENT_USER.clientCustomer;
+  const projects = S.projects.filter(p=>p.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const docs = [...S.invoices.map(d=>({...d,kind:'invoice'})), ...S.quotes.map(d=>({...d,kind:'quote'}))]
+    .filter(d=>d.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return `
+  ${topbar(S.settings.companyName||'Ledger', `Client portal — ${customer}`, false,
+    `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
+  <div class="content">
+    <div class="section-title">Projects</div>
+    ${projects.length===0? `<div class="card"><div class="tiny muted">No projects yet.</div></div>` :
+      projects.map(p=>{
+        const val=projectValue(p), adv=projectAdvances(p), bal=projectBalance(p);
+        const installedPct=boqProgressPct(p,'installedQty');
+        return `
+        <div class="card" style="margin-bottom:14px">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:700;font-size:15px">${esc(p.name)}</div>
+              <div class="tiny muted">${esc(p.number)} · ${fmtDate(p.date)}</div>
+            </div>
+            <span class="badge ${p.status}">${esc(p.status)}</span>
+          </div>
+          <div class="bar-wrap" style="margin-top:12px"><div style="width:74px" class="tiny muted">Installed</div><div class="bar-track"><div class="bar-fill" style="width:${installedPct}%"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(installedPct)}%</div></div>
+          <div class="grid2" style="margin-top:10px">
+            <div class="stat"><div class="num">${fmtMoney(val)}</div><div class="lbl">Total value</div></div>
+            <div class="stat"><div class="num">${fmtMoney(adv)}</div><div class="lbl">Advances received</div></div>
+            <div class="stat" style="grid-column:1 / -1"><div class="num" style="color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div><div class="lbl">Balance due</div></div>
+          </div>
+          ${(p.boq&&p.boq.length)? `
+          <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Scope of work</div>
+          ${p.boq.map(item=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
+            <div class="small">${esc(item.desc)}</div>
+            <div class="tiny mono muted">${item.qty} ${esc(item.unit||'')}</div>
+          </div>`).join('')}` : ''}
+          ${(p.payments&&p.payments.length)? `
+          <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Advance payments</div>
+          ${p.payments.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(pay=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
+            <div class="small">${fmtMoney(pay.amount)}</div>
+            <div class="tiny mono muted">${fmtDate(pay.date)}</div>
+          </div>`).join('')}` : ''}
+        </div>`;
+      }).join('')}
+
+    <div class="section-title">Invoices &amp; quotes</div>
+    ${docs.length===0? `<div class="card"><div class="tiny muted">Nothing issued to you yet.</div></div>` :
+      docs.map(d=>{
+        const total=docTotal(d), bal=remaining(d);
+        return `<div class="card" style="margin-bottom:8px">
+          <div class="row-between">
+            <div>
+              <div class="small" style="font-weight:600">${esc(d.number)} <span class="tiny muted" style="font-weight:400">· ${d.kind==='invoice'?'Invoice':'Quote'}</span></div>
+              <div class="tiny mono muted">${fmtDate(d.date)}</div>
+            </div>
+            <span class="badge ${d.status}">${esc(d.status)}</span>
+          </div>
+          <div class="row-between" style="margin-top:8px">
+            <div class="tiny muted">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div>
+          </div>
+          ${d.kind==='invoice'?`<div class="row-between"><div class="tiny muted">Balance due</div><div class="small mono" style="font-weight:600;color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div></div>`:''}
+        </div>`;
+      }).join('')}
+  </div>`;
+}
 
 /* ---------- FACE ID (native app shell only — no-ops in a plain browser) ----------
    The native iOS wrapper calls window.__faceIDUnlock() after Face ID succeeds,
@@ -1154,7 +1221,7 @@ function __faceIDUnlock(){
   if(!user) return false;
   const badge = document.getElementById('faceidBadge');
   const finish = ()=>{
-    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null};
     AUTH_ERR='';
     if(!applyHashRoute()) render();
   };
@@ -1220,6 +1287,9 @@ function render(){
   if(STORAGE_MODE==='error'){ app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
   if(!S.users || S.users.length===0){ app.innerHTML = noStorageBanner() + renderSetup(); sidebar.innerHTML=''; return; }
   if(!CURRENT_USER){ app.innerHTML = noStorageBanner() + renderLogin(); sidebar.innerHTML=''; return; }
+  // client accounts get their own read-only portal — never the staff/admin app shell,
+  // regardless of what VIEW happens to be set to (e.g. from a stale #project= hash link)
+  if(CURRENT_USER.role==='client'){ app.innerHTML = renderClientPortal(); sidebar.innerHTML=''; return; }
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
   let body='';
@@ -3073,17 +3143,24 @@ function renderTeamForm(){
       <label>Username</label><input id="t_user" placeholder="username" autocapitalize="off">
       <label>PIN / passcode (min 4 characters)</label><input id="t_pin" type="password" placeholder="••••">
       <label>Role</label>
-      <select id="t_role">
+      <select id="t_role" onchange="document.getElementById('t_client_wrap').style.display=this.value==='client'?'block':'none'">
         <option value="staff">Staff — can't delete, edit prices, or change settings</option>
         <option value="admin">Admin — full access</option>
+        <option value="client">Client — view-only access to their own project(s)</option>
       </select>
+      <div id="t_client_wrap" style="display:none">
+        <label>Customer</label>
+        <input id="t_customer" placeholder="Customer name (must match projects/invoices)" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
+        <div class="tiny muted" style="margin-top:2px">They'll see every project, invoice and quote billed to this exact customer name — nothing else.</div>
+        ${customerDatalist()}
+      </div>
       <div id="t_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px"></div>
       <button class="btn btn-primary btn-block" style="margin-top:6px" onclick="addTeamMember()">${ic('plus')} Add member</button>
     </div>
     <div class="section-title">Team</div>
     ${staff.length===0? `<div class="card"><div class="tiny muted">Just you so far — add teammates above.</div></div>` :
       staff.map(u=>`<div class="card row-between">
-        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':'Staff'}</div></div>
+        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}`:'Staff'}</div></div>
         <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
       </div>`).join('')}
   </div>`;
@@ -3093,13 +3170,17 @@ async function addTeamMember(){
   const username=document.getElementById('t_user').value.trim().toLowerCase();
   const pin=document.getElementById('t_pin').value;
   const role=document.getElementById('t_role').value;
+  const clientCustomer=document.getElementById('t_customer').value.trim();
   const err=document.getElementById('t_err');
   if(!name||!username||pin.length<4){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
+  if(role==='client' && !clientCustomer){ err.textContent='Pick which customer this client account belongs to.'; return; }
   if(S.users.some(u=>u.username===username)){ err.textContent='That username is already taken.'; return; }
   const passHash=await sha256(username+':'+pin);
-  S.users.push({id:uid(), name, username, passHash, role});
+  const user={id:uid(), name, username, passHash, role};
+  if(role==='client') user.clientCustomer=clientCustomer;
+  S.users.push(user);
   await persist('users');
-  logActivity(`Added team member "${name}" (${role})`);
+  logActivity(`Added team member "${name}" (${role==='client'?`client — ${clientCustomer}`:role})`);
   toast('Team member added');
   render();
 }
