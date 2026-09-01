@@ -490,13 +490,14 @@ const ICO = {
   download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
   chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
   logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
+  card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
 };
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
 const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats'];
 const DEFAULT_SETTINGS={
-  companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'',
+  companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1
@@ -1190,7 +1191,10 @@ function renderClientPortal(){
             <div class="stat"><div class="num">${fmtMoney(adv)}</div><div class="lbl">Advances received</div></div>
             <div class="stat" style="grid-column:1 / -1"><div class="num" style="color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div><div class="lbl">Balance due</div></div>
           </div>
-          ${bal>0? `<button class="btn btn-teal btn-block" style="margin-top:10px" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay ${fmtMoney(bal)} towards ${p.number} — ${p.name}.`)}')">${ic('chat')} Pay ${fmtMoney(bal)} via WhatsApp</button>`:''}
+          ${bal>0? `<div style="display:flex;gap:8px;margin-top:10px">
+            ${S.settings.paypalMeUsername?`<button class="btn btn-primary" style="flex:1" onclick="clientPayViaPaypal(${bal})">${ic('card')} PayPal</button>`:''}
+            <button class="btn btn-teal" style="flex:1" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay ${fmtMoney(bal)} towards ${p.number} — ${p.name}.`)}')">${ic('chat')} WhatsApp</button>
+          </div>`:''}
           ${p.scopeSummary? `
           <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Scope of work</div>
           <div class="small" style="line-height:1.5">${esc(p.scopeSummary)}</div>` : ''}
@@ -1222,7 +1226,10 @@ function renderClientPortal(){
             <div class="tiny muted">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div>
           </div>
           ${d.kind==='invoice'?`<div class="row-between"><div class="tiny muted">Balance due</div><div class="small mono" style="font-weight:600;color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div></div>`:''}
-          ${d.kind==='invoice' && bal>0? `<button class="btn btn-teal btn-block" style="margin-top:8px" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay the balance of ${fmtMoney(bal)} on invoice ${d.number}.`)}')">${ic('chat')} Pay ${fmtMoney(bal)} via WhatsApp</button>`:''}
+          ${d.kind==='invoice' && bal>0? `<div style="display:flex;gap:8px;margin-top:8px">
+            ${S.settings.paypalMeUsername?`<button class="btn btn-primary" style="flex:1" onclick="clientPayViaPaypal(${bal})">${ic('card')} PayPal</button>`:''}
+            <button class="btn btn-teal" style="flex:1" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay the balance of ${fmtMoney(bal)} on invoice ${d.number}.`)}')">${ic('chat')} WhatsApp</button>
+          </div>`:''}
         </div>`;
       }).join('')}
 
@@ -2140,6 +2147,20 @@ function clientPayViaWhatsapp(text){
   }
   const phone=(S.settings.companyPhone||'').replace(/[^0-9]/g,'');
   const url=(phone?`https://wa.me/${phone}`:'https://wa.me/')+'?text='+encodeURIComponent(text);
+  window.open(url,'_blank');
+}
+// paypal.me links open PayPal's own hosted checkout pre-filled with the amount —
+// PayPal handles the actual charge entirely on their end, nothing to build or
+// secure on our side. Requires the business to have set a paypal.me username.
+function clientPayViaPaypal(amount){
+  const user=(S.settings.paypalMeUsername||'').trim();
+  if(!user){ toast('PayPal isn’t set up yet — use WhatsApp or contact us to pay.'); return; }
+  const cur=(S.settings.currency||'USD').trim().toUpperCase().replace(/[^A-Z]/g,'');
+  const url=`https://paypal.me/${encodeURIComponent(user)}/${amount.toFixed(2)}${cur}`;
+  if(isWrappedApp() && navigator.share){
+    navigator.share({url}).catch(()=>{});
+    return;
+  }
   window.open(url,'_blank');
 }
 window.__pendingShareFile = null;
@@ -3387,6 +3408,10 @@ function renderSettingsForm(){
       <label>Tax registration number (TRN)</label><input id="s_trn" value="${esc(s.companyTRN)}" placeholder="Optional — shown on invoice/quote PDFs">
     </div>
     <div class="card">
+      <label>PayPal.me username <span class="tiny muted" style="font-weight:400;text-transform:none">— lets clients pay you directly</span></label>
+      <input id="s_paypal" value="${esc(s.paypalMeUsername||'')}" placeholder="e.g. yourname (from paypal.me/yourname)">
+    </div>
+    <div class="card">
       <div class="item-grid">
         <div><label>Currency code</label><input id="s_cur" value="${esc(s.currency)}" placeholder="AED"></div>
         <div><label>Default VAT rate (%)</label><input id="s_vat" type="number" min="0" step="0.5" value="${s.vatRate}"></div>
@@ -3412,6 +3437,7 @@ function saveSettings(){
   s.companyEmail=document.getElementById('s_email').value.trim();
   s.companyAddress=document.getElementById('s_addr').value.trim();
   s.companyTRN=document.getElementById('s_trn').value.trim();
+  s.paypalMeUsername=document.getElementById('s_paypal').value.trim().replace(/^@/,'');
   s.currency=document.getElementById('s_cur').value.trim()||'AED';
   s.vatRate=Number(document.getElementById('s_vat').value)||0;
   s.vatDefaultOn=document.getElementById('s_vatdef').checked;
