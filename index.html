@@ -1180,6 +1180,9 @@ function renderClientPortal(){
           ${p.scopeSummary? `
           <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Scope of work</div>
           <div class="small" style="line-height:1.5">${esc(p.scopeSummary)}</div>` : ''}
+          ${p.remainingTasks? `
+          <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Remaining tasks</div>
+          <div class="small" style="line-height:1.5">${esc(p.remainingTasks)}</div>` : ''}
           ${(p.payments&&p.payments.length)? `
           <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Advance payments</div>
           ${p.payments.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(pay=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
@@ -2694,6 +2697,10 @@ function renderProjectForm(id){
       <textarea id="pj_scope" rows="3" placeholder="e.g. Implementation &amp; Installation of surveillance cameras as per SIRA requirements.">${esc(p.scopeSummary||'')}</textarea>
     </div>
     <div class="card">
+      <label>Remaining tasks <span class="tiny muted" style="font-weight:400;text-transform:none">— shown to the client, what's left to finish</span></label>
+      <textarea id="pj_remaining" rows="3" placeholder="e.g. Final testing &amp; handover, SIRA certification submission.">${esc(p.remainingTasks||'')}</textarea>
+    </div>
+    <div class="card">
       <label>Notes</label>
       <textarea id="pj_notes" rows="3" placeholder="Scope notes, site contact, access instructions...">${esc(p.notes)}</textarea>
     </div>
@@ -2716,6 +2723,7 @@ function saveProject(id){
   p.date=document.getElementById('pj_date').value||todayISO();
   p.status=document.getElementById('pj_status').value;
   p.scopeSummary=document.getElementById('pj_scope').value.trim();
+  p.remainingTasks=document.getElementById('pj_remaining').value.trim();
   p.notes=document.getElementById('pj_notes').value;
   persist('projects'); persist('settings');
   logActivity(`${isNew?'Created':'Updated'} project ${p.number} — ${name}`);
