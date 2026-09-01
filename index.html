@@ -3057,7 +3057,7 @@ function renderMore(){
       ${isAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('settings-form')">
         <div class="small" style="font-weight:600">Business settings</div>${ic('chev')}
       </div>`:''}
-      ${isAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('team-form')">
+      ${isAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="TEAM_EDIT_ID=null;goPush('team-form')">
         <div class="small" style="font-weight:600">Team & logins</div>${ic('chev')}
       </div>`:`<div class="row-between" style="padding:14px">
         <div class="small muted">Business settings — admin only</div>
@@ -3139,56 +3139,79 @@ function sendChatMessage(){
   persist('chat');
   render();
 }
+let TEAM_EDIT_ID = null;
+function editTeamMember(id){ TEAM_EDIT_ID=id; render(); }
+function cancelTeamEdit(){ TEAM_EDIT_ID=null; render(); }
 function renderTeamForm(){
   const staff = S.users.filter(u=>u.id!==CURRENT_USER.id);
+  const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
+  const role = editing ? editing.role : 'staff';
   return `
   ${topbar('Team & logins','',true)}
   <div class="content">
-    <div class="section-title">Add a team member</div>
+    <div class="section-title">${editing?'Edit team member':'Add a team member'}</div>
     <div class="card">
-      <label>Name</label><input id="t_name" placeholder="Full name">
-      <label>Username</label><input id="t_user" placeholder="username" autocapitalize="off">
-      <label>PIN / passcode (min 4 characters)</label><input id="t_pin" type="password" placeholder="••••">
+      <label>Name</label><input id="t_name" placeholder="Full name" value="${editing?esc(editing.name):''}">
+      <label>Username</label><input id="t_user" placeholder="username" autocapitalize="off" value="${editing?esc(editing.username):''}">
+      <label>PIN / passcode ${editing?'<span class="tiny muted" style="font-weight:400">— leave blank to keep the current one</span>':'(min 4 characters)'}</label>
+      <input id="t_pin" type="password" placeholder="••••">
       <label>Role</label>
       <select id="t_role" onchange="document.getElementById('t_client_wrap').style.display=this.value==='client'?'block':'none'">
-        <option value="staff">Staff — can't delete, edit prices, or change settings</option>
-        <option value="admin">Admin — full access</option>
-        <option value="client">Client — view-only access to their own project(s)</option>
+        <option value="staff" ${role==='staff'?'selected':''}>Staff — can't delete, edit prices, or change settings</option>
+        <option value="admin" ${role==='admin'?'selected':''}>Admin — full access</option>
+        <option value="client" ${role==='client'?'selected':''}>Client — view-only access to their own project(s)</option>
       </select>
-      <div id="t_client_wrap" style="display:none">
+      <div id="t_client_wrap" style="display:${role==='client'?'block':'none'}">
         <label>Customer</label>
-        <input id="t_customer" placeholder="Customer name (must match projects/invoices)" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
+        <input id="t_customer" placeholder="Customer name (must match projects/invoices)" value="${editing?esc(editing.clientCustomer||''):''}" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
         <div class="tiny muted" style="margin-top:2px">They'll see every project, invoice and quote billed to this exact customer name — nothing else.</div>
         ${customerDatalist()}
       </div>
       <div id="t_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px"></div>
-      <button class="btn btn-primary btn-block" style="margin-top:6px" onclick="addTeamMember()">${ic('plus')} Add member</button>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        ${editing?`<button class="btn btn-ghost" onclick="cancelTeamEdit()">Cancel</button>`:''}
+        <button class="btn btn-primary btn-block" onclick="saveTeamMember()">${editing?ic('check')+' Save changes':ic('plus')+' Add member'}</button>
+      </div>
     </div>
     <div class="section-title">Team</div>
     ${staff.length===0? `<div class="card"><div class="tiny muted">Just you so far — add teammates above.</div></div>` :
       staff.map(u=>`<div class="card row-between">
         <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}`:'Staff'}</div></div>
-        <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="editTeamMember('${u.id}')">${ic('edit')}</button>
+          <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
+        </div>
       </div>`).join('')}
   </div>`;
 }
-async function addTeamMember(){
+async function saveTeamMember(){
   const name=document.getElementById('t_name').value.trim();
   const username=document.getElementById('t_user').value.trim().toLowerCase();
   const pin=document.getElementById('t_pin').value;
   const role=document.getElementById('t_role').value;
   const clientCustomer=document.getElementById('t_customer').value.trim();
   const err=document.getElementById('t_err');
-  if(!name||!username||pin.length<4){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
+  const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
+  if(!name||!username||(!editing&&pin.length<4)||(pin&&pin.length<4)){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
   if(role==='client' && !clientCustomer){ err.textContent='Pick which customer this client account belongs to.'; return; }
-  if(S.users.some(u=>u.username===username)){ err.textContent='That username is already taken.'; return; }
-  const passHash=await sha256(username+':'+pin);
-  const user={id:uid(), name, username, passHash, role};
-  if(role==='client') user.clientCustomer=clientCustomer;
-  S.users.push(user);
-  await persist('users');
-  logActivity(`Added team member "${name}" (${role==='client'?`client — ${clientCustomer}`:role})`);
-  toast('Team member added');
+  if(S.users.some(u=>u.username===username && u.id!==TEAM_EDIT_ID)){ err.textContent='That username is already taken.'; return; }
+  if(editing){
+    editing.name=name; editing.username=username; editing.role=role;
+    if(role==='client') editing.clientCustomer=clientCustomer; else delete editing.clientCustomer;
+    if(pin) editing.passHash=await sha256(username+':'+pin);
+    await persist('users');
+    logActivity(`Updated team member "${name}" (${role==='client'?`client — ${clientCustomer}`:role})`);
+    toast('Team member updated');
+    TEAM_EDIT_ID=null;
+  } else {
+    const passHash=await sha256(username+':'+pin);
+    const user={id:uid(), name, username, passHash, role};
+    if(role==='client') user.clientCustomer=clientCustomer;
+    S.users.push(user);
+    await persist('users');
+    logActivity(`Added team member "${name}" (${role==='client'?`client — ${clientCustomer}`:role})`);
+    toast('Team member added');
+  }
   render();
 }
 function removeTeamMember(id){
@@ -3198,6 +3221,7 @@ function removeTeamMember(id){
   persist('users');
   logActivity(`Removed team member "${u?u.name:''}"`);
   toast('Removed');
+  if(TEAM_EDIT_ID===id) TEAM_EDIT_ID=null;
   render();
   });
 }
