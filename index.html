@@ -1126,8 +1126,8 @@ function renderLogin(){
     </div>
     <div class="faceid-divider">or sign in with username &amp; PIN</div>`:''}
     <div class="card">
-      <label>Username</label><input id="li_user" placeholder="Username" autocapitalize="off">
-      <label>PIN / passcode</label><input id="li_pin" type="password" placeholder="••••">
+      <label>Username</label><input id="li_user" placeholder="Username" autocapitalize="off" onkeydown="if(event.key==='Enter')doLogin()">
+      <label>PIN / passcode</label><input id="li_pin" type="password" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
       <div id="li_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px">${esc(AUTH_ERR)}</div>
     </div>
     <button class="btn btn-primary btn-block" onclick="doLogin()">${ic('check')} Sign in</button>
