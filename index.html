@@ -494,18 +494,22 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[] };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{} };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory';
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
+let CLIENT_CHAT_DRAFT='';
+let CLIENT_CHAT_INPUT_WAS_FOCUSED=false;
+let CLIENT_CHAT_REPLY_DRAFT='';
+let CLIENT_CHAT_REPLY_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
 let CURRENT_USER=null; // {id,name,username,role} — session only, not persisted
 let AUTH_ERR='';
@@ -692,6 +696,14 @@ const todayISO=()=> new Date().toISOString().slice(0,10);
 function fmtMoney(n){ n = Number(n)||0; return S.settings.currency+' '+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso+'T00:00:00'); return d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}); }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Escapes a value for safe embedding inside a single-quoted JS string literal
+// within an inline onclick="..." attribute (customer/company names, or free-text
+// messages, can contain apostrophes or quotes, e.g. "O'Brien LLC", which would
+// otherwise break the handler or the surrounding HTML attribute). Apply
+// jsAttr() first (escapes \ and ' for the JS string), then esc() (escapes the
+// result for the "..." HTML attribute it sits inside) — onclickStr() does both.
+function jsAttr(s){ return (s||'').toString().replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function onclickStr(s){ return esc(jsAttr(s)); }
 let toastTimer=null;
 function toast(msg){
   clearTimeout(toastTimer);
@@ -1153,6 +1165,7 @@ function renderClientPortal(){
   const projects = S.projects.filter(p=>p.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const docs = [...S.invoices.map(d=>({...d,kind:'invoice'})), ...S.quotes.map(d=>({...d,kind:'quote'}))]
     .filter(d=>d.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const clientChatMsgs = (S.clientChats && S.clientChats[customer]) || [];
   return `
   ${topbar(S.settings.companyName||'Ledger', `Client portal — ${customer}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
@@ -1177,6 +1190,7 @@ function renderClientPortal(){
             <div class="stat"><div class="num">${fmtMoney(adv)}</div><div class="lbl">Advances received</div></div>
             <div class="stat" style="grid-column:1 / -1"><div class="num" style="color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div><div class="lbl">Balance due</div></div>
           </div>
+          ${bal>0? `<button class="btn btn-teal btn-block" style="margin-top:10px" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay ${fmtMoney(bal)} towards ${p.number} — ${p.name}.`)}')">${ic('chat')} Pay ${fmtMoney(bal)} via WhatsApp</button>`:''}
           ${p.scopeSummary? `
           <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Scope of work</div>
           <div class="small" style="line-height:1.5">${esc(p.scopeSummary)}</div>` : ''}
@@ -1208,9 +1222,43 @@ function renderClientPortal(){
             <div class="tiny muted">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div>
           </div>
           ${d.kind==='invoice'?`<div class="row-between"><div class="tiny muted">Balance due</div><div class="small mono" style="font-weight:600;color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div></div>`:''}
+          ${d.kind==='invoice' && bal>0? `<button class="btn btn-teal btn-block" style="margin-top:8px" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay the balance of ${fmtMoney(bal)} on invoice ${d.number}.`)}')">${ic('chat')} Pay ${fmtMoney(bal)} via WhatsApp</button>`:''}
         </div>`;
       }).join('')}
+
+    <div class="section-title">Messages</div>
+    <div class="card">
+      ${clientChatMsgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">Send us a message and we'll reply here.</div>` :
+        `<div id="clientChatScroll">${clientChatMsgs.map(m=>{
+          const mine = m.from==='client';
+          return `<div class="chat-msg ${mine?'mine':''}">
+            ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+            <div class="chat-bubble-wrap">
+              ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
+              <div class="chat-bubble">${esc(m.text)}</div>
+              <div class="chat-time">${fmtLogTime(m.ts)}</div>
+            </div>
+          </div>`;
+        }).join('')}</div>`}
+      <div class="chat-composer">
+        <input id="clientChatInput" placeholder="Message us…" value="${esc(CLIENT_CHAT_DRAFT)}" oninput="CLIENT_CHAT_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendClientChatMessage();}">
+        <button class="chat-send" onclick="sendClientChatMessage()">${ic('check')}</button>
+      </div>
+    </div>
   </div>`;
+}
+function sendClientChatMessage(){
+  const input = document.getElementById('clientChatInput');
+  const text = (input?input.value:CLIENT_CHAT_DRAFT).trim();
+  if(!text) return;
+  const customer = CURRENT_USER.clientCustomer;
+  if(!S.clientChats) S.clientChats={};
+  if(!S.clientChats[customer]) S.clientChats[customer]=[];
+  S.clientChats[customer].push({id:uid(), ts:Date.now(), from:'client', authorName:CURRENT_USER.name, text});
+  if(S.clientChats[customer].length>500) S.clientChats[customer]=S.clientChats[customer].slice(-500);
+  CLIENT_CHAT_DRAFT='';
+  persist('clientChats');
+  render();
 }
 
 /* ---------- FACE ID (native app shell only — no-ops in a plain browser) ----------
@@ -1293,7 +1341,21 @@ function render(){
   if(!CURRENT_USER){ app.className=''; app.innerHTML = noStorageBanner() + renderLogin(); sidebar.innerHTML=''; return; }
   // client accounts get their own read-only portal — never the staff/admin app shell,
   // regardless of what VIEW happens to be set to (e.g. from a stale #project= hash link)
-  if(CURRENT_USER.role==='client'){ app.className='client-portal'; app.innerHTML = renderClientPortal(); sidebar.innerHTML=''; return; }
+  if(CURRENT_USER.role==='client'){
+    app.className='client-portal';
+    CLIENT_CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='clientChatInput';
+    app.innerHTML = renderClientPortal();
+    sidebar.innerHTML='';
+    const scroller = document.getElementById('clientChatScroll');
+    if(scroller) scroller.scrollIntoView({block:'end'});
+    const input = document.getElementById('clientChatInput');
+    if(input && CLIENT_CHAT_INPUT_WAS_FOCUSED){
+      input.focus();
+      const len = input.value.length;
+      input.setSelectionRange(len,len);
+    }
+    return;
+  }
   app.className='';
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
@@ -1320,9 +1382,12 @@ function render(){
     case 'team-form': body = renderTeamForm(); break;
     case 'activity-log': body = renderActivityLog(); break;
     case 'chat': body = renderChat(); break;
+    case 'client-chats': body = renderClientChatList(); break;
+    case 'client-chat': body = renderClientChatThread(VIEW.params.customer); break;
     default: body = renderDashboard();
   }
   CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='chatInput';
+  CLIENT_CHAT_REPLY_WAS_FOCUSED = document.activeElement && document.activeElement.id==='clientChatReplyInput';
   app.innerHTML = noStorageBanner() + body + renderTabbar();
   sidebar.innerHTML = renderSidebar();
   afterRender();
@@ -1349,6 +1414,7 @@ const TAB_SECTIONS={
   'projects':'projects','project-form':'projects','project-view':'projects',
   'reports':'more',
   'chat':'more',
+  'client-chats':'more','client-chat':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){ STACK=[]; go(id); }
@@ -2062,6 +2128,19 @@ function showShareMenu(kind,id){
 // which itself offers Print/Save to Files/Mail/WhatsApp/AirDrop.
 function isWrappedApp(){
   return !!(window.webkit && window.webkit.messageHandlers);
+}
+// No payment gateway is wired up — "paying" from the client portal just opens
+// a pre-filled WhatsApp message to the company so they can arrange payment and
+// record it themselves the normal way. No money moves and nothing is logged
+// automatically; it's a contact shortcut, not a transaction.
+function clientPayViaWhatsapp(text){
+  if(isWrappedApp() && navigator.share){
+    navigator.share({text}).catch(()=>{});
+    return;
+  }
+  const phone=(S.settings.companyPhone||'').replace(/[^0-9]/g,'');
+  const url=(phone?`https://wa.me/${phone}`:'https://wa.me/')+'?text='+encodeURIComponent(text);
+  window.open(url,'_blank');
 }
 window.__pendingShareFile = null;
 window.__pendingShareTitle = '';
@@ -3059,6 +3138,9 @@ function renderMore(){
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('chat')">
         <div class="small" style="font-weight:600">Team chat</div>${ic('chev')}
       </div>
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('client-chats')">
+        <div class="small" style="font-weight:600">Client messages</div>${ic('chev')}
+      </div>
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('reports')">
         <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
       </div>
@@ -3145,6 +3227,65 @@ function sendChatMessage(){
   if(S.chat.length>500) S.chat = S.chat.slice(S.chat.length-500);
   CHAT_DRAFT='';
   persist('chat');
+  render();
+}
+
+/* ---------- CLIENT MESSAGES (staff/admin side) — a private thread per customer,
+   separate from the internal Team chat so clients never see staff-to-staff talk ---------- */
+function renderClientChatList(){
+  const customers = new Set();
+  S.users.filter(u=>u.role==='client' && u.clientCustomer).forEach(u=>customers.add(u.clientCustomer));
+  Object.keys(S.clientChats||{}).forEach(c=>{ if((S.clientChats[c]||[]).length) customers.add(c); });
+  const rows = [...customers].map(c=>{
+    const msgs=(S.clientChats&&S.clientChats[c])||[];
+    return {customer:c, last: msgs.length?msgs[msgs.length-1]:null};
+  }).sort((a,b)=>(b.last?b.last.ts:0)-(a.last?a.last.ts:0));
+  return `
+  ${topbar('Client messages','One private thread per customer', true)}
+  <div class="content">
+    ${rows.length===0? emptyState('chat','No client accounts yet','Add a client from Team & logins to start messaging them.') :
+      rows.map(r=>`<div class="card row-between" onclick="goPush('client-chat',{customer:'${onclickStr(r.customer)}'})">
+        <div style="min-width:0;flex:1">
+          <div class="small" style="font-weight:600">${esc(r.customer)}</div>
+          <div class="tiny muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${r.last?esc(r.last.text):'No messages yet'}</div>
+        </div>
+        ${r.last?`<div class="tiny mono muted" style="flex-shrink:0;margin-left:8px">${fmtLogTime(r.last.ts)}</div>`:''}
+      </div>`).join('')}
+  </div>`;
+}
+function renderClientChatThread(customer){
+  const msgs = (S.clientChats && S.clientChats[customer]) || [];
+  return `
+  ${topbar(customer,'Private conversation', true)}
+  <div class="content">
+    ${msgs.length===0? emptyState('chat','No messages yet','Send the first message below.') :
+      `<div id="chatScroll">${msgs.map(m=>{
+        const mine = m.from==='staff';
+        return `<div class="chat-msg ${mine?'mine':''}">
+          ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+          <div class="chat-bubble-wrap">
+            ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
+            <div class="chat-bubble">${esc(m.text)}</div>
+            <div class="chat-time">${fmtLogTime(m.ts)}</div>
+          </div>
+        </div>`;
+      }).join('')}</div>`}
+    <div class="chat-composer">
+      <input id="clientChatReplyInput" placeholder="Reply to ${esc(customer)}…" value="${esc(CLIENT_CHAT_REPLY_DRAFT)}" oninput="CLIENT_CHAT_REPLY_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendClientChatReply('${onclickStr(customer)}');}">
+      <button class="chat-send" onclick="sendClientChatReply('${onclickStr(customer)}')">${ic('check')}</button>
+    </div>
+  </div>`;
+}
+function sendClientChatReply(customer){
+  const input = document.getElementById('clientChatReplyInput');
+  const text = (input?input.value:CLIENT_CHAT_REPLY_DRAFT).trim();
+  if(!text) return;
+  if(!S.clientChats) S.clientChats={};
+  if(!S.clientChats[customer]) S.clientChats[customer]=[];
+  S.clientChats[customer].push({id:uid(), ts:Date.now(), from:'staff', authorName:CURRENT_USER.name, text});
+  if(S.clientChats[customer].length>500) S.clientChats[customer]=S.clientChats[customer].slice(-500);
+  CLIENT_CHAT_REPLY_DRAFT='';
+  persist('clientChats');
   render();
 }
 let TEAM_EDIT_ID = null;
@@ -3292,6 +3433,16 @@ function afterRender(){
     if(scroller) scroller.scrollIntoView({block:'end'});
     const input = document.getElementById('chatInput');
     if(input && CHAT_INPUT_WAS_FOCUSED){
+      input.focus();
+      const len = input.value.length;
+      input.setSelectionRange(len,len);
+    }
+  }
+  if(VIEW.name==='client-chat'){
+    const scroller = document.getElementById('chatScroll');
+    if(scroller) scroller.scrollIntoView({block:'end'});
+    const input = document.getElementById('clientChatReplyInput');
+    if(input && CLIENT_CHAT_REPLY_WAS_FOCUSED){
       input.focus();
       const len = input.value.length;
       input.setSelectionRange(len,len);
