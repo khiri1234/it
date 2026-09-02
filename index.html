@@ -867,6 +867,21 @@ function boqProgressPct(p, field){
   const doneQty = (p.boq||[]).reduce((a,b)=>a+Math.min(Number(b[field])||0, Number(b.qty)||0),0);
   return Math.min(100, doneQty/totalQty*100);
 }
+// Purchases actually applied to stock for this project — only these move purchasedQty on
+// the BOQ, so they're the ones "actual cost so far" should be measured against.
+function projectPurchases(p){ return S.purchases.filter(x=>x.projectId===p.id && x.stockApplied); }
+function projectActualCost(p){
+  return projectPurchases(p).reduce((sum,pur)=>sum+pur.items.reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.cost)||0),0),0);
+}
+function boqLineActualCost(p, boqItemId){
+  return projectPurchases(p).reduce((sum,pur)=>sum+pur.items.filter(it=>it.boqItemId===boqItemId).reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.cost)||0),0),0);
+}
+// Purchase items tied to this project but not linked to any BOQ line (misc costs).
+function projectUnlinkedPurchaseItems(p){
+  const rows=[];
+  projectPurchases(p).forEach(pur=>{ pur.items.forEach(it=>{ if(!it.boqItemId) rows.push({purchase:pur, item:it}); }); });
+  return rows;
+}
 function ensureModalRoot(){
   let m=document.getElementById('modalRoot');
   if(!m){ m=document.createElement('div'); m.id='modalRoot'; document.body.appendChild(m); }
@@ -1427,6 +1442,7 @@ function render(){
     case 'projects': body = renderProjectsList(); break;
     case 'project-form': body = renderProjectForm(VIEW.params.id); break;
     case 'project-view': body = renderProjectView(VIEW.params.id); break;
+    case 'project-cost': body = renderProjectCostBreakdown(VIEW.params.id); break;
     case 'reports': body = renderReports(); break;
     case 'more': body = renderMore(); break;
     case 'settings-form': body = renderSettingsForm(); break;
@@ -1462,7 +1478,7 @@ const TAB_SECTIONS={
   'dashboard':'dashboard',
   'sales':'sales','invoice-form':'sales','quote-form':'sales','invoice-view':'sales','quote-view':'sales','bulk-payment':'sales',
   'stock':'stock','item-form':'stock','purchase-form':'stock','purchase-view':'stock','inventory-import':'stock',
-  'projects':'projects','project-form':'projects','project-view':'projects',
+  'projects':'projects','project-form':'projects','project-view':'projects','project-cost':'projects',
   'reports':'more',
   'chat':'more',
   'client-chats':'more','client-chat':'more',
@@ -2991,7 +3007,8 @@ function renderProjectView(id){
     <div class="grid2">
       <div class="stat"><div class="num">${fmtMoney(cost)}</div><div class="lbl">Total cost</div></div>
       <div class="stat"><div class="num" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtMoney(profit)}</div><div class="lbl">Profit (${val>0?Math.round(profit/val*100):0}% margin)</div></div>
-    </div>`:''}
+    </div>
+    <button class="btn btn-ghost btn-block" onclick="go('project-cost',{id:'${p.id}'})">${ic('reports')} View detailed cost breakdown</button>`:''}
 
     <div class="section-title">Invoicing</div>
     <div class="card">
@@ -3067,6 +3084,78 @@ function renderProjectView(id){
     </select>
     <div style="height:10px"></div>
     <button class="btn btn-ghost btn-block" onclick="go('project-form',{id:'${p.id}'})">${ic('edit')} Edit project details</button>
+  </div>`;
+}
+function renderProjectCostBreakdown(id){
+  const p=S.projects.find(x=>x.id===id);
+  if(!p) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This project may have been deleted.')}</div>`;
+  if(!isAdmin()) return topbar('Cost breakdown','',true)+`<div class="content">${emptyState('alert','Admins only','Cost breakdown is only visible to admins.')}</div>`;
+  const val=projectValue(p), budgetCost=projectCost(p), budgetProfit=projectProfit(p);
+  const actualCost=projectActualCost(p);
+  const lines=(p.boq||[]).map(item=>{
+    const purchasedQty=Number(item.purchasedQty)||0;
+    const budgetForPurchased=purchasedQty*(Number(item.unitCost)||0);
+    const actualLineCost=boqLineActualCost(p,item.id);
+    return {item, purchasedQty, budgetForPurchased, actualLineCost, variance:actualLineCost-budgetForPurchased};
+  });
+  const budgetForPurchasedTotal=lines.reduce((a,l)=>a+l.budgetForPurchased,0);
+  const actualLinkedTotal=lines.reduce((a,l)=>a+l.actualLineCost,0);
+  const varianceTotal=actualLinkedTotal-budgetForPurchasedTotal;
+  const varianceColor=v=>v>0?'var(--red)':v<0?'var(--green)':'inherit';
+  const unlinkedRows=projectUnlinkedPurchaseItems(p);
+  const unlinkedTotal=unlinkedRows.reduce((a,r)=>a+(Number(r.item.qty)||0)*(Number(r.item.cost)||0),0);
+  return `
+  ${topbar(p.number, 'Cost breakdown', true)}
+  <div class="content">
+    <div class="grid2">
+      <div class="stat"><div class="num">${fmtMoney(val)}</div><div class="lbl">Quoted (BOQ) value</div></div>
+      <div class="stat"><div class="num">${fmtMoney(budgetCost)}</div><div class="lbl">Budgeted cost (full BOQ)</div></div>
+      <div class="stat"><div class="num" style="color:${budgetProfit>=0?'var(--green)':'var(--red)'}">${fmtMoney(budgetProfit)}</div><div class="lbl">Budgeted profit (${val>0?Math.round(budgetProfit/val*100):0}% margin)</div></div>
+      <div class="stat"><div class="num">${fmtMoney(actualCost)}</div><div class="lbl">Actual cost so far</div></div>
+    </div>
+
+    <div class="section-title">Purchased-to-date variance</div>
+    <div class="card">
+      <div class="row-between" style="padding:6px 0"><div class="small">Budgeted cost of what's purchased so far</div><div class="mono small">${fmtMoney(budgetForPurchasedTotal)}</div></div>
+      <div class="row-between" style="padding:6px 0"><div class="small">Actual cost of what's purchased so far</div><div class="mono small">${fmtMoney(actualLinkedTotal)}</div></div>
+      <div class="row-between" style="padding:6px 0;border-top:1px solid var(--line);margin-top:4px">
+        <div class="small" style="font-weight:600">Variance</div>
+        <div class="mono small" style="font-weight:600;color:${varianceColor(varianceTotal)}">${varianceTotal>0?'+':''}${fmtMoney(varianceTotal)}</div>
+      </div>
+      <div class="tiny muted" style="margin-top:6px">Positive means purchases cost more than budgeted; negative means they came in under budget.</div>
+    </div>
+
+    <div class="section-title">By BOQ line</div>
+    ${lines.length? lines.map(({item,purchasedQty,budgetForPurchased,actualLineCost,variance})=>`
+      <div class="card">
+        <div class="row-between">
+          <div style="font-weight:600;font-size:14px">${esc(item.desc)}</div>
+          <div class="mono tiny muted">${item.qty} ${esc(item.unit||'')}</div>
+        </div>
+        <div class="tiny muted" style="margin:2px 0 8px">Sell ${fmtMoney(item.unitPrice)}/unit · Budget cost ${fmtMoney(item.unitCost)}/unit</div>
+        <div class="grid2">
+          <div class="stat"><div class="num" style="font-size:15px">${fmtMoney(budgetForPurchased)}</div><div class="lbl">Budgeted (${purchasedQty}/${item.qty} purchased)</div></div>
+          <div class="stat"><div class="num" style="font-size:15px">${fmtMoney(actualLineCost)}</div><div class="lbl">Actual cost</div></div>
+        </div>
+        ${purchasedQty>0? `<div class="tiny" style="margin-top:6px;font-weight:600;color:${varianceColor(variance)}">${variance===0?'On budget':(variance>0?'+':'')+fmtMoney(variance)+' vs budget'}</div>` : `<div class="tiny muted" style="margin-top:6px">Not purchased yet</div>`}
+      </div>`).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet.</div></div>`}
+
+    ${unlinkedRows.length? `
+    <div class="section-title">Other project costs <span class="tiny muted" style="font-weight:400;text-transform:none">— not tied to a BOQ line</span></div>
+    <div class="card">
+      ${unlinkedRows.map(({purchase,item})=>`
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div>
+            <div class="small" style="font-weight:600">${esc(item.desc)}</div>
+            <div class="tiny muted">${esc(purchase.number)} · ${esc(purchase.supplier)} · ${fmtDate(purchase.date)}</div>
+          </div>
+          <div class="mono small">${fmtMoney((Number(item.qty)||0)*(Number(item.cost)||0))}</div>
+        </div>`).join('')}
+      <div class="row-between" style="padding-top:8px">
+        <div class="small" style="font-weight:600">Total</div>
+        <div class="mono small" style="font-weight:600">${fmtMoney(unlinkedTotal)}</div>
+      </div>
+    </div>` : ''}
   </div>`;
 }
 function quickProjectStatus(id,val){
