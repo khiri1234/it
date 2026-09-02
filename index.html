@@ -2782,7 +2782,13 @@ function renderProjectsList(){
               <span class="badge ${p.status}">${p.status}</span>
             </div>
           </div>
-          ${val>0?`<div class="bar-wrap" style="margin-top:9px;margin-bottom:0">
+          ${val>0?`
+          <div class="bar-wrap" style="margin-top:9px">
+            <div style="width:70px" class="tiny muted">Purchased</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${boqProgressPct(p,'purchasedQty')}%;background:var(--navy-2)"></div></div>
+            <div class="tiny mono" style="width:36px;text-align:right">${Math.round(boqProgressPct(p,'purchasedQty'))}%</div>
+          </div>
+          <div class="bar-wrap" style="margin-bottom:0">
             <div style="width:70px" class="tiny muted">Installed</div>
             <div class="bar-track"><div class="bar-fill" style="width:${boqProgressPct(p,'installedQty')}%"></div></div>
             <div class="tiny mono" style="width:36px;text-align:right">${Math.round(boqProgressPct(p,'installedQty'))}%</div>
