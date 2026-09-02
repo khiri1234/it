@@ -77,6 +77,7 @@
   .stripe.boq-installed{border-left-color:var(--green);}
   .stripe.boq-purchased{border-left-color:var(--blue);}
   .stripe.boq-over{border-left-color:var(--amber);}
+  .stripe.boq-under{border-left-color:var(--red);}
   .badge{
     display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;
     font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
@@ -96,6 +97,7 @@
   .badge.boq-installed{background:var(--green-soft);color:var(--green);}
   .badge.boq-purchased{background:var(--blue-soft);color:var(--blue);}
   .badge.boq-over{background:var(--amber-soft);color:var(--amber);}
+  .badge.boq-under{background:var(--red-soft);color:var(--red);}
   .activity-avatar.paid,.activity-avatar.received,.activity-avatar.accepted{background:var(--green-soft);color:var(--green);}
   .activity-avatar.sent{background:var(--teal-soft);color:var(--teal);}
   .activity-avatar.draft{background:#EEF1F5;color:var(--ink-soft);}
@@ -829,11 +831,12 @@ function boqLineStatus(item){
   const installed = Number(item.installedQty)||0;
   if(qty<=0) return '';
   if(purchased>qty) return 'boq-over';
+  if(installed>=qty && purchased<qty) return 'boq-under'; // installed off existing stock, not this line's own purchase
   if(installed>=qty) return 'boq-installed';
   if(purchased>=qty) return 'boq-purchased';
   return '';
 }
-const BOQ_STATUS_LABEL={'boq-over':'Over-purchased','boq-installed':'Installed','boq-purchased':'Purchased'};
+const BOQ_STATUS_LABEL={'boq-over':'Over-purchased','boq-installed':'Installed','boq-purchased':'Purchased','boq-under':'Under-purchased'};
 function projectValue(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineTotal(b),0); }
 function projectCost(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineCost(b),0); }
 function projectProfit(p){ return projectValue(p)-projectCost(p); }
