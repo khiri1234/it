@@ -2782,7 +2782,7 @@ function renderProjectsList(){
               <span class="badge ${p.status}">${p.status}</span>
             </div>
           </div>
-          ${val>0?`
+          ${(p.boq&&p.boq.length)?`
           <div class="bar-wrap" style="margin-top:9px">
             <div style="width:70px" class="tiny muted">Purchased</div>
             <div class="bar-track"><div class="bar-fill" style="width:${boqProgressPct(p,'purchasedQty')}%;background:var(--navy-2)"></div></div>
