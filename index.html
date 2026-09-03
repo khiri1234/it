@@ -2914,6 +2914,33 @@ function quickRfqStatus(id,status){
   logActivity(`Marked RFQ ${r.number} as ${status}`);
   render();
 }
+// Shares the RFQ's item list via the OS share sheet (WhatsApp/email/SMS all show up there)
+// or falls back to copying text / a generic WhatsApp link — same pattern as
+// shareForQuotation() on the purchase form. No supplier contact info is stored in the
+// app, so this is a "send to whoever you pick" share rather than a targeted one.
+function inviteSuppliersToRfq(rfqId){
+  const rfq=S.rfqs.find(r=>r.id===rfqId); if(!rfq) return;
+  let text = `New request for quotation — ${S.settings.companyName}\n`;
+  text += `${rfq.number}${rfq.title?' — '+rfq.title:''}\n`;
+  if(rfq.notes) text += `${rfq.notes}\n`;
+  text += `\nCould you please quote for the following:\n\n`;
+  rfq.items.forEach((it,i)=>{ text += `${i+1}. ${it.desc}${it.code?' ('+it.code+')':''} — Qty: ${it.qty}${it.unit?' '+it.unit:''}\n`; });
+  text += `\nPlease log in to your supplier account to submit your prices.\n\nThank you,\n${S.settings.companyName}`;
+  if(S.settings.companyPhone) text += `\n${S.settings.companyPhone}`;
+  logActivity(`Shared RFQ ${rfq.number} to notify suppliers`);
+
+  if(navigator.share){
+    navigator.share({title:'New RFQ — '+rfq.number, text}).catch(()=>{});
+  } else if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>{
+      toast('Copied — paste into WhatsApp, email, or SMS');
+    }).catch(()=>{
+      window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+    });
+  } else {
+    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+  }
+}
 function renderRfqView(id){
   const rfq = S.rfqs.find(r=>r.id===id);
   if(!rfq) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This RFQ may have been deleted.')}</div>`;
@@ -2929,6 +2956,9 @@ function renderRfqView(id){
       </div>
       ${rfq.notes?`<div class="small" style="margin-top:8px">${esc(rfq.notes)}</div>`:''}
     </div>
+
+    ${rfq.status==='open'? `<button class="btn btn-teal btn-block" onclick="inviteSuppliersToRfq('${rfq.id}')">${ic('share')} Notify suppliers</button>
+    <div class="tiny muted" style="margin:6px 0 4px">Shares this RFQ's item list — send it to any supplier's WhatsApp, email, or SMS. They'll need their supplier login to submit prices.</div>` : ''}
 
     <div class="section-title">Items requested — compare by supplier</div>
     ${rfq.items.map(it=>{
