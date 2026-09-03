@@ -506,14 +506,14 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
-  invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ',
-  invoiceNext:1, quoteNext:1, poNext:1, projectNext:1
+  invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ', rfqPrefix:'RFQ',
+  invoiceNext:1, quoteNext:1, poNext:1, projectNext:1, rfqNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{} };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='';
 let CHAT_DRAFT='';
@@ -806,6 +806,7 @@ function nextNumber(type){
   if(type==='quote'){ const n=s.quoteNext||1; s.quoteNext=n+1; return `${s.quotePrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
   if(type==='purchase'){ const n=s.poNext||1; s.poNext=n+1; return `${s.poPrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
   if(type==='project'){ const n=s.projectNext||1; s.projectNext=n+1; return `${s.projectPrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
+  if(type==='rfq'){ const n=s.rfqNext||1; s.rfqNext=n+1; return `${s.rfqPrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
 }
 
 function calcItems(items){
@@ -1211,7 +1212,7 @@ async function doLogin(){
   const passHash = await sha256(username+':'+pin);
   const user = S.users.find(u=>u.username===username && u.passHash===passHash);
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null};
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null};
   AUTH_ERR='';
   setRememberedUserId(user.id);
   if(!applyHashRoute()) render();
@@ -1342,7 +1343,7 @@ function __faceIDUnlock(){
   if(!user) return false;
   const badge = document.getElementById('faceidBadge');
   const finish = ()=>{
-    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null};
+    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null};
     AUTH_ERR='';
     if(!applyHashRoute()) render();
   };
@@ -1425,6 +1426,14 @@ function render(){
     }
     return;
   }
+  // supplier accounts get a minimal portal too — a list of open RFQs and a form to
+  // submit their prices, nothing else of the app is reachable
+  if(CURRENT_USER.role==='supplier'){
+    app.className='client-portal';
+    app.innerHTML = VIEW.name==='supplier-rfq' ? renderSupplierRfqForm(VIEW.params.id) : renderSupplierPortal();
+    sidebar.innerHTML='';
+    return;
+  }
   app.className='';
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
@@ -1454,6 +1463,9 @@ function render(){
     case 'chat': body = renderChat(); break;
     case 'client-chats': body = renderClientChatList(); break;
     case 'client-chat': body = renderClientChatThread(VIEW.params.customer); break;
+    case 'rfqs': body = renderRfqsList(); break;
+    case 'rfq-form': body = renderRfqForm(VIEW.params.id); break;
+    case 'rfq-view': body = renderRfqView(VIEW.params.id); break;
     default: body = renderDashboard();
   }
   CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='chatInput';
@@ -1485,6 +1497,7 @@ const TAB_SECTIONS={
   'reports':'more',
   'chat':'more',
   'client-chats':'more','client-chat':'more',
+  'rfqs':'more','rfq-form':'more','rfq-view':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){ STACK=[]; go(id); }
@@ -2779,6 +2792,287 @@ function deletePurchase(id){
   goBack();
   });
 }
+
+/* ---------- SUPPLIER RFQs (request for quotation) ----------
+   Admin/staff create an RFQ (item list + qty); supplier accounts log in and see
+   only open RFQs, submit a price (+ optional note, e.g. an alternative model) per
+   item. S.supplierQuotes holds one entry per (rfqId, supplierName) — supplierName
+   is how a submission is recognized as coming from a particular supplier, since
+   several suppliers can quote the same RFQ. Admin compares them side by side and
+   can one-tap turn a chosen supplier's priced items into a Purchase. */
+function rfqBadgeClass(status){ return status==='closed' ? 'completed' : 'sent'; }
+function newRfq(){ goPush('rfq-form',{id:null}); }
+function renderRfqsList(){
+  const list=[...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return `
+  ${topbar('Supplier RFQs','Request & compare supplier prices', true)}
+  <div class="content">
+    ${list.length===0? emptyState('mail','No RFQs yet','Create one to request pricing from your suppliers.') :
+      list.map(r=>{
+        const quoteCount = new Set((S.supplierQuotes||[]).filter(q=>q.rfqId===r.id).map(q=>q.supplierName)).size;
+        return `<div class="card stripe ${rfqBadgeClass(r.status)}" onclick="go('rfq-view',{id:'${r.id}'})">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:600">${esc(r.title||'Untitled RFQ')}</div>
+              <div class="tiny mono muted">${esc(r.number)} · ${fmtDate(r.date)}</div>
+            </div>
+            <span class="badge ${rfqBadgeClass(r.status)}">${r.status}</span>
+          </div>
+          <div class="tiny muted" style="margin-top:6px">${r.items.length} item${r.items.length===1?'':'s'} · ${quoteCount} supplier${quoteCount===1?'':'s'} quoted</div>
+        </div>`;
+      }).join('')}
+  </div>
+  <button class="fab" onclick="newRfq()">${ic('plus')}</button>`;
+}
+function renderRfqForm(id){
+  const editing = id ? S.rfqs.find(r=>r.id===id) : null;
+  const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}]};
+  return `
+  ${topbar(editing?'Edit RFQ':'New RFQ', editing?rfq.number:'', true)}
+  <div class="content">
+    <div class="card">
+      <label>Title</label>
+      <input id="rfq_title" value="${esc(rfq.title)}" placeholder="e.g. CCTV materials for Bahiya Villa">
+      <label>Date</label>
+      <input id="rfq_date" type="date" value="${rfq.date}">
+      <label>Notes for suppliers (optional)</label>
+      <textarea id="rfq_notes" rows="2" placeholder="Any extra instructions">${esc(rfq.notes)}</textarea>
+    </div>
+    <div class="section-title">Items</div>
+    <div id="rfqItemsWrap">${renderRfqRows(rfq.items)}</div>
+    <button class="btn btn-ghost btn-block" onclick="addRfqRow()">${ic('plus')} Add item</button>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      ${editing && isAdmin() ?`<button class="btn btn-danger" onclick="deleteRfq('${rfq.id}')">${ic('trash')}</button>`:''}
+      <button class="btn btn-primary btn-block" onclick="saveRfq('${rfq.id||''}')">${ic('check')} Save RFQ</button>
+    </div>
+  </div>`;
+}
+function renderRfqRows(items){
+  return items.map((it,idx)=>`
+    <div class="item-row-p" data-idx="${idx}" data-itemid="${it.id}">
+      <input placeholder="Item description" value="${esc(it.desc)}" class="rfqDesc">
+      <div class="item-grid">
+        <div><label style="margin-top:8px">Item code (optional)</label><input value="${esc(it.code||'')}" class="rfqCode"></div>
+        <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" class="rfqQty"></div>
+      </div>
+      <label style="margin-top:8px">Unit (optional)</label>
+      <input value="${esc(it.unit||'')}" class="rfqUnit" placeholder="e.g. pcs, m">
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="removeRfqRow(${idx})">${ic('trash')} Remove</button>
+    </div>`).join('');
+}
+function readRfqItemsFromDOM(){
+  return [...document.querySelectorAll('.item-row-p')].map(r=>({
+    id: r.dataset.itemid || uid(),
+    desc: r.querySelector('.rfqDesc').value.trim(),
+    code: r.querySelector('.rfqCode').value.trim(),
+    qty: Number(r.querySelector('.rfqQty').value)||0,
+    unit: r.querySelector('.rfqUnit').value.trim()
+  })).filter(r=>r.desc||r.qty);
+}
+function addRfqRow(){
+  const items=readRfqItemsFromDOM(); items.push({id:uid(),desc:'',code:'',qty:1,unit:''});
+  document.getElementById('rfqItemsWrap').innerHTML=renderRfqRows(items);
+}
+function removeRfqRow(idx){
+  const items=readRfqItemsFromDOM(); items.splice(idx,1);
+  if(items.length===0) items.push({id:uid(),desc:'',code:'',qty:1,unit:''});
+  document.getElementById('rfqItemsWrap').innerHTML=renderRfqRows(items);
+}
+function saveRfq(id){
+  const title=document.getElementById('rfq_title').value.trim();
+  if(!title){ toast('Enter a title'); return; }
+  const items=readRfqItemsFromDOM();
+  if(items.length===0){ toast('Add at least one item'); return; }
+  const isNew=!id; let r;
+  if(isNew){ r={id:uid(), number:nextNumber('rfq'), status:'open'}; S.rfqs.push(r); }
+  else { r=S.rfqs.find(x=>x.id===id); }
+  r.title=title;
+  r.date=document.getElementById('rfq_date').value||todayISO();
+  r.notes=document.getElementById('rfq_notes').value;
+  r.items=items;
+  persist('rfqs'); persist('settings');
+  logActivity(`${isNew?'Created':'Updated'} RFQ ${r.number} — ${title}`);
+  toast('RFQ saved');
+  goBack();
+}
+function deleteRfq(id){
+  if(!isAdmin()){ toast('Only admins can delete'); return; }
+  showConfirm('Delete this RFQ? Any supplier quotes for it will also be removed.', ()=>{
+    const r=S.rfqs.find(x=>x.id===id);
+    S.rfqs=S.rfqs.filter(x=>x.id!==id);
+    S.supplierQuotes=(S.supplierQuotes||[]).filter(q=>q.rfqId!==id);
+    persist('rfqs'); persist('supplierQuotes');
+    logActivity(`Deleted RFQ ${r?r.number:''}`);
+    toast('Deleted');
+    goBack();
+  });
+}
+function quickRfqStatus(id,status){
+  const r=S.rfqs.find(x=>x.id===id); if(!r) return;
+  r.status=status;
+  persist('rfqs');
+  logActivity(`Marked RFQ ${r.number} as ${status}`);
+  render();
+}
+function renderRfqView(id){
+  const rfq = S.rfqs.find(r=>r.id===id);
+  if(!rfq) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This RFQ may have been deleted.')}</div>`;
+  const quotes = (S.supplierQuotes||[]).filter(q=>q.rfqId===id);
+  const supplierNames = [...new Set(quotes.map(q=>q.supplierName))].sort();
+  return `
+  ${topbar(rfq.number, rfq.title, true)}
+  <div class="content">
+    <div class="card">
+      <div class="row-between">
+        <span class="badge ${rfqBadgeClass(rfq.status)}">${rfq.status}</span>
+        <div class="tiny muted">${fmtDate(rfq.date)}</div>
+      </div>
+      ${rfq.notes?`<div class="small" style="margin-top:8px">${esc(rfq.notes)}</div>`:''}
+    </div>
+
+    <div class="section-title">Items requested — compare by supplier</div>
+    ${rfq.items.map(it=>{
+      const rows = supplierNames.map(sn=>{
+        const q = quotes.find(x=>x.supplierName===sn);
+        const qi = q ? q.items.find(x=>x.itemId===it.id) : null;
+        return {supplierName:sn, price: qi?Number(qi.price)||0:0, note: qi?(qi.note||''):''};
+      });
+      const priced = rows.filter(r=>r.price>0);
+      const minPrice = priced.length? Math.min(...priced.map(r=>r.price)) : null;
+      return `<div class="card">
+        <div class="row-between">
+          <div style="font-weight:600;font-size:14px">${esc(it.desc)}${it.code?` <span class="tiny muted mono">(${esc(it.code)})</span>`:''}</div>
+          <div class="mono tiny muted">${it.qty}${it.unit?' '+esc(it.unit):''}</div>
+        </div>
+        ${supplierNames.length===0? `<div class="tiny muted" style="margin-top:6px">No supplier quotes yet.</div>` :
+          rows.map(r=>{
+            const isLowest = r.price>0 && r.price===minPrice;
+            return `<div class="row-between" style="padding:5px 0;border-top:1px solid var(--line)">
+              <div class="small">${esc(r.supplierName)}</div>
+              <div class="mono small" style="font-weight:${isLowest?700:400};color:${isLowest?'var(--green)':(r.price?'inherit':'var(--ink-soft)')}">${r.price>0?fmtMoney(r.price):(r.note?'No price':'—')}</div>
+            </div>${r.note?`<div class="tiny muted" style="padding-left:2px">${esc(r.note)}</div>`:''}`;
+          }).join('')}
+      </div>`;
+    }).join('')}
+
+    <div class="section-title">Suppliers</div>
+    ${supplierNames.length===0? `<div class="card"><div class="tiny muted">No suppliers have quoted yet.</div></div>` :
+      supplierNames.map(sn=>{
+        const q = quotes.find(x=>x.supplierName===sn);
+        const pricedItems = q.items.filter(qi=>Number(qi.price)>0);
+        const total = pricedItems.reduce((a,qi)=>{ const item=rfq.items.find(x=>x.id===qi.itemId); return a+(item?Number(item.qty)*Number(qi.price):0); },0);
+        return `<div class="card">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:600">${esc(sn)}</div>
+              <div class="tiny muted">${pricedItems.length}/${rfq.items.length} items priced · ${fmtLogTime(q.submittedAt)}</div>
+            </div>
+            <div class="mono" style="font-weight:700">${fmtMoney(total)}</div>
+          </div>
+          ${isAdmin()?`<button class="btn btn-primary btn-block" style="margin-top:10px" onclick="createPurchaseFromSupplierQuote('${rfq.id}','${onclickStr(sn)}')">${ic('cart')} Create purchase from this quote</button>`:''}
+        </div>`;
+      }).join('')}
+
+    <label>RFQ status</label>
+    <select onchange="quickRfqStatus('${rfq.id}',this.value)">
+      <option value="open" ${rfq.status==='open'?'selected':''}>Open — accepting quotes</option>
+      <option value="closed" ${rfq.status==='closed'?'selected':''}>Closed</option>
+    </select>
+    <div style="height:10px"></div>
+    <button class="btn btn-ghost btn-block" onclick="go('rfq-form',{id:'${rfq.id}'})">${ic('edit')} Edit RFQ</button>
+  </div>`;
+}
+function createPurchaseFromSupplierQuote(rfqId, supplierName){
+  if(!isAdmin()){ toast('Only admins can create purchases'); return; }
+  const rfq=S.rfqs.find(r=>r.id===rfqId); if(!rfq) return;
+  const q=(S.supplierQuotes||[]).find(x=>x.rfqId===rfqId && x.supplierName===supplierName); if(!q) return;
+  const items=rfq.items.map(it=>{
+    const qi=q.items.find(x=>x.itemId===it.id);
+    if(!qi || !(Number(qi.price)>0)) return null;
+    return {desc:it.desc, qty:it.qty, cost:Number(qi.price), invId:findInventoryByName(it.desc)?.id||null, boqItemId:null};
+  }).filter(Boolean);
+  if(items.length===0){ toast("This supplier didn't price any items"); return; }
+  const p={id:uid(), number:nextNumber('purchase'), supplier:supplierName, date:todayISO(), status:'pending', items, notes:`From ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:null};
+  S.purchases.push(p);
+  persist('purchases'); persist('settings');
+  logActivity(`Created purchase ${p.number} from ${supplierName}'s quote on ${rfq.number}`);
+  toast('Purchase created from quote');
+  go('purchase-view',{id:p.id});
+}
+
+/* ---------- SUPPLIER PORTAL (login-only — sees open RFQs, submits prices) ---------- */
+function renderSupplierPortal(){
+  const supplierName = CURRENT_USER.supplierName;
+  const rfqs = [...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const myQuotes = (S.supplierQuotes||[]).filter(q=>q.supplierName===supplierName);
+  return `
+  ${topbar(S.settings.companyName||'Ledger', `Supplier portal — ${supplierName}`, false,
+    `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
+  <div class="content">
+    <div class="section-title">Requests for quotation</div>
+    ${rfqs.length===0? `<div class="card"><div class="tiny muted">No requests yet.</div></div>` :
+      rfqs.map(r=>{
+        const submitted = !!myQuotes.find(q=>q.rfqId===r.id);
+        const statusBadge = r.status==='closed' ? {cls:'draft', label:'Closed'} : submitted ? {cls:'accepted', label:'Submitted'} : {cls:'pending', label:'Awaiting your price'};
+        return `<div class="card" onclick="goPush('supplier-rfq',{id:'${r.id}'})">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:600">${esc(r.title||'Untitled RFQ')}</div>
+              <div class="tiny mono muted">${esc(r.number)} · ${fmtDate(r.date)} · ${r.items.length} item${r.items.length===1?'':'s'}</div>
+            </div>
+            <span class="badge ${statusBadge.cls}">${statusBadge.label}</span>
+          </div>
+        </div>`;
+      }).join('')}
+  </div>`;
+}
+function renderSupplierRfqForm(id){
+  const rfq = S.rfqs.find(r=>r.id===id);
+  if(!rfq) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This request may have been removed.')}</div>`;
+  const supplierName = CURRENT_USER.supplierName;
+  const mine = (S.supplierQuotes||[]).find(q=>q.rfqId===id && q.supplierName===supplierName);
+  const closed = rfq.status==='closed';
+  return `
+  ${topbar(rfq.number, rfq.title, true)}
+  <div class="content">
+    ${rfq.notes?`<div class="card"><div class="small">${esc(rfq.notes)}</div></div>`:''}
+    ${closed?`<div class="card"><div class="tiny" style="color:var(--amber)">This request is closed — you can no longer submit or change your prices.</div></div>`:''}
+    ${rfq.items.map(it=>{
+      const qi = mine ? mine.items.find(x=>x.itemId===it.id) : null;
+      return `<div class="card">
+        <div style="font-weight:600;font-size:14px">${esc(it.desc)}${it.code?` <span class="tiny muted mono">(${esc(it.code)})</span>`:''}</div>
+        <div class="tiny muted" style="margin-bottom:8px">Qty needed: ${it.qty}${it.unit?' '+esc(it.unit):''}</div>
+        <label style="margin-top:0">Your price${it.unit?' per '+esc(it.unit):' per unit'}</label>
+        <input type="number" min="0" step="0.01" id="sq_price_${it.id}" value="${qi&&qi.price?qi.price:''}" placeholder="0.00" ${closed?'disabled':''}>
+        <label>Note (optional — e.g. not available, suggest an alternative)</label>
+        <input id="sq_note_${it.id}" value="${esc(qi?qi.note||'':'')}" placeholder="Optional note" ${closed?'disabled':''}>
+      </div>`;
+    }).join('')}
+    ${!closed?`<button class="btn btn-primary btn-block" onclick="saveSupplierQuote('${rfq.id}')">${ic('check')} Submit prices</button>`:''}
+  </div>`;
+}
+function saveSupplierQuote(rfqId){
+  const rfq=S.rfqs.find(r=>r.id===rfqId); if(!rfq) return;
+  if(rfq.status!=='open'){ toast('This RFQ is closed'); return; }
+  const supplierName=CURRENT_USER.supplierName;
+  const items=rfq.items.map(it=>{
+    const priceEl=document.getElementById('sq_price_'+it.id);
+    const noteEl=document.getElementById('sq_note_'+it.id);
+    return { itemId: it.id, price: Number(priceEl?priceEl.value:0)||0, note: (noteEl?noteEl.value:'').trim() };
+  });
+  const hasAny = items.some(i=>i.price>0 || i.note);
+  if(!hasAny){ toast('Enter at least one price or note'); return; }
+  if(!S.supplierQuotes) S.supplierQuotes=[];
+  let q=S.supplierQuotes.find(x=>x.rfqId===rfqId && x.supplierName===supplierName);
+  if(!q){ q={id:uid(), rfqId, supplierName, submittedAt:Date.now(), items:[]}; S.supplierQuotes.push(q); }
+  q.items=items;
+  q.submittedAt=Date.now();
+  persist('supplierQuotes');
+  logActivity(`Supplier "${supplierName}" submitted a quote for ${rfq.number}`);
+  toast('Quote submitted — thank you!');
+  goBack();
+}
+
 /* ---------- PURCHASE ATTACHMENTS (supplier invoice/receipt, for future reference) ----------
    Stored in Firebase Storage (not Firestore) — the purchase record only keeps a small
    {name,url,size,type,path} pointer, since Firestore documents here hold the *entire*
@@ -3392,6 +3686,9 @@ function renderMore(){
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('client-chats')">
         <div class="small" style="font-weight:600">Client messages</div>${ic('chev')}
       </div>
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('rfqs')">
+        <div class="small" style="font-weight:600">Supplier RFQs</div>${ic('chev')}
+      </div>
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('reports')">
         <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
       </div>
@@ -3591,6 +3888,10 @@ function sendClientChatReply(customer){
 let TEAM_EDIT_ID = null;
 function editTeamMember(id){ TEAM_EDIT_ID=id; render(); }
 function cancelTeamEdit(){ TEAM_EDIT_ID=null; render(); }
+function toggleTeamRoleWraps(role){
+  const c=document.getElementById('t_client_wrap'); if(c) c.style.display = role==='client'?'block':'none';
+  const s=document.getElementById('t_supplier_wrap'); if(s) s.style.display = role==='supplier'?'block':'none';
+}
 function renderTeamForm(){
   const staff = S.users.filter(u=>u.id!==CURRENT_USER.id);
   const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
@@ -3605,16 +3906,23 @@ function renderTeamForm(){
       <label>PIN / passcode ${editing?'<span class="tiny muted" style="font-weight:400">— leave blank to keep the current one</span>':'(min 4 characters)'}</label>
       <input id="t_pin" type="password" placeholder="••••">
       <label>Role</label>
-      <select id="t_role" onchange="document.getElementById('t_client_wrap').style.display=this.value==='client'?'block':'none'">
+      <select id="t_role" onchange="toggleTeamRoleWraps(this.value)">
         <option value="staff" ${role==='staff'?'selected':''}>Staff — can't delete, edit prices, or change settings</option>
         <option value="admin" ${role==='admin'?'selected':''}>Admin — full access</option>
         <option value="client" ${role==='client'?'selected':''}>Client — view-only access to their own project(s)</option>
+        <option value="supplier" ${role==='supplier'?'selected':''}>Supplier — logs in to submit prices for RFQs</option>
       </select>
       <div id="t_client_wrap" style="display:${role==='client'?'block':'none'}">
         <label>Customer</label>
         <input id="t_customer" placeholder="Customer name (must match projects/invoices)" value="${editing?esc(editing.clientCustomer||''):''}" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
         <div class="tiny muted" style="margin-top:2px">They'll see every project, invoice and quote billed to this exact customer name — nothing else.</div>
         ${customerDatalist()}
+      </div>
+      <div id="t_supplier_wrap" style="display:${role==='supplier'?'block':'none'}">
+        <label>Supplier name</label>
+        <input id="t_supplier" placeholder="Supplier / company name" value="${editing?esc(editing.supplierName||''):''}" oninput="acOpen(this,AC_OPTS.suppliers)" onfocus="acOpen(this,AC_OPTS.suppliers)" autocomplete="off">
+        <div class="tiny muted" style="margin-top:2px">Every price they submit is tagged with this exact supplier name, so you can tell suppliers apart.</div>
+        ${supplierDatalist()}
       </div>
       <div id="t_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px"></div>
       <div style="display:flex;gap:8px;margin-top:6px">
@@ -3625,7 +3933,7 @@ function renderTeamForm(){
     <div class="section-title">Team</div>
     ${staff.length===0? `<div class="card"><div class="tiny muted">Just you so far — add teammates above.</div></div>` :
       staff.map(u=>`<div class="card row-between">
-        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}`:'Staff'}</div></div>
+        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:'Staff'}</div></div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost btn-sm" onclick="editTeamMember('${u.id}')">${ic('edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
@@ -3639,26 +3947,31 @@ async function saveTeamMember(){
   const pin=document.getElementById('t_pin').value;
   const role=document.getElementById('t_role').value;
   const clientCustomer=document.getElementById('t_customer').value.trim();
+  const supplierName=document.getElementById('t_supplier').value.trim();
   const err=document.getElementById('t_err');
   const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
   if(!name||!username||(!editing&&pin.length<4)||(pin&&pin.length<4)){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
   if(role==='client' && !clientCustomer){ err.textContent='Pick which customer this client account belongs to.'; return; }
+  if(role==='supplier' && !supplierName){ err.textContent='Enter the supplier name this account belongs to.'; return; }
   if(S.users.some(u=>u.username===username && u.id!==TEAM_EDIT_ID)){ err.textContent='That username is already taken.'; return; }
+  const label = role==='client'?`client — ${clientCustomer}`:role==='supplier'?`supplier — ${supplierName}`:role;
   if(editing){
     editing.name=name; editing.username=username; editing.role=role;
     if(role==='client') editing.clientCustomer=clientCustomer; else delete editing.clientCustomer;
+    if(role==='supplier') editing.supplierName=supplierName; else delete editing.supplierName;
     if(pin) editing.passHash=await sha256(username+':'+pin);
     await persist('users');
-    logActivity(`Updated team member "${name}" (${role==='client'?`client — ${clientCustomer}`:role})`);
+    logActivity(`Updated team member "${name}" (${label})`);
     toast('Team member updated');
     TEAM_EDIT_ID=null;
   } else {
     const passHash=await sha256(username+':'+pin);
     const user={id:uid(), name, username, passHash, role};
     if(role==='client') user.clientCustomer=clientCustomer;
+    if(role==='supplier') user.supplierName=supplierName;
     S.users.push(user);
     await persist('users');
-    logActivity(`Added team member "${name}" (${role==='client'?`client — ${clientCustomer}`:role})`);
+    logActivity(`Added team member "${name}" (${label})`);
     toast('Team member added');
   }
   render();
