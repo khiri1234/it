@@ -506,14 +506,14 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{} };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{} };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='';
 let CHAT_DRAFT='';
@@ -1226,6 +1226,8 @@ function renderClientPortal(){
   const docs = [...S.invoices.map(d=>({...d,kind:'invoice'})), ...S.quotes.map(d=>({...d,kind:'quote'}))]
     .filter(d=>d.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const clientChatMsgs = (S.clientChats && S.clientChats[customer]) || [];
+  markClientChatRead(customer,'client');
+  const clientChatSeenLabel = clientThreadSeenLabel(customer, clientChatMsgs, 'client');
   return `
   ${topbar(S.settings.companyName||'Ledger', `Client portal — ${customer}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
@@ -1295,14 +1297,15 @@ function renderClientPortal(){
     <div class="section-title">Messages</div>
     <div class="card">
       ${clientChatMsgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">Send us a message and we'll reply here.</div>` :
-        `<div id="clientChatScroll">${clientChatMsgs.map(m=>{
+        `<div id="clientChatScroll">${clientChatMsgs.map((m,idx)=>{
           const mine = m.from==='client';
+          const showSeen = mine && idx===clientChatMsgs.length-1 && clientChatSeenLabel;
           return `<div class="chat-msg ${mine?'mine':''}">
             ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
             <div class="chat-bubble-wrap">
               ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
               <div class="chat-bubble">${esc(m.text)}</div>
-              <div class="chat-time">${fmtLogTime(m.ts)}</div>
+              <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(clientChatSeenLabel):''}</div>
             </div>
           </div>`;
         }).join('')}</div>`}
@@ -3443,20 +3446,46 @@ function renderActivityLog(){
 }
 
 /* ---------- TEAM CHAT ---------- */
+// Team chat "seen" — computed only for the last message you sent (WhatsApp-style),
+// against every other non-client user's last-read timestamp in S.chatReads.
+function markTeamChatRead(){
+  if(!CURRENT_USER || CURRENT_USER.role==='client') return;
+  const msgs = S.chat||[];
+  if(msgs.length===0) return;
+  const lastTs = msgs[msgs.length-1].ts;
+  if(!S.chatReads) S.chatReads={};
+  if((S.chatReads[CURRENT_USER.id]||0) >= lastTs) return;
+  S.chatReads[CURRENT_USER.id]=lastTs;
+  persist('chatReads');
+}
+function teamChatSeenLabel(msgs){
+  if(msgs.length===0) return '';
+  const last = msgs[msgs.length-1];
+  if(!CURRENT_USER || last.userId!==CURRENT_USER.id) return '';
+  const others = S.users.filter(u=>u.role!=='client' && u.id!==CURRENT_USER.id);
+  if(others.length===0) return '';
+  const seenBy = others.filter(u=>((S.chatReads&&S.chatReads[u.id])||0) >= last.ts);
+  if(seenBy.length===0) return '';
+  if(seenBy.length===others.length) return 'Seen';
+  return 'Seen by '+seenBy.map(u=>(u.name||'').split(' ')[0]).join(', ');
+}
 function renderChat(){
   const msgs = S.chat||[];
+  markTeamChatRead();
+  const seenLabel = teamChatSeenLabel(msgs);
   return `
   ${topbar('Team chat','Comments, to-dos, requests', true)}
   <div class="content">
     ${msgs.length===0? emptyState('chat','No messages yet','Say hello to the team below.') :
-      `<div id="chatScroll">${msgs.map(m=>{
+      `<div id="chatScroll">${msgs.map((m,idx)=>{
         const mine = CURRENT_USER && m.userId===CURRENT_USER.id;
+        const showSeen = mine && idx===msgs.length-1 && seenLabel;
         return `<div class="chat-msg ${mine?'mine':''}">
           ${!mine?`<div class="chat-avatar">${esc((m.userName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
           <div class="chat-bubble-wrap">
             ${!mine?`<div class="chat-sender">${esc(m.userName)}</div>`:''}
             <div class="chat-bubble">${esc(m.text)}</div>
-            <div class="chat-time">${fmtLogTime(m.ts)}</div>
+            <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(seenLabel):''}</div>
           </div>
         </div>`;
       }).join('')}</div>`}
@@ -3503,18 +3532,21 @@ function renderClientChatList(){
 }
 function renderClientChatThread(customer){
   const msgs = (S.clientChats && S.clientChats[customer]) || [];
+  markClientChatRead(customer,'staff');
+  const seenLabel = clientThreadSeenLabel(customer, msgs, 'staff');
   return `
   ${topbar(customer,'Private conversation', true)}
   <div class="content">
     ${msgs.length===0? emptyState('chat','No messages yet','Send the first message below.') :
-      `<div id="chatScroll">${msgs.map(m=>{
+      `<div id="chatScroll">${msgs.map((m,idx)=>{
         const mine = m.from==='staff';
+        const showSeen = mine && idx===msgs.length-1 && seenLabel;
         return `<div class="chat-msg ${mine?'mine':''}">
           ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
           <div class="chat-bubble-wrap">
             ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
             <div class="chat-bubble">${esc(m.text)}</div>
-            <div class="chat-time">${fmtLogTime(m.ts)}</div>
+            <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(seenLabel):''}</div>
           </div>
         </div>`;
       }).join('')}</div>`}
@@ -3523,6 +3555,26 @@ function renderClientChatThread(customer){
       <button class="chat-send" onclick="sendClientChatReply('${onclickStr(customer)}')">${ic('check')}</button>
     </div>
   </div>`;
+}
+// "Seen" for the private client<->staff thread — a strict two-sided read receipt,
+// unlike the group Team chat above. S.clientChatReads[customer] = {client:ts, staff:ts}.
+function markClientChatRead(customer, side){
+  const msgs = (S.clientChats && S.clientChats[customer]) || [];
+  if(msgs.length===0) return;
+  const lastTs = msgs[msgs.length-1].ts;
+  if(!S.clientChatReads) S.clientChatReads={};
+  if(!S.clientChatReads[customer]) S.clientChatReads[customer]={};
+  if((S.clientChatReads[customer][side]||0) >= lastTs) return;
+  S.clientChatReads[customer][side]=lastTs;
+  persist('clientChatReads');
+}
+function clientThreadSeenLabel(customer, msgs, viewerSide){
+  if(msgs.length===0) return '';
+  const last = msgs[msgs.length-1];
+  if(last.from!==viewerSide) return '';
+  const reads = (S.clientChatReads && S.clientChatReads[customer]) || {};
+  const otherSide = viewerSide==='staff'?'client':'staff';
+  return (reads[otherSide]||0) >= last.ts ? 'Seen' : '';
 }
 function sendClientChatReply(customer){
   const input = document.getElementById('clientChatReplyInput');
