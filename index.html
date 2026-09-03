@@ -515,7 +515,7 @@ const DEFAULT_SETTINGS={
 };
 let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{} };
 let VIEW = {name:'dashboard', params:{}};
-let SALES_TAB='invoices', STOCK_TAB='inventory';
+let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='';
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
 let CLIENT_CHAT_DRAFT='';
@@ -2408,7 +2408,10 @@ function renderStockList(){
     </div>
     <button class="fab" onclick="goPush('item-form',{id:null})">${ic('plus')}</button>`;
   } else {
-    const list=[...S.purchases].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    let list=[...S.purchases].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(PURCHASE_PROJECT_FILTER==='__none__') list=list.filter(p=>!p.projectId);
+    else if(PURCHASE_PROJECT_FILTER) list=list.filter(p=>p.projectId===PURCHASE_PROJECT_FILTER);
+    const sortedProjects=[...S.projects].sort((a,b)=>(a.number||'').localeCompare(b.number||''));
     return `
     ${topbar('Stock','Inventory & purchases')}
     <div class="content">
@@ -2416,15 +2419,24 @@ function renderStockList(){
         <button class="active" onclick="STOCK_TAB='purchases';render()">Purchases</button>
         <button onclick="STOCK_TAB='inventory';render()">Inventory</button>
       </div>
+      ${S.projects.length? `
+      <label>Filter by project</label>
+      <select onchange="PURCHASE_PROJECT_FILTER=this.value;render()">
+        <option value="" ${PURCHASE_PROJECT_FILTER===''?'selected':''}>All projects</option>
+        <option value="__none__" ${PURCHASE_PROJECT_FILTER==='__none__'?'selected':''}>No project</option>
+        ${sortedProjects.map(pr=>`<option value="${pr.id}" ${PURCHASE_PROJECT_FILTER===pr.id?'selected':''}>${esc(pr.number)} — ${esc(pr.name)}</option>`).join('')}
+      </select>` : ''}
       <div style="height:12px"></div>
-      ${list.length===0? emptyState('cart','No purchases yet','Record a purchase to stock up your inventory.') :
+      ${list.length===0? emptyState('cart', PURCHASE_PROJECT_FILTER?'No purchases for this filter':'No purchases yet', PURCHASE_PROJECT_FILTER?'Try a different project, or clear the filter.':'Record a purchase to stock up your inventory.') :
         list.map(p=>{
           const total=p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+          const proj = p.projectId ? S.projects.find(x=>x.id===p.projectId) : null;
           return `<div class="card stripe ${p.status}" onclick="go('purchase-view',{id:'${p.id}'})">
             <div class="row-between">
               <div>
                 <div style="font-weight:600">${esc(p.supplier||'Untitled')}</div>
                 <div class="tiny mono muted">${p.number} · ${fmtDate(p.date)}</div>
+                <div class="tiny muted" style="margin-top:2px">${proj? esc(proj.number)+' — '+esc(proj.name) : 'No project'}</div>
               </div>
               <div style="text-align:right">
                 <div class="mono" style="font-weight:600">${fmtMoney(total)}</div>
