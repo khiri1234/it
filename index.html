@@ -2955,6 +2955,9 @@ function renderRfqView(id){
       </div>`;
     }).join('')}
 
+    ${supplierNames.length>0 && isAdmin() ? `<button class="btn btn-teal btn-block" onclick="createPurchasesFromLowestPrices('${rfq.id}')">${ic('cart')} Create purchase(s) from lowest prices</button>
+    <div class="tiny muted" style="margin:6px 0 4px">Picks whichever supplier is cheapest on each item — if that's more than one supplier, one purchase is created per supplier.</div>` : ''}
+
     <div class="section-title">Suppliers</div>
     ${supplierNames.length===0? `<div class="card"><div class="tiny muted">No suppliers have quoted yet.</div></div>` :
       supplierNames.map(sn=>{
@@ -2998,6 +3001,43 @@ function createPurchaseFromSupplierQuote(rfqId, supplierName){
   logActivity(`Created purchase ${p.number} from ${supplierName}'s quote on ${rfq.number}`);
   toast('Purchase created from quote');
   go('purchase-view',{id:p.id});
+}
+// Picks whichever supplier quoted the lowest price on each item (ties broken
+// alphabetically by supplier name, for a deterministic result), groups the winning
+// items by supplier, and creates one purchase per supplier that won at least one item.
+function createPurchasesFromLowestPrices(rfqId){
+  if(!isAdmin()){ toast('Only admins can create purchases'); return; }
+  const rfq=S.rfqs.find(r=>r.id===rfqId); if(!rfq) return;
+  const quotes=(S.supplierQuotes||[]).filter(q=>q.rfqId===rfqId);
+  if(quotes.length===0){ toast('No supplier quotes yet'); return; }
+  const bySupplier={};
+  rfq.items.forEach(it=>{
+    let best=null;
+    quotes.forEach(q=>{
+      const qi=q.items.find(x=>x.itemId===it.id);
+      const price=qi?Number(qi.price):0;
+      if(price>0 && (!best || price<best.price || (price===best.price && q.supplierName<best.supplierName))){
+        best={supplierName:q.supplierName, price};
+      }
+    });
+    if(best){
+      if(!bySupplier[best.supplierName]) bySupplier[best.supplierName]=[];
+      bySupplier[best.supplierName].push({desc:it.desc, qty:it.qty, cost:best.price, invId:findInventoryByName(it.desc)?.id||null, boqItemId:null});
+    }
+  });
+  const supplierNames=Object.keys(bySupplier);
+  if(supplierNames.length===0){ toast('No items have been priced yet'); return; }
+  const createdIds=[];
+  supplierNames.forEach(sn=>{
+    const p={id:uid(), number:nextNumber('purchase'), supplier:sn, date:todayISO(), status:'pending', items:bySupplier[sn], notes:`Lowest price per item from ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:null};
+    S.purchases.push(p);
+    createdIds.push(p.id);
+  });
+  persist('purchases'); persist('settings');
+  logActivity(`Created ${createdIds.length} purchase${createdIds.length>1?'s':''} from lowest prices on ${rfq.number} (${supplierNames.join(', ')})`);
+  toast(`${createdIds.length} purchase${createdIds.length>1?'s':''} created from lowest prices`);
+  if(createdIds.length===1) go('purchase-view',{id:createdIds[0]});
+  else go('rfq-view',{id:rfq.id});
 }
 
 /* ---------- SUPPLIER PORTAL (login-only — sees open RFQs, submits prices) ---------- */
