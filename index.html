@@ -621,12 +621,13 @@ async function loadAll(){
     }
   }
 
+  let usersLoadFailed = false;
   if(FIREBASE_ENABLED){
     await Promise.all(KEYS.map(async k=>{
       try{
         const snap = await fbDB.collection('ledger').doc(k).get();
         if(snap.exists && snap.data().json) S[k]=JSON.parse(snap.data().json);
-      }catch(e){ console.error('firestore read failed',k,e); }
+      }catch(e){ console.error('firestore read failed',k,e); if(k==='users') usersLoadFailed=true; }
     }));
   } else if(typeof window.storage === 'undefined' || !window.storage){
     // No Claude storage bridge available (e.g. opened as a plain downloaded file, or outside claude.ai)
@@ -636,8 +637,17 @@ async function loadAll(){
       try{
         const r = await window.storage.get(k,true);
         if(r && r.value) S[k] = JSON.parse(r.value);
-      }catch(e){ /* not found yet, keep default */ }
+      }catch(e){ /* not found yet, keep default */ if(k==='users') usersLoadFailed=true; }
     }));
+  }
+  if(usersLoadFailed){
+    // Couldn't confirm whether a team already exists (e.g. a flaky connection dropped
+    // just this one read) — never fall through to "Set up Ledger" on a failed read, since
+    // creating a new admin account there would overwrite the real team's data. Show the
+    // same retry screen used for an outright connection failure instead.
+    STORAGE_MODE='error';
+    render();
+    return;
   }
   if(!S.settings || !S.settings.companyName) S.settings = {...DEFAULT_SETTINGS, ...(S.settings||{})};
   render();
