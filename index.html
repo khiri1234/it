@@ -1463,7 +1463,6 @@ function render(){
     case 'chat': body = renderChat(); break;
     case 'client-chats': body = renderClientChatList(); break;
     case 'client-chat': body = renderClientChatThread(VIEW.params.customer); break;
-    case 'rfqs': body = renderRfqsList(); break;
     case 'rfq-form': body = renderRfqForm(VIEW.params.id); break;
     case 'rfq-view': body = renderRfqView(VIEW.params.id); break;
     default: body = renderDashboard();
@@ -1492,12 +1491,11 @@ function topbar(title, sub, showBack, rightBtn){
 const TAB_SECTIONS={
   'dashboard':'dashboard',
   'sales':'sales','invoice-form':'sales','quote-form':'sales','invoice-view':'sales','quote-view':'sales','bulk-payment':'sales',
-  'stock':'stock','item-form':'stock','purchase-form':'stock','purchase-view':'stock','inventory-import':'stock',
+  'stock':'stock','item-form':'stock','purchase-form':'stock','purchase-view':'stock','inventory-import':'stock','rfq-form':'stock','rfq-view':'stock',
   'projects':'projects','project-form':'projects','project-view':'projects','project-cost':'projects',
   'reports':'more',
   'chat':'more',
   'client-chats':'more','client-chat':'more',
-  'rfqs':'more','rfq-form':'more','rfq-view':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){ STACK=[]; go(id); }
@@ -2392,17 +2390,21 @@ function applyHashRoute(){
   return true;
 }
 
-/* ---------- STOCK (Inventory / Purchases) ---------- */
+/* ---------- STOCK (Inventory / Purchases / Supplier RFQs) ---------- */
+function stockSegmented(active){
+  return `<div class="segmented">
+    <button class="${active==='purchases'?'active':''}" onclick="STOCK_TAB='purchases';render()">Purchases</button>
+    <button class="${active==='inventory'?'active':''}" onclick="STOCK_TAB='inventory';render()">Inventory</button>
+    <button class="${active==='rfqs'?'active':''}" onclick="STOCK_TAB='rfqs';render()">RFQs</button>
+  </div>`;
+}
 function renderStockList(){
   if(STOCK_TAB==='inventory'){
     const items=[...S.inventory].sort((a,b)=>a.name.localeCompare(b.name));
     return `
     ${topbar('Stock','Inventory & purchases')}
     <div class="content">
-      <div class="segmented">
-        <button onclick="STOCK_TAB='purchases';render()">Purchases</button>
-        <button class="active" onclick="STOCK_TAB='inventory';render()">Inventory</button>
-      </div>
+      ${stockSegmented('inventory')}
       ${S.projects.length?`<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('inventory-import',{})">${ic('box')} Import items from projects' BOQs</button></div>`:''}
       <div style="height:12px"></div>
       ${items.length===0? emptyState('box','No items yet','Tap + to add your first product or service.') :
@@ -2423,6 +2425,29 @@ function renderStockList(){
         }).join('')}
     </div>
     <button class="fab" onclick="goPush('item-form',{id:null})">${ic('plus')}</button>`;
+  } else if(STOCK_TAB==='rfqs'){
+    const list=[...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    return `
+    ${topbar('Stock','Inventory & purchases')}
+    <div class="content">
+      ${stockSegmented('rfqs')}
+      <div style="height:12px"></div>
+      ${list.length===0? emptyState('mail','No RFQs yet','Create one to request pricing from your suppliers.') :
+        list.map(r=>{
+          const quoteCount = new Set((S.supplierQuotes||[]).filter(q=>q.rfqId===r.id).map(q=>q.supplierName)).size;
+          return `<div class="card stripe ${rfqBadgeClass(r.status)}" onclick="go('rfq-view',{id:'${r.id}'})">
+            <div class="row-between">
+              <div>
+                <div style="font-weight:600">${esc(r.title||'Untitled RFQ')}</div>
+                <div class="tiny mono muted">${esc(r.number)} · ${fmtDate(r.date)}</div>
+              </div>
+              <span class="badge ${rfqBadgeClass(r.status)}">${r.status}</span>
+            </div>
+            <div class="tiny muted" style="margin-top:6px">${r.items.length} item${r.items.length===1?'':'s'} · ${quoteCount} supplier${quoteCount===1?'':'s'} quoted</div>
+          </div>`;
+        }).join('')}
+    </div>
+    <button class="fab" onclick="newRfq()">${ic('plus')}</button>`;
   } else {
     let list=[...S.purchases].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(PURCHASE_PROJECT_FILTER==='__none__') list=list.filter(p=>!p.projectId);
@@ -2431,10 +2456,7 @@ function renderStockList(){
     return `
     ${topbar('Stock','Inventory & purchases')}
     <div class="content">
-      <div class="segmented">
-        <button class="active" onclick="STOCK_TAB='purchases';render()">Purchases</button>
-        <button onclick="STOCK_TAB='inventory';render()">Inventory</button>
-      </div>
+      ${stockSegmented('purchases')}
       ${S.projects.length? `
       <label>Filter by project</label>
       <select onchange="PURCHASE_PROJECT_FILTER=this.value;render()">
@@ -2802,28 +2824,6 @@ function deletePurchase(id){
    can one-tap turn a chosen supplier's priced items into a Purchase. */
 function rfqBadgeClass(status){ return status==='closed' ? 'completed' : 'sent'; }
 function newRfq(){ goPush('rfq-form',{id:null}); }
-function renderRfqsList(){
-  const list=[...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return `
-  ${topbar('Supplier RFQs','Request & compare supplier prices', true)}
-  <div class="content">
-    ${list.length===0? emptyState('mail','No RFQs yet','Create one to request pricing from your suppliers.') :
-      list.map(r=>{
-        const quoteCount = new Set((S.supplierQuotes||[]).filter(q=>q.rfqId===r.id).map(q=>q.supplierName)).size;
-        return `<div class="card stripe ${rfqBadgeClass(r.status)}" onclick="go('rfq-view',{id:'${r.id}'})">
-          <div class="row-between">
-            <div>
-              <div style="font-weight:600">${esc(r.title||'Untitled RFQ')}</div>
-              <div class="tiny mono muted">${esc(r.number)} · ${fmtDate(r.date)}</div>
-            </div>
-            <span class="badge ${rfqBadgeClass(r.status)}">${r.status}</span>
-          </div>
-          <div class="tiny muted" style="margin-top:6px">${r.items.length} item${r.items.length===1?'':'s'} · ${quoteCount} supplier${quoteCount===1?'':'s'} quoted</div>
-        </div>`;
-      }).join('')}
-  </div>
-  <button class="fab" onclick="newRfq()">${ic('plus')}</button>`;
-}
 function renderRfqForm(id){
   const editing = id ? S.rfqs.find(r=>r.id===id) : null;
   const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}]};
@@ -3725,9 +3725,6 @@ function renderMore(){
       </div>
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('client-chats')">
         <div class="small" style="font-weight:600">Client messages</div>${ic('chev')}
-      </div>
-      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('rfqs')">
-        <div class="small" style="font-weight:600">Supplier RFQs</div>${ic('chev')}
       </div>
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('reports')">
         <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
