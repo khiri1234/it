@@ -2411,28 +2411,35 @@ function stockSegmented(active){
 function renderStockList(){
   if(STOCK_TAB==='inventory'){
     const items=[...S.inventory].sort((a,b)=>a.name.localeCompare(b.name));
+    // Group alphabetically under an A–Z (and "#" for anything not starting with a
+    // letter) header, like a contacts list, so a long inventory is easy to scan.
+    let lastLetter=null;
+    const itemsHtml = items.map(i=>{
+      const firstChar = (i.name||'').trim().charAt(0).toUpperCase();
+      const groupLetter = /[A-Z]/.test(firstChar) ? firstChar : '#';
+      const header = groupLetter!==lastLetter ? `<div class="section-title" style="margin-top:${lastLetter===null?'0':'18px'}">${groupLetter}</div>` : '';
+      lastLetter = groupLetter;
+      const low = Number(i.stock) <= Number(i.lowStockThreshold||0);
+      return header + `<div class="card" onclick="goPush('item-form',{id:'${i.id}'})">
+        <div class="row-between">
+          <div>
+            <div style="font-weight:600">${esc(i.name)}</div>
+            <div class="tiny mono muted">${esc(i.sku||'—')} · ${fmtMoney(i.sellPrice)}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="mono" style="font-weight:700;${low?'color:var(--red)':''}">${i.stock}</div>
+            <div class="tiny muted">${low?'low stock':'in stock'}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
     return `
     ${topbar('Stock','Inventory & purchases')}
     <div class="content">
       ${stockSegmented('inventory')}
       ${S.projects.length?`<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('inventory-import',{})">${ic('box')} Import items from projects' BOQs</button></div>`:''}
       <div style="height:12px"></div>
-      ${items.length===0? emptyState('box','No items yet','Tap + to add your first product or service.') :
-        items.map(i=>{
-          const low = Number(i.stock) <= Number(i.lowStockThreshold||0);
-          return `<div class="card" onclick="goPush('item-form',{id:'${i.id}'})">
-            <div class="row-between">
-              <div>
-                <div style="font-weight:600">${esc(i.name)}</div>
-                <div class="tiny mono muted">${esc(i.sku||'—')} · ${fmtMoney(i.sellPrice)}</div>
-              </div>
-              <div style="text-align:right">
-                <div class="mono" style="font-weight:700;${low?'color:var(--red)':''}">${i.stock}</div>
-                <div class="tiny muted">${low?'low stock':'in stock'}</div>
-              </div>
-            </div>
-          </div>`;
-        }).join('')}
+      ${items.length===0? emptyState('box','No items yet','Tap + to add your first product or service.') : itemsHtml}
     </div>
     <button class="fab" onclick="goPush('item-form',{id:null})">${ic('plus')}</button>`;
   } else if(STOCK_TAB==='rfqs'){
