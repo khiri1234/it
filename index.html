@@ -1182,7 +1182,7 @@ function renderLogin(){
   const rid = rememberedUserId();
   const rememberedUser = rid ? S.users.find(u=>u.id===rid) : null;
   return `
-  <div class="content" style="padding-top:60px">
+  <div class="content" style="padding-top:110px">
     <div style="text-align:center;margin-bottom:22px">
       <div class="display" style="font-size:22px;font-weight:700">${esc(S.settings.companyName||'Ledger')}</div>
       <div class="tiny muted">Sign in to continue</div>
