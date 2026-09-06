@@ -1804,7 +1804,7 @@ function renderItemRows(items){
   AC_OPTS.inventoryNames = S.inventory.map(i=>i.name);
   return items.map((it,idx)=>`
     <div class="item-row" data-idx="${idx}">
-      <input placeholder="Item / service description" value="${esc(it.desc)}"
+      <input placeholder="Item description" value="${esc(it.desc)}"
         oninput="onItemDescChange(${idx}, this.value);acOpen(this,AC_OPTS.inventoryNames)" onfocus="acOpen(this,AC_OPTS.inventoryNames)" autocomplete="off" class="rowDesc">
       <div class="item-grid">
         <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" oninput="liveTotals()" class="rowQty"></div>
