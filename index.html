@@ -2070,15 +2070,17 @@ function buildPdfHTML(kind, id, opts){
     const t = calcTotals(d.items, d.vatOn, d.vatRate, d.discountPct);
     const paid = kind==='invoice' ? paymentsSum(d) : 0;
     const rem = kind==='invoice' ? Math.max(0,t.total-paid) : 0;
-    const rows = t.calced.map((it,i)=>`
+    const rows = t.calced.map((it,i)=>{
+      const invDesc = kind==='invoice' ? findInventoryByName(it.desc)?.sku : '';
+      return `
       <tr>
         <td>${i+1}</td>
-        <td>${esc(it.desc)}</td>
+        <td>${esc(invDesc || it.desc)}</td>
         <td class="num">${it.qty}</td>
         <td class="num">${fmtMoney(it.price)}</td>
         <td class="num">${it.discountPct?it.discountPct+'%':'—'}</td>
         <td class="num">${fmtMoney(it.net)}</td>
-      </tr>`).join('');
+      </tr>`;}).join('');
     return `
     <div class="pdf-page">
       ${pdfHeader(kind==='invoice'?'Tax Invoice':'Quotation', d.number, d.status)}
