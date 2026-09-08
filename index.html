@@ -871,19 +871,71 @@ function calcItems(items){
     return {...it, gross, discAmt, net: gross-discAmt};
   });
 }
-function calcTotals(items, vatOn, vatRate, overallDiscPct){
+function calcTotals(items, vatOn, vatRate, overallDiscPct, charges){
   const calced = calcItems(items);
   const subtotal = calced.reduce((a,b)=>a+b.net,0);
   const overallDiscAmt = subtotal*((Number(overallDiscPct)||0)/100);
   const afterDisc = subtotal - overallDiscAmt;
-  const vatAmt = vatOn ? afterDisc*((Number(vatRate)||0)/100) : 0;
-  const total = afterDisc+vatAmt;
-  return {calced, subtotal, overallDiscAmt, afterDisc, vatAmt, total};
+  const chargesTotal = (charges||[]).reduce((a,c)=>a+(Number(c.amount)||0),0);
+  const taxableBase = afterDisc + chargesTotal;
+  const vatAmt = vatOn ? taxableBase*((Number(vatRate)||0)/100) : 0;
+  const total = taxableBase+vatAmt;
+  return {calced, subtotal, overallDiscAmt, afterDisc, chargesTotal, vatAmt, total};
+}
+
+/* ---------- ADDITIONAL CHARGES (shipping, card fees, etc.) ---------- */
+const CHARGE_PRESETS=['Shipping','Card charge','Delivery fee','Handling fee'];
+function chargesSum(charges){ return (charges||[]).reduce((a,c)=>a+(Number(c.amount)||0),0); }
+function purchaseTotal(p){ return (p.items||[]).reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0) + chargesSum(p.charges); }
+function renderChargeRows(charges, containerId){
+  return (charges||[]).map((c,idx)=>`
+    <div class="charge-row" data-idx="${idx}">
+      <div class="item-grid">
+        <input placeholder="Charge description" value="${esc(c.desc)}" oninput="chargesChanged('${containerId}')" class="chgDesc" style="flex:2">
+        <input type="number" min="0" step="0.01" placeholder="Amount" value="${c.amount||0}" oninput="chargesChanged('${containerId}')" class="chgAmount" style="flex:1">
+        <button class="btn btn-ghost btn-sm" onclick="removeChargeRow('${containerId}',${idx})">${ic('trash')}</button>
+      </div>
+    </div>`).join('');
+}
+function readChargesFromDOM(containerId){
+  const wrap=document.getElementById(containerId);
+  if(!wrap) return [];
+  return [...wrap.querySelectorAll('.charge-row')].map(r=>({
+    desc: r.querySelector('.chgDesc').value.trim(),
+    amount: Number(r.querySelector('.chgAmount').value)||0
+  })).filter(c=>c.desc || c.amount);
+}
+function addChargeRow(containerId, presetDesc){
+  const charges=readChargesFromDOM(containerId);
+  charges.push({desc:presetDesc||'', amount:0});
+  document.getElementById(containerId).innerHTML = renderChargeRows(charges, containerId);
+  chargesChanged(containerId);
+}
+function removeChargeRow(containerId, idx){
+  const charges=readChargesFromDOM(containerId);
+  charges.splice(idx,1);
+  document.getElementById(containerId).innerHTML = renderChargeRows(charges, containerId);
+  chargesChanged(containerId);
+}
+function chargesChanged(containerId){
+  if(containerId==='chargesWrap') liveTotals();
+  else if(containerId==='pChargesWrap') purchaseLiveTotals();
+}
+function chargesSection(charges, containerId){
+  return `
+    <div class="section-title">Additional charges</div>
+    <div class="card">
+      <div class="chip-row" style="margin-bottom:10px">
+        ${CHARGE_PRESETS.map(p=>`<div class="chip" onclick="addChargeRow('${containerId}','${p}')">${p}</div>`).join('')}
+      </div>
+      <div id="${containerId}">${renderChargeRows(charges, containerId)}</div>
+      <button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" onclick="addChargeRow('${containerId}')">${ic('plus')} Add charge</button>
+    </div>`;
 }
 
 /* ---------- PAYMENTS ---------- */
 const PAY_METHODS=['Cash','Card','Bank transfer','Stripe','Cheque','Other'];
-function docTotal(d){ return calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct).total; }
+function docTotal(d){ return calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct,d.charges).total; }
 function paymentsSum(d){ return (d.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0); }
 function remaining(d){ return Math.max(0, docTotal(d) - paymentsSum(d)); }
 function refreshPaymentStatus(d){
@@ -911,7 +963,7 @@ function boqLineStatus(item){
   return '';
 }
 const BOQ_STATUS_LABEL={'boq-over':'Over-purchased','boq-installed':'Installed','boq-purchased':'Purchased','boq-under':'Under-purchased'};
-function projectValue(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineTotal(b),0); }
+function projectValue(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineTotal(b),0) + chargesSum(p.charges); }
 function projectCost(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineCost(b),0); }
 function projectProfit(p){ return projectValue(p)-projectCost(p); }
 function projectAdvances(p){ return (p.payments||[]).reduce((a,pay)=>a+(Number(pay.amount)||0),0); }
@@ -1719,7 +1771,7 @@ function renderSalesList(){
     <div style="height:12px"></div>
     ${sorted.length===0? emptyState('sales', SALES_TAB==='invoices'?'No invoices yet':'No quotes yet', 'Tap the + button to create one.') :
       sorted.map(d=>{
-        const t = calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct);
+        const t = calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct,d.charges);
         return `<div class="card stripe ${d.status}" onclick="go('${SALES_TAB==='invoices'?'invoice':'quote'}-view',{id:'${d.id}'})">
           <div class="row-between">
             <div>
@@ -1745,7 +1797,7 @@ function renderDocForm(type, id){
   const editing = id ? list.find(d=>d.id===id) : null;
   const d = editing || {
     id:null, number:null, date:todayISO(), dueDate:'', customer:'', phone:'', email:'',
-    items:[{desc:'',qty:1,price:0,discountPct:0,invId:null}],
+    items:[{desc:'',qty:1,price:0,discountPct:0,invId:null}], charges:[],
     vatOn: S.settings.vatDefaultOn, vatRate:S.settings.vatRate, discountPct:0,
     status:'draft', notes:'', payments:[]
   };
@@ -1777,6 +1829,8 @@ function renderDocForm(type, id){
     <div class="section-title">Items</div>
     <div id="itemsWrap">${renderItemRows(d.items)}</div>
     <button class="btn btn-ghost btn-block" onclick="addItemRow()">${ic('plus')} Add item</button>
+
+    ${chargesSection(d.charges, 'chargesWrap')}
 
     <div class="card" style="margin-top:14px">
       <div class="toggle-row">
@@ -1861,12 +1915,14 @@ function liveTotals(){
   const box=document.getElementById('totalsBox');
   if(!box) return;
   const items=readItemsFromDOM();
+  const charges=readChargesFromDOM('chargesWrap');
   const vatOn=document.getElementById('f_vat')?.checked;
   const discountPct=Number(document.getElementById('f_disc')?.value)||0;
-  const t=calcTotals(items,vatOn,S.settings.vatRate,discountPct);
+  const t=calcTotals(items,vatOn,S.settings.vatRate,discountPct,charges);
   box.innerHTML=`
     <div class="line"><span class="muted">Subtotal</span><span class="mono">${fmtMoney(t.subtotal)}</span></div>
     ${t.overallDiscAmt?`<div class="line"><span class="muted">Discount</span><span class="mono">-${fmtMoney(t.overallDiscAmt)}</span></div>`:''}
+    ${t.chargesTotal?`<div class="line"><span class="muted">Additional charges</span><span class="mono">${fmtMoney(t.chargesTotal)}</span></div>`:''}
     ${vatOn?`<div class="line"><span class="muted">VAT (${S.settings.vatRate}%)</span><span class="mono">${fmtMoney(t.vatAmt)}</span></div>`:''}
     <div class="line grand"><span>Total</span><span class="mono">${fmtMoney(t.total)}</span></div>`;
 }
@@ -1892,6 +1948,7 @@ function saveDoc(type,id){
   doc.dueDate=document.getElementById('f_due').value||'';
   doc.status=document.getElementById('f_status').value;
   doc.items=items;
+  doc.charges=readChargesFromDOM('chargesWrap');
   doc.vatOn=document.getElementById('f_vat').checked;
   doc.vatRate=S.settings.vatRate;
   doc.discountPct=Number(document.getElementById('f_disc').value)||0;
@@ -1937,7 +1994,7 @@ function renderDocView(type,id){
   const list = type==='invoice'? S.invoices : S.quotes;
   const d = list.find(x=>x.id===id);
   if(!d) return topbar('Not found','',true)+`<div class="content">${emptyState('sales','Not found','This document may have been deleted.')}</div>`;
-  const t = calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct);
+  const t = calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct,d.charges);
   const statusOptions = type==='invoice' ? ['draft','sent','partial','paid','overdue'] : ['draft','sent','accepted'];
   const paid = type==='invoice' ? paymentsSum(d) : 0;
   const rem = type==='invoice' ? Math.max(0,t.total-paid) : 0;
@@ -1977,9 +2034,14 @@ function renderDocView(type,id){
           <div class="row-between"><div style="font-weight:600;font-size:14px">${esc(it.desc)}</div><div class="mono">${fmtMoney(it.net)}</div></div>
           <div class="tiny muted mono">${it.qty} × ${fmtMoney(it.price)}${it.discountPct?` · -${it.discountPct}%`:''}</div>
         </div>`).join('')}
+      ${(d.charges&&d.charges.length)? d.charges.map(c=>`
+        <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div class="row-between"><div style="font-weight:600;font-size:14px">${esc(c.desc)}</div><div class="mono">${fmtMoney(c.amount)}</div></div>
+        </div>`).join('') : ''}
       <div class="totals">
         <div class="line"><span class="muted">Subtotal</span><span class="mono">${fmtMoney(t.subtotal)}</span></div>
         ${t.overallDiscAmt?`<div class="line"><span class="muted">Discount (${d.discountPct}%)</span><span class="mono">-${fmtMoney(t.overallDiscAmt)}</span></div>`:''}
+        ${t.chargesTotal?`<div class="line"><span class="muted">Additional charges</span><span class="mono">${fmtMoney(t.chargesTotal)}</span></div>`:''}
         ${d.vatOn?`<div class="line"><span class="muted">VAT (${d.vatRate}%)</span><span class="mono">${fmtMoney(t.vatAmt)}</span></div>`:`<div class="line"><span class="muted">VAT</span><span class="mono">Not applied</span></div>`}
         <div class="line grand"><span>Total due</span><span class="mono">${fmtMoney(t.total)}</span></div>
       </div>
@@ -2070,7 +2132,7 @@ function buildPdfHTML(kind, id, opts){
   if(kind==='invoice' || kind==='quote'){
     const list = kind==='invoice' ? S.invoices : S.quotes;
     const d = list.find(x=>x.id===id); if(!d) return '';
-    const t = calcTotals(d.items, d.vatOn, d.vatRate, d.discountPct);
+    const t = calcTotals(d.items, d.vatOn, d.vatRate, d.discountPct, d.charges);
     const paid = kind==='invoice' ? paymentsSum(d) : 0;
     const rem = kind==='invoice' ? Math.max(0,t.total-paid) : 0;
     const rows = t.calced.map((it,i)=>{
@@ -2108,6 +2170,7 @@ function buildPdfHTML(kind, id, opts){
       <div class="pdf-totals">
         <div class="line muted"><span>Subtotal</span><span>${fmtMoney(t.subtotal)}</span></div>
         ${t.overallDiscAmt?`<div class="line muted"><span>Discount (${d.discountPct}%)</span><span>-${fmtMoney(t.overallDiscAmt)}</span></div>`:''}
+        ${(d.charges&&d.charges.length)? d.charges.map(c=>`<div class="line muted"><span>${esc(c.desc)}</span><span>${fmtMoney(c.amount)}</span></div>`).join('') : ''}
         <div class="line muted"><span>VAT${d.vatOn?` (${d.vatRate}%)`:''}</span><span>${d.vatOn?fmtMoney(t.vatAmt):'Not applied'}</span></div>
         <div class="line grand"><span>Total</span><span>${fmtMoney(t.total)}</span></div>
         ${kind==='invoice' && paid>0 ? `
@@ -2120,7 +2183,7 @@ function buildPdfHTML(kind, id, opts){
   }
   if(kind==='purchase'){
     const p = S.purchases.find(x=>x.id===id); if(!p) return '';
-    const total = p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+    const total = purchaseTotal(p);
     const rows = p.items.map((it,i)=>`
       <tr>
         <td>${i+1}</td>
@@ -2148,6 +2211,7 @@ function buildPdfHTML(kind, id, opts){
         <tbody>${rows}</tbody>
       </table>
       ${showPrices?`<div class="pdf-totals">
+        ${(p.charges&&p.charges.length)? p.charges.map(c=>`<div class="line muted"><span>${esc(c.desc)}</span><span>${fmtMoney(c.amount)}</span></div>`).join('') : ''}
         <div class="line grand"><span>Total</span><span>${fmtMoney(total)}</span></div>
       </div>`:''}
       ${p.notes?`<div class="pdf-notes"><div class="label">Notes</div>${esc(p.notes).replace(/\n/g,'<br>')}</div>`:''}
@@ -2187,6 +2251,7 @@ function buildPdfHTML(kind, id, opts){
         <tbody>${rows}</tbody>
       </table>
       <div class="pdf-totals">
+        ${(p.charges&&p.charges.length)? p.charges.map(c=>`<div class="line muted"><span>${esc(c.desc)}</span><span>${fmtMoney(c.amount)}</span></div>`).join('') : ''}
         <div class="line grand"><span>Total value</span><span>${fmtMoney(val)}</span></div>
         ${adv>0?`
         <div class="line muted"><span>Advances received</span><span>${fmtMoney(adv)}</span></div>
@@ -2204,11 +2269,13 @@ function buildShareSummary(kind,id){
   if(kind==='invoice'||kind==='quote'){
     const list = kind==='invoice'?S.invoices:S.quotes;
     const d=list.find(x=>x.id===id); if(!d) return null;
-    const t=calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct);
+    const t=calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct,d.charges);
     let text=`${kind==='invoice'?'Invoice':'Quote'} ${d.number}\n${S.settings.companyName}\n\nBill to: ${d.customer}\nDate: ${fmtDate(d.date)}\n\n`;
     t.calced.forEach(it=>{ text+=`${it.desc} — ${it.qty} × ${fmtMoney(it.price)} = ${fmtMoney(it.net)}\n`; });
+    (d.charges||[]).forEach(c=>{ text+=`${c.desc} — ${fmtMoney(c.amount)}\n`; });
     text+=`\nSubtotal: ${fmtMoney(t.subtotal)}\n`;
     if(t.overallDiscAmt) text+=`Discount: -${fmtMoney(t.overallDiscAmt)}\n`;
+    if(t.chargesTotal) text+=`Additional charges: ${fmtMoney(t.chargesTotal)}\n`;
     if(d.vatOn) text+=`VAT (${d.vatRate}%): ${fmtMoney(t.vatAmt)}\n`;
     text+=`Total: ${fmtMoney(t.total)}\n`;
     if(kind==='invoice'){
@@ -2219,9 +2286,10 @@ function buildShareSummary(kind,id){
   }
   if(kind==='purchase'){
     const p=S.purchases.find(x=>x.id===id); if(!p) return null;
-    const total=p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+    const total=purchaseTotal(p);
     let text=`Purchase Order ${p.number}\n${S.settings.companyName}\n\nSupplier: ${p.supplier}\nDate: ${fmtDate(p.date)}\n\n`;
     p.items.forEach(it=>{ text+=`${it.desc} — Qty ${it.qty}\n`; });
+    (p.charges||[]).forEach(c=>{ text+=`${c.desc} — ${fmtMoney(c.amount)}\n`; });
     text+=`\nTotal: ${fmtMoney(total)}\n`;
     return {title:`Purchase ${p.number}`, text, number:p.number};
   }
@@ -2230,6 +2298,7 @@ function buildShareSummary(kind,id){
     const val=projectValue(p);
     let text=`Project ${p.number} — ${p.name}\n${S.settings.companyName}\n\nCustomer: ${p.customer}\nStatus: ${p.status}\n\nScope:\n`;
     (p.boq||[]).forEach(b=>{ text+=`${b.desc} — ${b.qty} ${b.unit||''}\n`; });
+    (p.charges||[]).forEach(c=>{ text+=`${c.desc} — ${fmtMoney(c.amount)}\n`; });
     text+=`\nTotal value: ${fmtMoney(val)}\n`;
     const adv=projectAdvances(p);
     if(adv>0) text+=`Advances received: ${fmtMoney(adv)}\nBalance due: ${fmtMoney(projectBalance(p))}\n`;
@@ -2682,7 +2751,7 @@ function saveBoqImport(){
 function newPurchase(){ goPush('purchase-form',{id:null}); }
 function renderPurchaseForm(id){
   const editing = id? S.purchases.find(p=>p.id===id): null;
-  const p = editing || {id:null,number:null,date:todayISO(),supplier:'',status:'pending',items:[{desc:'',qty:1,cost:0,invId:null,boqItemId:null}],notes:'',stockApplied:false,projectId:null};
+  const p = editing || {id:null,number:null,date:todayISO(),supplier:'',status:'pending',items:[{desc:'',qty:1,cost:0,invId:null,boqItemId:null}],charges:[],notes:'',stockApplied:false,projectId:null};
   return `
   ${topbar(editing?'Edit purchase':'New purchase', editing?p.number:'', true)}
   <div class="content">
@@ -2708,6 +2777,9 @@ function renderPurchaseForm(id){
     <div class="section-title">Items purchased</div>
     <div id="pItemsWrap">${renderPurchaseRows(p.items)}</div>
     <button class="btn btn-ghost btn-block" onclick="addPurchaseRow()">${ic('plus')} Add item</button>
+
+    ${chargesSection(p.charges, 'pChargesWrap')}
+
     <div class="card" style="margin-top:14px">
       <div class="totals" id="pTotalsBox"></div>
     </div>
@@ -2765,8 +2837,13 @@ function removePurchaseRow(idx){
 function purchaseLiveTotals(){
   const box=document.getElementById('pTotalsBox'); if(!box) return;
   const items=readPurchaseItemsFromDOM();
-  const total=items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
-  box.innerHTML=`<div class="line grand"><span>Total cost</span><span class="mono">${fmtMoney(total)}</span></div>`;
+  const charges=readChargesFromDOM('pChargesWrap');
+  const itemsTotal=items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+  const chargesTotal=chargesSum(charges);
+  const total=itemsTotal+chargesTotal;
+  box.innerHTML=`
+    ${chargesTotal?`<div class="line"><span class="muted">Additional charges</span><span class="mono">${fmtMoney(chargesTotal)}</span></div>`:''}
+    <div class="line grand"><span>Total cost</span><span class="mono">${fmtMoney(total)}</span></div>`;
 }
 function shareForQuotation(){
   const supplier=document.getElementById('p_supplier').value.trim();
@@ -2857,6 +2934,7 @@ function savePurchase(id){
   p.date=document.getElementById('p_date').value||todayISO();
   p.status=document.getElementById('p_status').value;
   p.items=items;
+  p.charges=readChargesFromDOM('pChargesWrap');
   p.notes=document.getElementById('p_notes').value;
   p.projectId=document.getElementById('p_project').value||null;
   if(p.status==='received'){
@@ -3278,7 +3356,7 @@ function renderPurchaseAttachments(p){
 function renderPurchaseView(id){
   const p=S.purchases.find(x=>x.id===id);
   if(!p) return topbar('Not found','',true)+`<div class="content">${emptyState('cart','Not found','')}</div>`;
-  const total=p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+  const total=purchaseTotal(p);
   return `
   ${topbar(p.number,p.supplier,true, `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="showShareMenu('purchase','${p.id}')">${ic('share')}</button>`)}
   <div class="content">
@@ -3290,6 +3368,9 @@ function renderPurchaseView(id){
       ${p.items.map(it=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
         <div class="small">${esc(it.desc)} <span class="muted tiny mono">×${it.qty}</span></div>
         <div class="mono">${fmtMoney(it.qty*it.cost)}</div></div>`).join('')}
+      ${(p.charges&&p.charges.length)? p.charges.map(c=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
+        <div class="small">${esc(c.desc)}</div>
+        <div class="mono">${fmtMoney(c.amount)}</div></div>`).join('') : ''}
       <div class="totals"><div class="line grand"><span>Total</span><span class="mono">${fmtMoney(total)}</span></div></div>
     </div>
     ${p.notes?`<div class="card"><div class="small">${esc(p.notes)}</div></div>`:''}
@@ -3396,7 +3477,7 @@ function saveProject(id){
   const customer=document.getElementById('pj_customer').value.trim();
   if(!name||!customer){ toast('Enter a project name and customer'); return; }
   const isNew=!id; let p;
-  if(isNew){ p={id:uid(), number:nextNumber('project'), boq:[], payments:[]}; S.projects.push(p); }
+  if(isNew){ p={id:uid(), number:nextNumber('project'), boq:[], payments:[], charges:[]}; S.projects.push(p); }
   else { p=S.projects.find(x=>x.id===id); }
   p.name=name; p.customer=customer;
   p.phone=document.getElementById('pj_phone').value.trim();
@@ -3504,6 +3585,19 @@ function renderProjectView(id){
       </div>`;
     }).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet — add the scope of work below.</div></div>`}
     <button class="btn btn-ghost btn-block" onclick="showBoqLineForm('${p.id}')">${ic('plus')} Add BOQ line</button>
+
+    <div class="section-title">Additional charges</div>
+    <div class="card">
+      ${(p.charges&&p.charges.length)? p.charges.map(c=>`
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div class="small">${esc(c.desc)}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="mono small">${fmtMoney(c.amount)}</div>
+            ${isAdmin()?`<button class="icon-btn" onclick="removeProjectCharge('${p.id}','${c.id}')">${ic('trash')}</button>`:''}
+          </div>
+        </div>`).join('') : `<div class="tiny muted" style="padding:8px 0">No additional charges.</div>`}
+    </div>
+    <button class="btn btn-ghost btn-block" onclick="showProjectChargeForm('${p.id}')">${ic('plus')} Add charge</button>
 
     <div class="section-title">Advance payments</div>
     <div class="card">
@@ -3628,6 +3722,7 @@ function generateProjectInvoice(projId){
     id:uid(), number:nextNumber('invoice'), date:todayISO(), dueDate:'',
     customer:p.customer, phone:p.phone||'', email:p.email||'',
     items: p.boq.map(b=>({desc:b.desc, qty:b.qty, price:b.unitPrice, discountPct:0, invId:null})),
+    charges: (p.charges||[]).map(c=>({...c,id:uid()})),
     vatOn:S.settings.vatDefaultOn, vatRate:S.settings.vatRate, discountPct:0,
     status:'sent', notes:`Generated from project ${p.number} — ${p.name}`,
     payments:(p.payments||[]).map(pay=>({...pay,id:uid()})), stockApplied:false
@@ -3656,6 +3751,49 @@ function removeBoqLine(projId,itemId){
   p.boq=(p.boq||[]).filter(i=>i.id!==itemId);
   persist('projects');
   logActivity(`Removed BOQ line "${item?item.desc:''}" from project ${p.number}`);
+  render();
+  });
+}
+function showProjectChargeForm(projId){
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:10px">Add charge</div>
+      <div class="chip-row" style="margin-bottom:10px">
+        ${CHARGE_PRESETS.map(p=>`<div class="chip" onclick="document.getElementById('chg_desc').value='${p}'">${p}</div>`).join('')}
+      </div>
+      <label>Description</label>
+      <input id="chg_desc" placeholder="e.g. Shipping">
+      <label>Amount</label>
+      <input id="chg_amount" type="number" min="0" step="0.01" value="0">
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary btn-block" onclick="saveProjectCharge('${projId}')">${ic('check')} Add charge</button>
+      </div>
+    </div>
+  </div>`;
+}
+function saveProjectCharge(projId){
+  const desc=document.getElementById('chg_desc').value.trim();
+  if(!desc){ toast('Enter a description'); return; }
+  const amount=Number(document.getElementById('chg_amount').value)||0;
+  const p=S.projects.find(x=>x.id===projId); if(!p) return;
+  if(!p.charges) p.charges=[];
+  p.charges.push({id:uid(), desc, amount});
+  persist('projects');
+  logActivity(`Added charge "${desc}" to project ${p.number}`);
+  closeModal();
+  toast('Charge added');
+  render();
+}
+function removeProjectCharge(projId,chargeId){
+  if(!isAdmin()){ toast('Only admins can remove charges'); return; }
+  const p=S.projects.find(x=>x.id===projId); if(!p) return;
+  showConfirm('Remove this charge?', ()=>{
+  p.charges=(p.charges||[]).filter(c=>c.id!==chargeId);
+  persist('projects');
+  logActivity(`Removed charge from project ${p.number}`);
   render();
   });
 }
@@ -3740,14 +3878,14 @@ function renderReports(){
   let sales=0, vatCollected=0, outstanding=0, discountGiven=0;
   const itemTotals={};
   invs.forEach(i=>{
-    const t=calcTotals(i.items,i.vatOn,i.vatRate,i.discountPct);
+    const t=calcTotals(i.items,i.vatOn,i.vatRate,i.discountPct,i.charges);
     sales+=t.total; vatCollected+=t.vatAmt; discountGiven+=t.overallDiscAmt;
     outstanding+=remaining(i);
     t.calced.forEach(it=>{ itemTotals[it.desc]=(itemTotals[it.desc]||0)+it.net; });
   });
   const paid = S.invoices.reduce((a,i)=> a + (i.payments||[]).filter(p=>inRange(p.date,start,end)).reduce((x,p)=>x+(Number(p.amount)||0),0), 0);
-  const purchaseTotal = purs.reduce((a,p)=>a+p.items.reduce((x,y)=>x+(Number(y.qty)||0)*(Number(y.cost)||0),0),0);
-  const grossMargin = sales - purchaseTotal;
+  const purchasesTotal = purs.reduce((a,p)=>a+purchaseTotal(p),0);
+  const grossMargin = sales - purchasesTotal;
   const topItems = Object.entries(itemTotals).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const maxTop = topItems.length? topItems[0][1] : 1;
   const lowStock = S.inventory.filter(i=>Number(i.stock)<=Number(i.lowStockThreshold||0));
@@ -3766,7 +3904,7 @@ function renderReports(){
       <div class="stat"><div class="num">${fmtMoney(vatCollected)}</div><div class="lbl">VAT collected</div></div>
       <div class="stat"><div class="num">${fmtMoney(paid)}</div><div class="lbl">Paid</div></div>
       <div class="stat"><div class="num" style="color:${outstanding>0?'var(--amber)':'inherit'}">${fmtMoney(outstanding)}</div><div class="lbl">Outstanding</div></div>
-      <div class="stat"><div class="num">${fmtMoney(purchaseTotal)}</div><div class="lbl">Purchases</div></div>
+      <div class="stat"><div class="num">${fmtMoney(purchasesTotal)}</div><div class="lbl">Purchases</div></div>
       <div class="stat"><div class="num" style="color:${grossMargin>=0?'var(--green)':'var(--red)'}">${fmtMoney(grossMargin)}</div><div class="lbl">Gross margin</div></div>
     </div>
 
