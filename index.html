@@ -891,10 +891,11 @@ function purchaseTotal(p){ return (p.items||[]).reduce((a,b)=>a+(Number(b.qty)||
 // showCost: whether to expose an admin-only "cost to us" field alongside the billed amount
 // (invoices/quotes). Purchase charges skip it — the amount there already IS the cost paid.
 function renderChargeRows(charges, containerId, showCost){
+  const label = containerId==='pChargesWrap' ? 'Cost' : 'Charge';
   return (charges||[]).map((c,idx)=>`
     <div class="charge-row" data-idx="${idx}">
       <div class="item-grid">
-        <input placeholder="Charge description" value="${esc(c.desc)}" oninput="chargesChanged('${containerId}')" class="chgDesc" style="flex:2">
+        <input placeholder="${label} description" value="${esc(c.desc)}" oninput="chargesChanged('${containerId}')" class="chgDesc" style="flex:2">
         <input type="number" min="0" step="0.01" placeholder="Amount" value="${c.amount||0}" oninput="chargesChanged('${containerId}')" class="chgAmount" style="flex:1">
         ${showCost ? (isAdmin()
           ? `<input type="number" min="0" step="0.01" placeholder="Cost" value="${c.cost||0}" oninput="chargesChanged('${containerId}')" class="chgCost" style="flex:1">`
@@ -935,15 +936,16 @@ function chargesChanged(containerId){
 }
 function chargesSection(charges, containerId){
   const showCost = containerId==='chargesWrap';
+  const label = containerId==='pChargesWrap' ? 'cost' : 'charge';
   return `
-    <div class="section-title">Additional charges</div>
+    <div class="section-title">Additional ${label}s</div>
     <div class="card">
       <div class="chip-row" style="margin-bottom:10px">
         ${CHARGE_PRESETS.map(p=>`<div class="chip" onclick="addChargeRow('${containerId}','${p}')">${p}</div>`).join('')}
       </div>
       ${showCost && isAdmin() ? `<div class="tiny muted" style="margin-bottom:8px">Amount = what you charge the client. Cost = what it actually costs you (admin only) — used for profit reporting.</div>` : ''}
       <div id="${containerId}">${renderChargeRows(charges, containerId, showCost)}</div>
-      <button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" onclick="addChargeRow('${containerId}')">${ic('plus')} Add charge</button>
+      <button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" onclick="addChargeRow('${containerId}')">${ic('plus')} Add ${label}</button>
     </div>`;
 }
 
@@ -2863,7 +2865,7 @@ function purchaseLiveTotals(){
   const chargesTotal=chargesSum(charges);
   const total=itemsTotal+chargesTotal;
   box.innerHTML=`
-    ${chargesTotal?`<div class="line"><span class="muted">Additional charges</span><span class="mono">${fmtMoney(chargesTotal)}</span></div>`:''}
+    ${chargesTotal?`<div class="line"><span class="muted">Additional costs</span><span class="mono">${fmtMoney(chargesTotal)}</span></div>`:''}
     <div class="line grand"><span>Total cost</span><span class="mono">${fmtMoney(total)}</span></div>`;
 }
 function shareForQuotation(){
@@ -3607,7 +3609,7 @@ function renderProjectView(id){
     }).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet — add the scope of work below.</div></div>`}
     <button class="btn btn-ghost btn-block" onclick="showBoqLineForm('${p.id}')">${ic('plus')} Add BOQ line</button>
 
-    <div class="section-title">Additional charges</div>
+    <div class="section-title">Additional costs</div>
     <div class="card">
       ${(p.charges&&p.charges.length)? p.charges.map(c=>`
         <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
@@ -3616,9 +3618,9 @@ function renderProjectView(id){
             <div class="mono small">${fmtMoney(c.amount)}</div>
             ${isAdmin()?`<button class="icon-btn" onclick="removeProjectCharge('${p.id}','${c.id}')">${ic('trash')}</button>`:''}
           </div>
-        </div>`).join('') : `<div class="tiny muted" style="padding:8px 0">No additional charges.</div>`}
+        </div>`).join('') : `<div class="tiny muted" style="padding:8px 0">No additional costs.</div>`}
     </div>
-    <button class="btn btn-ghost btn-block" onclick="showProjectChargeForm('${p.id}')">${ic('plus')} Add charge</button>
+    <button class="btn btn-ghost btn-block" onclick="showProjectChargeForm('${p.id}')">${ic('plus')} Add cost</button>
 
     <div class="section-title">Advance payments</div>
     <div class="card">
@@ -3728,7 +3730,7 @@ function renderProjectCostBreakdown(id){
     </div>` : ''}
 
     ${(p.charges&&p.charges.length)? `
-    <div class="section-title">Charges <span class="tiny muted" style="font-weight:400;text-transform:none">— billed to client vs. actual cost</span></div>
+    <div class="section-title">Additional costs <span class="tiny muted" style="font-weight:400;text-transform:none">— billed to client vs. actual cost</span></div>
     <div class="card">
       ${p.charges.map(c=>`
         <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
@@ -3736,7 +3738,7 @@ function renderProjectCostBreakdown(id){
           <div class="tiny muted mono">Billed ${fmtMoney(c.amount)} · Cost ${fmtMoney(c.cost||0)}</div>
         </div>`).join('')}
       <div class="row-between" style="padding-top:8px">
-        <div class="small" style="font-weight:600">Charges profit</div>
+        <div class="small" style="font-weight:600">Profit</div>
         <div class="mono small" style="font-weight:600;color:${chargesSum(p.charges)-chargesCost(p.charges)>=0?'var(--green)':'var(--red)'}">${fmtMoney(chargesSum(p.charges)-chargesCost(p.charges))}</div>
       </div>
     </div>` : ''}
@@ -3804,7 +3806,7 @@ function showProjectChargeForm(projId){
   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:10px">Add charge</div>
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:10px">Add cost</div>
       <div class="chip-row" style="margin-bottom:10px">
         ${CHARGE_PRESETS.map(p=>`<div class="chip" onclick="document.getElementById('chg_desc').value='${p}'">${p}</div>`).join('')}
       </div>
@@ -3816,7 +3818,7 @@ function showProjectChargeForm(projId){
       <input id="chg_cost" type="number" min="0" step="0.01" value="0">`:''}
       <div style="display:flex;gap:10px;margin-top:14px">
         <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary btn-block" onclick="saveProjectCharge('${projId}')">${ic('check')} Add charge</button>
+        <button class="btn btn-primary btn-block" onclick="saveProjectCharge('${projId}')">${ic('check')} Add cost</button>
       </div>
     </div>
   </div>`;
