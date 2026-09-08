@@ -886,13 +886,19 @@ function calcTotals(items, vatOn, vatRate, overallDiscPct, charges){
 /* ---------- ADDITIONAL CHARGES (shipping, card fees, etc.) ---------- */
 const CHARGE_PRESETS=['Shipping','Card charge','Delivery fee','Handling fee'];
 function chargesSum(charges){ return (charges||[]).reduce((a,c)=>a+(Number(c.amount)||0),0); }
+function chargesCost(charges){ return (charges||[]).reduce((a,c)=>a+(Number(c.cost)||0),0); }
 function purchaseTotal(p){ return (p.items||[]).reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0) + chargesSum(p.charges); }
-function renderChargeRows(charges, containerId){
+// showCost: whether to expose an admin-only "cost to us" field alongside the billed amount
+// (invoices/quotes). Purchase charges skip it — the amount there already IS the cost paid.
+function renderChargeRows(charges, containerId, showCost){
   return (charges||[]).map((c,idx)=>`
     <div class="charge-row" data-idx="${idx}">
       <div class="item-grid">
         <input placeholder="Charge description" value="${esc(c.desc)}" oninput="chargesChanged('${containerId}')" class="chgDesc" style="flex:2">
         <input type="number" min="0" step="0.01" placeholder="Amount" value="${c.amount||0}" oninput="chargesChanged('${containerId}')" class="chgAmount" style="flex:1">
+        ${showCost ? (isAdmin()
+          ? `<input type="number" min="0" step="0.01" placeholder="Cost" value="${c.cost||0}" oninput="chargesChanged('${containerId}')" class="chgCost" style="flex:1">`
+          : `<input type="hidden" value="${c.cost||0}" class="chgCost">`) : ''}
         <button class="btn btn-ghost btn-sm" onclick="removeChargeRow('${containerId}',${idx})">${ic('trash')}</button>
       </div>
     </div>`).join('');
@@ -900,21 +906,27 @@ function renderChargeRows(charges, containerId){
 function readChargesFromDOM(containerId){
   const wrap=document.getElementById(containerId);
   if(!wrap) return [];
-  return [...wrap.querySelectorAll('.charge-row')].map(r=>({
-    desc: r.querySelector('.chgDesc').value.trim(),
-    amount: Number(r.querySelector('.chgAmount').value)||0
-  })).filter(c=>c.desc || c.amount);
+  return [...wrap.querySelectorAll('.charge-row')].map(r=>{
+    const costEl=r.querySelector('.chgCost');
+    return {
+      desc: r.querySelector('.chgDesc').value.trim(),
+      amount: Number(r.querySelector('.chgAmount').value)||0,
+      cost: costEl ? (Number(costEl.value)||0) : 0
+    };
+  }).filter(c=>c.desc || c.amount || c.cost);
 }
 function addChargeRow(containerId, presetDesc){
+  const showCost = containerId==='chargesWrap';
   const charges=readChargesFromDOM(containerId);
-  charges.push({desc:presetDesc||'', amount:0});
-  document.getElementById(containerId).innerHTML = renderChargeRows(charges, containerId);
+  charges.push({desc:presetDesc||'', amount:0, cost:0});
+  document.getElementById(containerId).innerHTML = renderChargeRows(charges, containerId, showCost);
   chargesChanged(containerId);
 }
 function removeChargeRow(containerId, idx){
+  const showCost = containerId==='chargesWrap';
   const charges=readChargesFromDOM(containerId);
   charges.splice(idx,1);
-  document.getElementById(containerId).innerHTML = renderChargeRows(charges, containerId);
+  document.getElementById(containerId).innerHTML = renderChargeRows(charges, containerId, showCost);
   chargesChanged(containerId);
 }
 function chargesChanged(containerId){
@@ -922,13 +934,15 @@ function chargesChanged(containerId){
   else if(containerId==='pChargesWrap') purchaseLiveTotals();
 }
 function chargesSection(charges, containerId){
+  const showCost = containerId==='chargesWrap';
   return `
     <div class="section-title">Additional charges</div>
     <div class="card">
       <div class="chip-row" style="margin-bottom:10px">
         ${CHARGE_PRESETS.map(p=>`<div class="chip" onclick="addChargeRow('${containerId}','${p}')">${p}</div>`).join('')}
       </div>
-      <div id="${containerId}">${renderChargeRows(charges, containerId)}</div>
+      ${showCost && isAdmin() ? `<div class="tiny muted" style="margin-bottom:8px">Amount = what you charge the client. Cost = what it actually costs you (admin only) — used for profit reporting.</div>` : ''}
+      <div id="${containerId}">${renderChargeRows(charges, containerId, showCost)}</div>
       <button class="btn btn-ghost btn-block btn-sm" style="margin-top:8px" onclick="addChargeRow('${containerId}')">${ic('plus')} Add charge</button>
     </div>`;
 }
@@ -964,7 +978,7 @@ function boqLineStatus(item){
 }
 const BOQ_STATUS_LABEL={'boq-over':'Over-purchased','boq-installed':'Installed','boq-purchased':'Purchased','boq-under':'Under-purchased'};
 function projectValue(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineTotal(b),0) + chargesSum(p.charges); }
-function projectCost(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineCost(b),0); }
+function projectCost(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineCost(b),0) + chargesCost(p.charges); }
 function projectProfit(p){ return projectValue(p)-projectCost(p); }
 function projectAdvances(p){ return (p.payments||[]).reduce((a,pay)=>a+(Number(pay.amount)||0),0); }
 function projectBalance(p){ return Math.max(0, projectValue(p)-projectAdvances(p)); }
@@ -978,7 +992,7 @@ function boqProgressPct(p, field){
 // the BOQ, so they're the ones "actual cost so far" should be measured against.
 function projectPurchases(p){ return S.purchases.filter(x=>x.projectId===p.id && x.stockApplied); }
 function projectActualCost(p){
-  return projectPurchases(p).reduce((sum,pur)=>sum+pur.items.reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.cost)||0),0),0);
+  return projectPurchases(p).reduce((sum,pur)=>sum+pur.items.reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.cost)||0),0)+chargesSum(pur.charges),0);
 }
 function boqLineActualCost(p, boqItemId){
   return projectPurchases(p).reduce((sum,pur)=>sum+pur.items.filter(it=>it.boqItemId===boqItemId).reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.cost)||0),0),0);
@@ -987,6 +1001,13 @@ function boqLineActualCost(p, boqItemId){
 function projectUnlinkedPurchaseItems(p){
   const rows=[];
   projectPurchases(p).forEach(pur=>{ pur.items.forEach(it=>{ if(!it.boqItemId) rows.push({purchase:pur, item:it}); }); });
+  return rows;
+}
+// Charges (shipping, card fees, etc.) on purchases tied to this project — never linked to a
+// specific BOQ line, so they always land in "other project costs" alongside unlinked items.
+function projectPurchaseCharges(p){
+  const rows=[];
+  projectPurchases(p).forEach(pur=>{ (pur.charges||[]).forEach(charge=>{ rows.push({purchase:pur, charge}); }); });
   return rows;
 }
 function ensureModalRoot(){
@@ -3642,7 +3663,9 @@ function renderProjectCostBreakdown(id){
   const varianceTotal=actualLinkedTotal-budgetForPurchasedTotal;
   const varianceColor=v=>v>0?'var(--red)':v<0?'var(--green)':'inherit';
   const unlinkedRows=projectUnlinkedPurchaseItems(p);
-  const unlinkedTotal=unlinkedRows.reduce((a,r)=>a+(Number(r.item.qty)||0)*(Number(r.item.cost)||0),0);
+  const purchaseChargeRows=projectPurchaseCharges(p);
+  const unlinkedTotal=unlinkedRows.reduce((a,r)=>a+(Number(r.item.qty)||0)*(Number(r.item.cost)||0),0)
+    + purchaseChargeRows.reduce((a,r)=>a+(Number(r.charge.amount)||0),0);
   return `
   ${topbar(p.number, 'Cost breakdown', true)}
   <div class="content">
@@ -3679,7 +3702,7 @@ function renderProjectCostBreakdown(id){
         ${purchasedQty>0? `<div class="tiny" style="margin-top:6px;font-weight:600;color:${varianceColor(variance)}">${variance===0?'On budget':(variance>0?'+':'')+fmtMoney(variance)+' vs budget'}</div>` : `<div class="tiny muted" style="margin-top:6px">Not purchased yet</div>`}
       </div>`).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet.</div></div>`}
 
-    ${unlinkedRows.length? `
+    ${(unlinkedRows.length || purchaseChargeRows.length)? `
     <div class="section-title">Other project costs <span class="tiny muted" style="font-weight:400;text-transform:none">— not tied to a BOQ line</span></div>
     <div class="card">
       ${unlinkedRows.map(({purchase,item})=>`
@@ -3690,9 +3713,31 @@ function renderProjectCostBreakdown(id){
           </div>
           <div class="mono small">${fmtMoney((Number(item.qty)||0)*(Number(item.cost)||0))}</div>
         </div>`).join('')}
+      ${purchaseChargeRows.map(({purchase,charge})=>`
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div>
+            <div class="small" style="font-weight:600">${esc(charge.desc)}</div>
+            <div class="tiny muted">${esc(purchase.number)} · ${esc(purchase.supplier)} · ${fmtDate(purchase.date)}</div>
+          </div>
+          <div class="mono small">${fmtMoney(charge.amount)}</div>
+        </div>`).join('')}
       <div class="row-between" style="padding-top:8px">
         <div class="small" style="font-weight:600">Total</div>
         <div class="mono small" style="font-weight:600">${fmtMoney(unlinkedTotal)}</div>
+      </div>
+    </div>` : ''}
+
+    ${(p.charges&&p.charges.length)? `
+    <div class="section-title">Charges <span class="tiny muted" style="font-weight:400;text-transform:none">— billed to client vs. actual cost</span></div>
+    <div class="card">
+      ${p.charges.map(c=>`
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div class="small" style="font-weight:600">${esc(c.desc)}</div>
+          <div class="tiny muted mono">Billed ${fmtMoney(c.amount)} · Cost ${fmtMoney(c.cost||0)}</div>
+        </div>`).join('')}
+      <div class="row-between" style="padding-top:8px">
+        <div class="small" style="font-weight:600">Charges profit</div>
+        <div class="mono small" style="font-weight:600;color:${chargesSum(p.charges)-chargesCost(p.charges)>=0?'var(--green)':'var(--red)'}">${fmtMoney(chargesSum(p.charges)-chargesCost(p.charges))}</div>
       </div>
     </div>` : ''}
   </div>`;
@@ -3765,8 +3810,10 @@ function showProjectChargeForm(projId){
       </div>
       <label>Description</label>
       <input id="chg_desc" placeholder="e.g. Shipping">
-      <label>Amount</label>
+      <label>Amount (charged to client)</label>
       <input id="chg_amount" type="number" min="0" step="0.01" value="0">
+      ${isAdmin()?`<label>Cost (your cost — admin only)</label>
+      <input id="chg_cost" type="number" min="0" step="0.01" value="0">`:''}
       <div style="display:flex;gap:10px;margin-top:14px">
         <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
         <button class="btn btn-primary btn-block" onclick="saveProjectCharge('${projId}')">${ic('check')} Add charge</button>
@@ -3778,9 +3825,11 @@ function saveProjectCharge(projId){
   const desc=document.getElementById('chg_desc').value.trim();
   if(!desc){ toast('Enter a description'); return; }
   const amount=Number(document.getElementById('chg_amount').value)||0;
+  const costEl=document.getElementById('chg_cost');
+  const cost = costEl ? (Number(costEl.value)||0) : 0;
   const p=S.projects.find(x=>x.id===projId); if(!p) return;
   if(!p.charges) p.charges=[];
-  p.charges.push({id:uid(), desc, amount});
+  p.charges.push({id:uid(), desc, amount, cost});
   persist('projects');
   logActivity(`Added charge "${desc}" to project ${p.number}`);
   closeModal();
@@ -3875,17 +3924,18 @@ function renderReports(){
   const invs = S.invoices.filter(i=>inRange(i.date,start,end));
   const purs = S.purchases.filter(p=>inRange(p.date,start,end));
 
-  let sales=0, vatCollected=0, outstanding=0, discountGiven=0;
+  let sales=0, vatCollected=0, outstanding=0, discountGiven=0, chargesCostTotal=0;
   const itemTotals={};
   invs.forEach(i=>{
     const t=calcTotals(i.items,i.vatOn,i.vatRate,i.discountPct,i.charges);
     sales+=t.total; vatCollected+=t.vatAmt; discountGiven+=t.overallDiscAmt;
     outstanding+=remaining(i);
+    chargesCostTotal+=chargesCost(i.charges);
     t.calced.forEach(it=>{ itemTotals[it.desc]=(itemTotals[it.desc]||0)+it.net; });
   });
   const paid = S.invoices.reduce((a,i)=> a + (i.payments||[]).filter(p=>inRange(p.date,start,end)).reduce((x,p)=>x+(Number(p.amount)||0),0), 0);
   const purchasesTotal = purs.reduce((a,p)=>a+purchaseTotal(p),0);
-  const grossMargin = sales - purchasesTotal;
+  const grossMargin = sales - purchasesTotal - chargesCostTotal;
   const topItems = Object.entries(itemTotals).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const maxTop = topItems.length? topItems[0][1] : 1;
   const lowStock = S.inventory.filter(i=>Number(i.stock)<=Number(i.lowStockThreshold||0));
