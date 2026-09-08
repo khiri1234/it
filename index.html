@@ -880,7 +880,7 @@ function calcTotals(items, vatOn, vatRate, overallDiscPct){
 }
 
 /* ---------- PAYMENTS ---------- */
-const PAY_METHODS=['Cash','Card','Bank transfer','Cheque','Other'];
+const PAY_METHODS=['Cash','Card','Bank transfer','Stripe','Cheque','Other'];
 function docTotal(d){ return calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct).total; }
 function paymentsSum(d){ return (d.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0); }
 function remaining(d){ return Math.max(0, docTotal(d) - paymentsSum(d)); }
