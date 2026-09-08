@@ -1340,6 +1340,7 @@ function renderClientPortal(){
             <div class="tiny muted">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div>
           </div>
           ${d.kind==='invoice'?`<div class="row-between"><div class="tiny muted">Balance due</div><div class="small mono" style="font-weight:600;color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div></div>`:''}
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="shareMenuPDF('${d.kind}','${d.id}')">${ic('download')} View / download PDF</button>
           ${d.kind==='invoice' && bal>0? `<div style="display:flex;gap:8px;margin-top:8px">
             ${S.settings.paypalMeUsername?`<button class="btn btn-primary" style="flex:1" onclick="clientPayViaPaypal(${bal})">${ic('card')} PayPal</button>`:''}
             <button class="btn btn-teal" style="flex:1" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay the balance of ${fmtMoney(bal)} on invoice ${d.number}.`)}')">${ic('chat')} WhatsApp</button>
