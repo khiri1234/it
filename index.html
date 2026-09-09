@@ -2654,7 +2654,7 @@ function renderStockList(){
       <div style="height:12px"></div>
       ${list.length===0? emptyState('cart', PURCHASE_PROJECT_FILTER?'No purchases for this filter':'No purchases yet', PURCHASE_PROJECT_FILTER?'Try a different project, or clear the filter.':'Record a purchase to stock up your inventory.') :
         list.map(p=>{
-          const total=p.items.reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0);
+          const total=purchaseTotal(p);
           const proj = p.projectId ? S.projects.find(x=>x.id===p.projectId) : null;
           return `<div class="card stripe ${p.status}" onclick="go('purchase-view',{id:'${p.id}'})">
             <div class="row-between">
