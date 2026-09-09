@@ -1290,6 +1290,7 @@ async function doSetupAdmin(){
   S.users.push(user);
   await persist('users');
   CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+  syncPushTopic();
   AUTH_ERR='';
   logActivity(`Created the admin account and set up Ledger`);
   toast('Welcome, '+name+'!');
@@ -1342,11 +1343,12 @@ async function doLogin(){
   const user = S.users.find(u=>u.username===username && u.passHash===passHash);
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
   CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null};
+  syncPushTopic();
   AUTH_ERR='';
   setRememberedUserId(user.id);
   if(!applyHashRoute()) render();
 }
-function logout(){ CURRENT_USER=null; setRememberedUserId(null); go('dashboard'); }
+function logout(){ CURRENT_USER=null; syncPushTopic(); setRememberedUserId(null); go('dashboard'); }
 
 /* ---------- CLIENT PORTAL (read-only — one customer's own projects/invoices/quotes,
    no cost prices, no profit margins, no edit controls of any kind) ---------- */
@@ -1474,6 +1476,7 @@ function __faceIDUnlock(){
   const badge = document.getElementById('faceidBadge');
   const finish = ()=>{
     CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null};
+    syncPushTopic();
     AUTH_ERR='';
     if(!applyHashRoute()) render();
   };
@@ -1512,6 +1515,32 @@ function requestFaceIDLogin(){
   }catch(e){ __faceIDFailed('Face ID isn’t available here.'); }
 }
 
+/* ---------- PUSH NOTIFICATIONS (native app shell only — no-ops in a plain browser) ----------
+   Whoever is signed in gets subscribed to an FCM topic so the native app can receive
+   push notifications meant for them: "staff" for admin/staff, "client_<slug>" for a
+   client. Call syncPushTopic() any time CURRENT_USER changes (sign in, Face ID unlock,
+   sign out) — it diffs against the last topic and tells the native wrapper (via the
+   pushTopic WKScriptMessageHandler) to unsubscribe/subscribe as needed. */
+function slugifyTopic(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,100) || 'unknown';
+}
+function pushTopicForUser(u){
+  if(!u) return null;
+  if(u.role==='admin' || u.role==='staff') return 'staff';
+  if(u.role==='client' && u.clientCustomer) return 'client_'+slugifyTopic(u.clientCustomer);
+  return null;
+}
+let CURRENT_PUSH_TOPIC = null;
+function syncPushTopic(){
+  const topic = pushTopicForUser(CURRENT_USER);
+  if(topic===CURRENT_PUSH_TOPIC) return;
+  const bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pushTopic;
+  if(bridge){
+    if(CURRENT_PUSH_TOPIC) bridge.postMessage({action:'unsubscribe', topic:CURRENT_PUSH_TOPIC});
+    if(topic) bridge.postMessage({action:'subscribe', topic});
+  }
+  CURRENT_PUSH_TOPIC = topic;
+}
 
 function go(name, params={}){ closeModal(); VIEW={name,params}; window.scrollTo(0,0); render(); }
 function goBack(){ if(STACK.length){ const v=STACK.pop(); VIEW=v; render(); } else { go('dashboard'); } }
