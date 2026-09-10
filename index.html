@@ -1516,30 +1516,30 @@ function requestFaceIDLogin(){
 }
 
 /* ---------- PUSH NOTIFICATIONS (native app shell only — no-ops in a plain browser) ----------
-   Whoever is signed in gets subscribed to an FCM topic so the native app can receive
-   push notifications meant for them: "staff" for admin/staff, "client_<slug>" for a
-   client. Call syncPushTopic() any time CURRENT_USER changes (sign in, Face ID unlock,
-   sign out) — it diffs against the last topic and tells the native wrapper (via the
-   pushTopic WKScriptMessageHandler) to unsubscribe/subscribe as needed. */
+   Whoever is signed in gets subscribed to the FCM topic(s) that match them: "staff" for
+   admin/staff, "client_<slug>" for a client, "suppliers" + "supplier_<slug>" for a
+   supplier. Call syncPushTopic() any time CURRENT_USER changes (sign in, Face ID unlock,
+   sign out) — it diffs against the last set of topics and tells the native wrapper (via
+   the pushTopic WKScriptMessageHandler) to unsubscribe/subscribe as needed. */
 function slugifyTopic(s){
   return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,100) || 'unknown';
 }
-function pushTopicForUser(u){
-  if(!u) return null;
-  if(u.role==='admin' || u.role==='staff') return 'staff';
-  if(u.role==='client' && u.clientCustomer) return 'client_'+slugifyTopic(u.clientCustomer);
-  return null;
+function pushTopicsForUser(u){
+  if(!u) return [];
+  if(u.role==='admin' || u.role==='staff') return ['staff'];
+  if(u.role==='client' && u.clientCustomer) return ['client_'+slugifyTopic(u.clientCustomer)];
+  if(u.role==='supplier' && u.supplierName) return ['suppliers', 'supplier_'+slugifyTopic(u.supplierName)];
+  return [];
 }
-let CURRENT_PUSH_TOPIC = null;
+let CURRENT_PUSH_TOPICS = [];
 function syncPushTopic(){
-  const topic = pushTopicForUser(CURRENT_USER);
-  if(topic===CURRENT_PUSH_TOPIC) return;
+  const topics = pushTopicsForUser(CURRENT_USER);
   const bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pushTopic;
   if(bridge){
-    if(CURRENT_PUSH_TOPIC) bridge.postMessage({action:'unsubscribe', topic:CURRENT_PUSH_TOPIC});
-    if(topic) bridge.postMessage({action:'subscribe', topic});
+    CURRENT_PUSH_TOPICS.filter(t=>!topics.includes(t)).forEach(t=>bridge.postMessage({action:'unsubscribe', topic:t}));
+    topics.filter(t=>!CURRENT_PUSH_TOPICS.includes(t)).forEach(t=>bridge.postMessage({action:'subscribe', topic:t}));
   }
-  CURRENT_PUSH_TOPIC = topic;
+  CURRENT_PUSH_TOPICS = topics;
 }
 
 function go(name, params={}){ closeModal(); VIEW={name,params}; window.scrollTo(0,0); render(); }
@@ -3223,7 +3223,8 @@ function createPurchaseFromSupplierQuote(rfqId, supplierName){
   if(items.length===0){ toast("This supplier didn't price any items"); return; }
   const p={id:uid(), number:nextNumber('purchase'), supplier:supplierName, date:todayISO(), status:'pending', items, notes:`From ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:null};
   S.purchases.push(p);
-  persist('purchases'); persist('settings');
+  q.status='accepted';
+  persist('purchases'); persist('supplierQuotes'); persist('settings');
   logActivity(`Created purchase ${p.number} from ${supplierName}'s quote on ${rfq.number}`);
   toast('Purchase created from quote');
   go('purchase-view',{id:p.id});
@@ -3258,8 +3259,10 @@ function createPurchasesFromLowestPrices(rfqId){
     const p={id:uid(), number:nextNumber('purchase'), supplier:sn, date:todayISO(), status:'pending', items:bySupplier[sn], notes:`Lowest price per item from ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:null};
     S.purchases.push(p);
     createdIds.push(p.id);
+    const q=quotes.find(x=>x.supplierName===sn);
+    if(q) q.status='accepted';
   });
-  persist('purchases'); persist('settings');
+  persist('purchases'); persist('supplierQuotes'); persist('settings');
   logActivity(`Created ${createdIds.length} purchase${createdIds.length>1?'s':''} from lowest prices on ${rfq.number} (${supplierNames.join(', ')})`);
   toast(`${createdIds.length} purchase${createdIds.length>1?'s':''} created from lowest prices`);
   if(createdIds.length===1) go('purchase-view',{id:createdIds[0]});
