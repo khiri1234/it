@@ -560,7 +560,7 @@ const DEFAULT_SETTINGS={
 };
 let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[] };
 let VIEW = {name:'dashboard', params:{}};
-let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='';
+let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
 let CLIENT_CHAT_DRAFT='';
@@ -2647,7 +2647,9 @@ function renderStockList(){
     let list=[...S.purchases].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(PURCHASE_PROJECT_FILTER==='__none__') list=list.filter(p=>!p.projectId);
     else if(PURCHASE_PROJECT_FILTER) list=list.filter(p=>p.projectId===PURCHASE_PROJECT_FILTER);
+    if(PURCHASE_PAYMENT_FILTER) list=list.filter(p=>purchasePaymentStatus(p)===PURCHASE_PAYMENT_FILTER);
     const sortedProjects=[...S.projects].sort((a,b)=>(a.number||'').localeCompare(b.number||''));
+    const hasFilter = PURCHASE_PROJECT_FILTER || PURCHASE_PAYMENT_FILTER;
     return `
     ${topbar('Stock','Inventory & purchases')}
     <div class="content">
@@ -2659,8 +2661,15 @@ function renderStockList(){
         <option value="__none__" ${PURCHASE_PROJECT_FILTER==='__none__'?'selected':''}>No project</option>
         ${sortedProjects.map(pr=>`<option value="${pr.id}" ${PURCHASE_PROJECT_FILTER===pr.id?'selected':''}>${esc(pr.number)} — ${esc(pr.name)}</option>`).join('')}
       </select>` : ''}
+      <label>Filter by payment status</label>
+      <select onchange="PURCHASE_PAYMENT_FILTER=this.value;render()">
+        <option value="" ${PURCHASE_PAYMENT_FILTER===''?'selected':''}>All</option>
+        <option value="unpaid" ${PURCHASE_PAYMENT_FILTER==='unpaid'?'selected':''}>Unpaid</option>
+        <option value="partial" ${PURCHASE_PAYMENT_FILTER==='partial'?'selected':''}>Partially paid</option>
+        <option value="paid" ${PURCHASE_PAYMENT_FILTER==='paid'?'selected':''}>Paid</option>
+      </select>
       <div style="height:12px"></div>
-      ${list.length===0? emptyState('cart', PURCHASE_PROJECT_FILTER?'No purchases for this filter':'No purchases yet', PURCHASE_PROJECT_FILTER?'Try a different project, or clear the filter.':'Record a purchase to stock up your inventory.') :
+      ${list.length===0? emptyState('cart', hasFilter?'No purchases for this filter':'No purchases yet', hasFilter?'Try a different filter, or clear the filters.':'Record a purchase to stock up your inventory.') :
         list.map(p=>{
           const total=purchaseTotal(p);
           const proj = p.projectId ? S.projects.find(x=>x.id===p.projectId) : null;
