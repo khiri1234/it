@@ -103,6 +103,7 @@
   .badge.overdue{background:var(--red-soft);color:var(--red);}
   .badge.pending{background:var(--amber-soft);color:var(--amber);}
   .badge.partial{background:var(--amber-soft);color:var(--amber);}
+  .badge.unpaid{background:var(--red-soft);color:var(--red);}
   .badge.converted{background:var(--chip-bg);color:var(--ink-soft);}
   .badge.planning{background:var(--chip-bg);color:var(--ink-soft);}
   .badge.active{background:var(--teal-soft);color:var(--teal);}
@@ -888,6 +889,13 @@ const CHARGE_PRESETS=['Shipping','Card charge','Delivery fee','Handling fee'];
 function chargesSum(charges){ return (charges||[]).reduce((a,c)=>a+(Number(c.amount)||0),0); }
 function chargesCost(charges){ return (charges||[]).reduce((a,c)=>a+(Number(c.cost)||0),0); }
 function purchaseTotal(p){ return (p.items||[]).reduce((a,b)=>a+(Number(b.qty)||0)*(Number(b.cost)||0),0) + chargesSum(p.charges); }
+function purchaseRemaining(p){ return Math.max(0, purchaseTotal(p) - paymentsSum(p)); }
+function purchasePaymentStatus(p){
+  const total=purchaseTotal(p), paid=paymentsSum(p);
+  if(total>0 && paid>=total-0.005) return 'paid';
+  if(paid>0) return 'partial';
+  return 'unpaid';
+}
 // showCost: whether to expose an admin-only "cost to us" field alongside the billed amount
 // (invoices/quotes). Purchase charges skip it — the amount there already IS the cost paid.
 function renderChargeRows(charges, containerId, showCost){
@@ -1037,9 +1045,9 @@ function showConfirm(message, onYes, opts){
   </div>`;
   window.__confirmYes = ()=>{ closeModal(); onYes(); };
 }
-function payKindStore(kind){ return kind==='project'? S.projects : S.invoices; }
-function payKindKey(kind){ return kind==='project'? 'projects' : 'invoices'; }
-function payKindRemaining(kind,d){ return kind==='project'? projectBalance(d) : remaining(d); }
+function payKindStore(kind){ return kind==='project'? S.projects : kind==='purchase'? S.purchases : S.invoices; }
+function payKindKey(kind){ return kind==='project'? 'projects' : kind==='purchase'? 'purchases' : 'invoices'; }
+function payKindRemaining(kind,d){ return kind==='project'? projectBalance(d) : kind==='purchase'? purchaseRemaining(d) : remaining(d); }
 let PAYMENT_ROWS=[];
 function paymentRowHtml(idx, r){
   return `<div class="item-row payRow" data-idx="${idx}">
@@ -2666,6 +2674,7 @@ function renderStockList(){
               <div style="text-align:right">
                 <div class="mono" style="font-weight:600">${fmtMoney(total)}</div>
                 <span class="badge ${p.status}">${p.status}</span>
+                <span class="badge ${purchasePaymentStatus(p)}">${purchasePaymentStatus(p)}</span>
               </div>
             </div>
           </div>`;
@@ -3416,7 +3425,7 @@ function renderPurchaseView(id){
   ${topbar(p.number,p.supplier,true, `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="showShareMenu('purchase','${p.id}')">${ic('share')}</button>`)}
   <div class="content">
     <div class="card">
-      <div class="row-between"><div style="font-weight:600">${esc(p.supplier)}</div><span class="badge ${p.status}">${p.status}</span></div>
+      <div class="row-between"><div style="font-weight:600">${esc(p.supplier)}</div><div style="display:flex;gap:6px"><span class="badge ${p.status}">${p.status}</span><span class="badge ${purchasePaymentStatus(p)}">${purchasePaymentStatus(p)}</span></div></div>
       <div class="tiny muted">${fmtDate(p.date)}</div>
     </div>
     <div class="card">
@@ -3430,6 +3439,23 @@ function renderPurchaseView(id){
     </div>
     ${p.notes?`<div class="card"><div class="small">${esc(p.notes)}</div></div>`:''}
     ${renderPurchaseAttachments(p)}
+
+    <div class="section-title">Payments to supplier</div>
+    <div class="card">
+      <div class="row-between">
+        <div style="font-weight:600;font-size:14px">Remaining: <span class="mono">${fmtMoney(purchaseRemaining(p))}</span></div>
+        <button class="btn btn-teal btn-sm" onclick="showPaymentModal('purchase','${p.id}')">${ic('plus')} Record payment</button>
+      </div>
+      ${(p.payments&&p.payments.length)? p.payments.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(pay=>`
+        <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--line)">
+          <div>
+            <div class="small" style="font-weight:600">${fmtMoney(pay.amount)} <span class="tiny muted" style="font-weight:400">· ${esc(pay.method)}</span></div>
+            <div class="tiny muted">${fmtDate(pay.date)} · by ${esc(pay.paidTo)}${pay.note?' · '+esc(pay.note):''}</div>
+          </div>
+          ${isAdmin()?`<button class="icon-btn" onclick="removePayment('purchase','${p.id}','${pay.id}')">${ic('trash')}</button>`:''}
+        </div>`).join('') : `<div class="tiny muted" style="padding:8px 0">No payments recorded yet.</div>`}
+    </div>
+
     <select onchange="quickPurchaseStatus('${p.id}',this.value)">
       ${['pending','received'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join('')}
     </select>
