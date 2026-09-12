@@ -30,6 +30,11 @@
     --chip-bg:#EEF1F5;
     --row-bg:#FAFBFC;
     --switch-track:#D7DDE5;
+    --glass-bg:rgba(255,255,255,.5);
+    --glass-bg-strong:rgba(255,255,255,.72);
+    --glass-border:rgba(255,255,255,.6);
+    --glass-highlight:rgba(255,255,255,.8);
+    --glass-blur:blur(24px) saturate(180%);
   }
   :root[data-theme="dark"]{
     --bg:#10161F;
@@ -40,6 +45,10 @@
     --chip-bg:#26303F;
     --row-bg:#1E2836;
     --switch-track:#3A4658;
+    --glass-bg:rgba(27,36,49,.5);
+    --glass-bg-strong:rgba(27,36,49,.68);
+    --glass-border:rgba(255,255,255,.09);
+    --glass-highlight:rgba(255,255,255,.07);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -392,11 +401,33 @@
   .desktop-sidebar{display:none;}
   .topbar-search-wrap{display:none;}
   @media (min-width:960px){
+    /* liquid-glass backdrop: a soft, colorful mesh sitting behind every translucent
+       panel below, fixed so it doesn't scroll away — without it backdrop-filter
+       has nothing to blur and just looks like plain frosted grey */
+    body{
+      background:
+        radial-gradient(1000px 700px at 10% 6%, rgba(14,156,144,.48), transparent 62%),
+        radial-gradient(1100px 780px at 90% 12%, rgba(42,109,176,.42), transparent 60%),
+        radial-gradient(950px 820px at 65% 88%, rgba(155,92,220,.30), transparent 62%),
+        radial-gradient(900px 700px at 15% 95%, rgba(224,168,50,.20), transparent 60%),
+        var(--bg);
+      background-attachment:fixed;
+    }
+    :root[data-theme="dark"] body{
+      background:
+        radial-gradient(1000px 700px at 10% 6%, rgba(14,156,144,.55), transparent 62%),
+        radial-gradient(1100px 780px at 90% 12%, rgba(42,109,176,.5), transparent 60%),
+        radial-gradient(950px 820px at 65% 88%, rgba(155,92,220,.38), transparent 62%),
+        radial-gradient(900px 700px at 15% 95%, rgba(224,168,50,.26), transparent 60%),
+        var(--bg);
+      background-attachment:fixed;
+    }
     .desktop-sidebar{
       display:flex;flex-direction:column;justify-content:space-between;
       position:fixed;top:0;left:0;bottom:0;width:248px;
-      background:var(--surface);color:var(--ink);border-right:1px solid var(--line);
-      box-shadow:6px 0 24px rgba(21,32,51,.04);
+      background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      color:var(--ink);border-right:1px solid var(--glass-border);
+      box-shadow:6px 0 32px rgba(21,32,51,.06), inset -1px 0 0 var(--glass-highlight);
       padding:20px 14px;z-index:50;
     }
     .desktop-sidebar:empty{display:none;}
@@ -414,8 +445,8 @@
       cursor:pointer;text-align:left;transition:background .18s,color .18s,transform .18s;width:100%;position:relative;
     }
     .ds-navbtn svg{width:17px;height:17px;flex-shrink:0;transition:transform .18s;}
-    .ds-navbtn:hover{background:var(--chip-bg);color:var(--ink);transform:translateX(2px);}
-    .ds-navbtn.active{background:linear-gradient(135deg,var(--blue-soft),var(--teal-soft));color:var(--blue);box-shadow:inset 0 0 0 1px rgba(42,109,176,.12);}
+    .ds-navbtn:hover{background:var(--glass-highlight);color:var(--ink);transform:translateX(2px);}
+    .ds-navbtn.active{background:linear-gradient(135deg,rgba(42,109,176,.22),rgba(14,156,144,.18));color:var(--blue);box-shadow:inset 0 0 0 1px rgba(42,109,176,.16);backdrop-filter:blur(6px);}
     .ds-navbtn.active svg{transform:scale(1.08);}
     .ds-navbtn.active::before{content:'';position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--blue),var(--teal));}
     .ds-foot{border-top:1px solid var(--line);padding-top:14px;margin-top:14px;}
@@ -423,11 +454,11 @@
     .ds-avatar{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;box-shadow:0 3px 8px rgba(14,156,144,.3);}
     .ds-uname{font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .ds-urole{font-size:10.5px;color:var(--ink-soft);}
-    .ds-logout{width:100%;background:var(--chip-bg);border:none;color:var(--ink-soft);border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif;transition:background .15s,color .15s;}
+    .ds-logout{width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--ink-soft);border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif;transition:background .15s,color .15s;}
     .ds-logout svg{width:12px;height:12px;}
-    .ds-logout:hover{background:var(--line);color:var(--ink);}
+    .ds-logout:hover{background:var(--glass-bg-strong);color:var(--ink);}
 
-    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;background:radial-gradient(1100px 600px at 100% -10%,rgba(42,109,176,.05),transparent),var(--bg);}
+    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;background:transparent;}
     .desktop-sidebar:not(:empty) ~ #app .tabbar{display:none !important;}
     .desktop-sidebar:not(:empty) ~ #app .fab{right:32px;bottom:32px;}
     /* client portal has no sidebar at all — still needs to escape the 520px mobile
@@ -446,25 +477,44 @@
        modern task-board apps — the navy mobile topbar reads too heavy once it's
        sitting next to a light sidebar instead of filling the whole screen */
     .desktop-sidebar:not(:empty) ~ #app .topbar{
-      background:var(--surface);color:var(--ink);border-bottom:1px solid var(--line);
-      box-shadow:0 2px 12px rgba(21,32,51,.03);
+      background:var(--glass-bg-strong);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      color:var(--ink);border-bottom:1px solid var(--glass-border);
+      box-shadow:0 1px 0 var(--glass-highlight) inset, 0 4px 20px rgba(21,32,51,.05);
     }
     .desktop-sidebar:not(:empty) ~ #app .topbar .title{color:var(--ink);font-size:21px;font-weight:700;}
     .desktop-sidebar:not(:empty) ~ #app .topbar .sub{color:var(--ink-soft);}
-    .desktop-sidebar:not(:empty) ~ #app .topbar .back{background:var(--chip-bg);color:var(--ink);transition:background .15s;}
-    .desktop-sidebar:not(:empty) ~ #app .topbar .back:hover{background:var(--line);}
-    .desktop-sidebar:not(:empty) ~ #app .topbar-search-wrap{
-      display:flex;align-items:center;gap:8px;background:var(--chip-bg);border-radius:10px;
-      padding:8px 12px;margin-right:4px;width:220px;flex-shrink:0;
-      border:1px solid transparent;transition:border-color .15s,background .15s,box-shadow .15s;
+    .desktop-sidebar:not(:empty) ~ #app .topbar .back{background:var(--glass-bg);color:var(--ink);transition:background .15s;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .back:hover{background:var(--glass-bg-strong);}
+    /* the mobile topbar is navy, so its icon-btn actions (share, logout) are inline-styled
+       white-on-transparent — invisible against this light glass bar, so force them back
+       to a readable, theme-matched glass chip here */
+    .desktop-sidebar:not(:empty) ~ #app .topbar .icon-btn{
+      background:var(--glass-bg) !important;color:var(--ink) !important;border-color:var(--glass-border) !important;
     }
-    .topbar-search-wrap:focus-within{border-color:var(--teal);background:var(--surface);box-shadow:0 0 0 3px var(--teal-soft);}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .icon-btn:hover{background:var(--glass-bg-strong) !important;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar-search-wrap{
+      display:flex;align-items:center;gap:8px;background:var(--glass-bg);border-radius:10px;
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      padding:8px 12px;margin-right:4px;width:220px;flex-shrink:0;
+      border:1px solid var(--glass-border);transition:border-color .15s,background .15s,box-shadow .15s;
+    }
+    .topbar-search-wrap:focus-within{border-color:var(--teal);background:var(--glass-bg-strong);box-shadow:0 0 0 3px var(--teal-soft);}
     .topbar-search-wrap svg{width:15px;height:15px;color:var(--ink-soft);flex-shrink:0;}
     .topbar-search{border:none;background:none;outline:none;font-size:13px;color:var(--ink);width:100%;font-family:'IBM Plex Sans',sans-serif;}
     .topbar-search::placeholder{color:var(--ink-soft);}
-    .card{box-shadow:0 1px 3px rgba(21,32,51,.04);border-radius:16px;}
+    .card{
+      background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
+      border-color:var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-highlight), 0 1px 3px rgba(21,32,51,.04);
+      border-radius:16px;
+    }
     .card.stripe{transition:box-shadow .2s,border-color .2s,transform .2s;}
     .section-title{font-weight:700;letter-spacing:.02em;}
+    input,select,textarea{
+      background:var(--glass-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      border-color:var(--glass-border);
+    }
+    .btn-ghost{background:var(--glass-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:var(--glass-border);}
+    .modal-sheet{background:var(--glass-bg-strong);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);}
   }
   @media (min-width:960px) and (hover:hover){
     .card.stripe:hover{box-shadow:0 8px 22px rgba(21,32,51,.09);border-color:#C7D0DC;transform:translateY(-1px);}
