@@ -30,6 +30,11 @@
     --chip-bg:#EEF1F5;
     --row-bg:#FAFBFC;
     --switch-track:#D7DDE5;
+    --glass-bg:rgba(255,255,255,.5);
+    --glass-bg-strong:rgba(255,255,255,.72);
+    --glass-border:rgba(255,255,255,.6);
+    --glass-highlight:rgba(255,255,255,.8);
+    --glass-blur:blur(24px) saturate(180%);
   }
   :root[data-theme="dark"]{
     --bg:#10161F;
@@ -40,6 +45,10 @@
     --chip-bg:#26303F;
     --row-bg:#1E2836;
     --switch-track:#3A4658;
+    --glass-bg:rgba(27,36,49,.5);
+    --glass-bg-strong:rgba(27,36,49,.68);
+    --glass-border:rgba(255,255,255,.09);
+    --glass-highlight:rgba(255,255,255,.07);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -93,10 +102,11 @@
   .stripe.boq-over{border-left-color:var(--amber);}
   .stripe.boq-under{border-left-color:var(--red);}
   .badge{
-    display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;
+    display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
     font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
     font-family:'IBM Plex Mono',monospace;
   }
+  .badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0;}
   .badge.paid,.badge.received,.badge.accepted{background:var(--green-soft);color:var(--green);}
   .badge.sent{background:var(--teal-soft);color:var(--teal);}
   .badge.draft{background:var(--chip-bg);color:var(--ink-soft);}
@@ -125,12 +135,16 @@
   .btn{
     border:none;border-radius:11px;padding:12px 16px;font-weight:600;font-size:14.5px;
     cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    font-family:'IBM Plex Sans',sans-serif;
+    font-family:'IBM Plex Sans',sans-serif;transition:transform .15s,box-shadow .15s,filter .15s;
   }
-  .btn-primary{background:var(--navy);color:#fff;}
-  .btn-teal{background:var(--teal);color:#fff;}
+  .btn-primary{background:linear-gradient(135deg,var(--navy),var(--navy-2));color:#fff;box-shadow:0 6px 16px rgba(21,42,77,.22);}
+  .btn-teal{background:linear-gradient(135deg,var(--teal),#0C8378);color:#fff;box-shadow:0 6px 16px rgba(14,156,144,.22);}
   .btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line);}
   .btn-danger{background:var(--red-soft);color:var(--red);}
+  @media (hover:hover){
+    .btn-primary:hover,.btn-teal:hover{transform:translateY(-1px);filter:brightness(1.05);}
+    .btn-ghost:hover{background:var(--chip-bg);}
+  }
   .btn-block{width:100%;}
   .btn-sm{padding:8px 12px;font-size:13px;border-radius:9px;}
   input,select,textarea{
@@ -385,38 +399,66 @@
 
   /* ---------- DESKTOP SHELL ---------- */
   .desktop-sidebar{display:none;}
+  .topbar-search-wrap{display:none;}
   @media (min-width:960px){
+    /* liquid-glass backdrop: a soft, colorful mesh sitting behind every translucent
+       panel below, fixed so it doesn't scroll away — without it backdrop-filter
+       has nothing to blur and just looks like plain frosted grey */
+    body{
+      background:
+        radial-gradient(1000px 700px at 10% 6%, rgba(14,156,144,.48), transparent 62%),
+        radial-gradient(1100px 780px at 90% 12%, rgba(42,109,176,.42), transparent 60%),
+        radial-gradient(950px 820px at 65% 88%, rgba(155,92,220,.30), transparent 62%),
+        radial-gradient(900px 700px at 15% 95%, rgba(224,168,50,.20), transparent 60%),
+        var(--bg);
+      background-attachment:fixed;
+    }
+    :root[data-theme="dark"] body{
+      background:
+        radial-gradient(1000px 700px at 10% 6%, rgba(14,156,144,.55), transparent 62%),
+        radial-gradient(1100px 780px at 90% 12%, rgba(42,109,176,.5), transparent 60%),
+        radial-gradient(950px 820px at 65% 88%, rgba(155,92,220,.38), transparent 62%),
+        radial-gradient(900px 700px at 15% 95%, rgba(224,168,50,.26), transparent 60%),
+        var(--bg);
+      background-attachment:fixed;
+    }
     .desktop-sidebar{
       display:flex;flex-direction:column;justify-content:space-between;
       position:fixed;top:0;left:0;bottom:0;width:248px;
-      background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#fff;
+      background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      color:var(--ink);border-right:1px solid var(--glass-border);
+      box-shadow:6px 0 32px rgba(21,32,51,.06), inset -1px 0 0 var(--glass-highlight);
       padding:20px 14px;z-index:50;
     }
     .desktop-sidebar:empty{display:none;}
-    .ds-head{display:flex;align-items:center;gap:10px;margin-bottom:26px;padding:0 6px;}
-    .ds-logo{width:38px;height:38px;border-radius:50%;background:#0A4174;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 10px rgba(0,0,0,.3);}
+    .ds-head{display:flex;align-items:center;gap:10px;margin-bottom:22px;padding:0 6px;}
+    .ds-logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--navy),var(--navy-2));display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 14px rgba(21,32,51,.28);}
     .ds-logo img{width:24px;height:24px;object-fit:contain;}
-    .ds-company{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;line-height:1.2;}
-    .ds-sub{font-size:10px;color:rgba(255,255,255,.5);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+    .ds-company{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;line-height:1.2;color:var(--ink);}
+    .ds-sub{font-size:10px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+    .ds-section-label{font-size:10.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;padding:0 12px;margin:14px 0 6px;}
+    .ds-section-label:first-of-type{margin-top:4px;}
     .ds-nav{display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto;}
     .ds-navbtn{
-      display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;border:none;
-      background:none;color:rgba(255,255,255,.7);font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;
-      cursor:pointer;text-align:left;transition:background .15s,color .15s;width:100%;
+      display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;border:none;
+      background:none;color:var(--ink-soft);font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;
+      cursor:pointer;text-align:left;transition:background .18s,color .18s,transform .18s;width:100%;position:relative;
     }
-    .ds-navbtn svg{width:17px;height:17px;flex-shrink:0;}
-    .ds-navbtn:hover{background:rgba(255,255,255,.07);color:#fff;}
-    .ds-navbtn.active{background:rgba(255,255,255,.14);color:#fff;}
-    .ds-foot{border-top:1px solid rgba(255,255,255,.12);padding-top:14px;margin-top:14px;}
+    .ds-navbtn svg{width:17px;height:17px;flex-shrink:0;transition:transform .18s;}
+    .ds-navbtn:hover{background:var(--glass-highlight);color:var(--ink);transform:translateX(2px);}
+    .ds-navbtn.active{background:linear-gradient(135deg,rgba(42,109,176,.22),rgba(14,156,144,.18));color:var(--blue);box-shadow:inset 0 0 0 1px rgba(42,109,176,.16);backdrop-filter:blur(6px);}
+    .ds-navbtn.active svg{transform:scale(1.08);}
+    .ds-navbtn.active::before{content:'';position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--blue),var(--teal));}
+    .ds-foot{border-top:1px solid var(--line);padding-top:14px;margin-top:14px;}
     .ds-user{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:0 6px;}
-    .ds-avatar{width:30px;height:30px;border-radius:9px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;}
-    .ds-uname{font-size:12.5px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .ds-urole{font-size:10.5px;color:rgba(255,255,255,.5);}
-    .ds-logout{width:100%;background:rgba(255,255,255,.08);border:none;color:#fff;border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif;}
+    .ds-avatar{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;box-shadow:0 3px 8px rgba(14,156,144,.3);}
+    .ds-uname{font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ds-urole{font-size:10.5px;color:var(--ink-soft);}
+    .ds-logout{width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--ink-soft);border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif;transition:background .15s,color .15s;}
     .ds-logout svg{width:12px;height:12px;}
-    .ds-logout:hover{background:rgba(255,255,255,.16);}
+    .ds-logout:hover{background:var(--glass-bg-strong);color:var(--ink);}
 
-    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;}
+    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;background:transparent;}
     .desktop-sidebar:not(:empty) ~ #app .tabbar{display:none !important;}
     .desktop-sidebar:not(:empty) ~ #app .fab{right:32px;bottom:32px;}
     /* client portal has no sidebar at all — still needs to escape the 520px mobile
@@ -430,6 +472,54 @@
     .dash-actions{grid-template-columns:repeat(4,1fr);}
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
+
+    /* airy, light desktop page header + working list search, in the style of
+       modern task-board apps — the navy mobile topbar reads too heavy once it's
+       sitting next to a light sidebar instead of filling the whole screen */
+    .desktop-sidebar:not(:empty) ~ #app .topbar{
+      background:var(--glass-bg-strong);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      color:var(--ink);border-bottom:1px solid var(--glass-border);
+      box-shadow:0 1px 0 var(--glass-highlight) inset, 0 4px 20px rgba(21,32,51,.05);
+    }
+    .desktop-sidebar:not(:empty) ~ #app .topbar .title{color:var(--ink);font-size:21px;font-weight:700;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .sub{color:var(--ink-soft);}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .back{background:var(--glass-bg);color:var(--ink);transition:background .15s;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .back:hover{background:var(--glass-bg-strong);}
+    /* the mobile topbar is navy, so its icon-btn actions (share, logout) are inline-styled
+       white-on-transparent — invisible against this light glass bar, so force them back
+       to a readable, theme-matched glass chip here */
+    .desktop-sidebar:not(:empty) ~ #app .topbar .icon-btn{
+      background:var(--glass-bg) !important;color:var(--ink) !important;border-color:var(--glass-border) !important;
+    }
+    .desktop-sidebar:not(:empty) ~ #app .topbar .icon-btn:hover{background:var(--glass-bg-strong) !important;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar-search-wrap{
+      display:flex;align-items:center;gap:8px;background:var(--glass-bg);border-radius:10px;
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      padding:8px 12px;margin-right:4px;width:220px;flex-shrink:0;
+      border:1px solid var(--glass-border);transition:border-color .15s,background .15s,box-shadow .15s;
+    }
+    .topbar-search-wrap:focus-within{border-color:var(--teal);background:var(--glass-bg-strong);box-shadow:0 0 0 3px var(--teal-soft);}
+    .topbar-search-wrap svg{width:15px;height:15px;color:var(--ink-soft);flex-shrink:0;}
+    .topbar-search{border:none;background:none;outline:none;font-size:13px;color:var(--ink);width:100%;font-family:'IBM Plex Sans',sans-serif;}
+    .topbar-search::placeholder{color:var(--ink-soft);}
+    .card{
+      background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
+      border-color:var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-highlight), 0 1px 3px rgba(21,32,51,.04);
+      border-radius:16px;
+    }
+    .card.stripe{transition:box-shadow .2s,border-color .2s,transform .2s;}
+    .section-title{font-weight:700;letter-spacing:.02em;}
+    input,select,textarea{
+      background:var(--glass-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      border-color:var(--glass-border);
+    }
+    .btn-ghost{background:var(--glass-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:var(--glass-border);}
+    .modal-sheet{background:var(--glass-bg-strong);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);}
+  }
+  @media (min-width:960px) and (hover:hover){
+    .card.stripe:hover{box-shadow:0 8px 22px rgba(21,32,51,.09);border-color:#C7D0DC;transform:translateY(-1px);}
+    .dash-action,.dash-stat{transition:transform .18s ease,box-shadow .18s ease;}
+    .dash-action:hover,.dash-stat:hover{box-shadow:0 10px 22px rgba(21,32,51,.1);transform:translateY(-2px);}
   }
   @media (min-width:1280px){
     .desktop-sidebar{width:264px;}
@@ -1640,16 +1730,23 @@ function render(){
 }
 
 /* ---------- TOPBAR helper ---------- */
-function topbar(title, sub, showBack, rightBtn){
+function topbar(title, sub, showBack, rightBtn, showSearch){
   return `<div class="topbar">
     ${showBack?`<button class="back" onclick="goBack()">${ICO.back}</button>`:''}
     <div style="flex:1;min-width:0">
       <div class="title">${esc(title)}</div>
       ${sub?`<div class="sub">${esc(sub)}</div>`:''}
     </div>
+    ${showSearch?`<div class="topbar-search-wrap">${ic('search')}<input class="topbar-search" type="text" placeholder="Search this list" oninput="quickFilterList(this.value)"></div>`:''}
     <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
     ${rightBtn||''}
   </div>`;
+}
+function quickFilterList(q){
+  const query=(q||'').trim().toLowerCase();
+  document.querySelectorAll('.content .card.stripe').forEach(row=>{
+    row.style.display = !query || row.textContent.toLowerCase().includes(query) ? '' : 'none';
+  });
 }
 
 /* ---------- TABBAR ---------- */
@@ -1678,6 +1775,7 @@ function renderSidebar(){
       <div class="ds-sub">IT Business Suite</div>
     </div>
   </div>
+  <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
     ${tabs.map(([id,icon,label])=>{
       const activeCls = activeId===id?'active':'';
@@ -1819,7 +1917,7 @@ function renderSalesList(){
   const list = SALES_TAB==='invoices'? S.invoices : S.quotes;
   const sorted=[...list].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return `
-  ${topbar('Sales','Invoices & quotes')}
+  ${topbar('Sales','Invoices & quotes', false, null, true)}
   <div class="content">
     <div class="segmented">
       <button class="${SALES_TAB==='invoices'?'active':''}" onclick="SALES_TAB='invoices';render()">Invoices</button>
@@ -2596,7 +2694,7 @@ function renderStockList(){
       const header = groupLetter!==lastLetter ? `<div class="section-title" style="margin-top:${lastLetter===null?'0':'18px'}">${groupLetter}</div>` : '';
       lastLetter = groupLetter;
       const low = Number(i.stock) <= Number(i.lowStockThreshold||0);
-      return header + `<div class="card" onclick="goPush('item-form',{id:'${i.id}'})">
+      return header + `<div class="card stripe ${low?'boq-under':''}" onclick="goPush('item-form',{id:'${i.id}'})">
         <div class="row-between">
           <div>
             <div style="font-weight:600">${esc(i.name)}</div>
@@ -2610,7 +2708,7 @@ function renderStockList(){
       </div>`;
     }).join('');
     return `
-    ${topbar('Stock','Inventory & purchases')}
+    ${topbar('Stock','Inventory & purchases', false, null, true)}
     <div class="content">
       ${stockSegmented('inventory')}
       ${S.projects.length?`<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('inventory-import',{})">${ic('box')} Import items from projects' BOQs</button></div>`:''}
@@ -2621,7 +2719,7 @@ function renderStockList(){
   } else if(STOCK_TAB==='rfqs'){
     const list=[...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     return `
-    ${topbar('Stock','Inventory & purchases')}
+    ${topbar('Stock','Inventory & purchases', false, null, true)}
     <div class="content">
       ${stockSegmented('rfqs')}
       <div style="height:12px"></div>
@@ -2649,7 +2747,7 @@ function renderStockList(){
     const sortedProjects=[...S.projects].sort((a,b)=>(a.number||'').localeCompare(b.number||''));
     const hasFilter = PURCHASE_PROJECT_FILTER || PURCHASE_PAYMENT_FILTER;
     return `
-    ${topbar('Stock','Inventory & purchases')}
+    ${topbar('Stock','Inventory & purchases', false, null, true)}
     <div class="content">
       ${stockSegmented('purchases')}
       ${S.projects.length? `
@@ -3482,7 +3580,7 @@ function newProject(){ goPush('project-form',{id:null}); }
 function renderProjectsList(){
   const list=[...S.projects].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return `
-  ${topbar('Projects','Bill of quantities & site progress')}
+  ${topbar('Projects','Bill of quantities & site progress', false, null, true)}
   <div class="content">
     ${list.length===0? emptyState('box','No projects yet','Tap + to start a project with a bill of quantities.') :
       list.map(p=>{
