@@ -975,6 +975,16 @@ function nextNumber(type){
   if(type==='project'){ const n=s.projectNext||1; s.projectNext=n+1; return `${s.projectPrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
   if(type==='rfq'){ const n=s.rfqNext||1; s.rfqNext=n+1; return `${s.rfqPrefix}-${new Date().getFullYear()}-${String(n).padStart(4,'0')}`; }
 }
+// Same formatting as nextNumber(), but read-only — used to show a new form's
+// suggested number without burning a sequence number just by opening the form.
+function previewNumber(type){
+  const s=S.settings, y=new Date().getFullYear();
+  if(type==='invoice') return `${s.invoicePrefix}-${y}-${String(s.invoiceNext||1).padStart(4,'0')}`;
+  if(type==='quote') return `${s.quotePrefix}-${y}-${String(s.quoteNext||1).padStart(4,'0')}`;
+  if(type==='purchase') return `${s.poPrefix}-${y}-${String(s.poNext||1).padStart(4,'0')}`;
+  if(type==='project') return `${s.projectPrefix}-${y}-${String(s.projectNext||1).padStart(4,'0')}`;
+  if(type==='rfq') return `${s.rfqPrefix}-${y}-${String(s.rfqNext||1).padStart(4,'0')}`;
+}
 
 function calcItems(items){
   return items.map(it=>{
@@ -1990,6 +2000,8 @@ function renderDocForm(type, id){
       <label>Customer name</label>
       <input id="f_customer" value="${esc(d.customer)}" placeholder="Customer or company name" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
       ${customerDatalist()}
+      <label>Number</label>
+      <input id="f_number" value="${esc(d.number || previewNumber(type))}" placeholder="${type==='invoice'?'INV':'QUO'}-2026-0001">
       <div class="item-grid">
         <div><label>Phone</label><input id="f_phone" value="${esc(d.phone)}" placeholder="+971 ..."></div>
         <div><label>Email</label><input id="f_email" value="${esc(d.email)}" placeholder="client@email.com"></div>
@@ -2111,13 +2123,16 @@ function saveDoc(type,id){
   if(!customer){ toast('Please enter a customer name'); return; }
   const items = readItemsFromDOM();
   if(items.length===0){ toast('Add at least one item'); return; }
+  const numberInput = document.getElementById('f_number').value.trim();
   const isNew = !id;
   let doc;
   if(isNew){
-    doc = { id:uid(), number: nextNumber(type), stockApplied:false };
+    const generated = nextNumber(type);
+    doc = { id:uid(), number: numberInput || generated, stockApplied:false };
     list.push(doc);
   } else {
     doc = list.find(d=>d.id===id);
+    doc.number = numberInput || doc.number;
   }
   doc.customer=customer;
   doc.phone=document.getElementById('f_phone').value.trim();
@@ -2947,6 +2962,8 @@ function renderPurchaseForm(id){
       <label>Supplier</label>
       <input id="p_supplier" value="${esc(p.supplier)}" placeholder="Supplier / vendor name" oninput="acOpen(this,AC_OPTS.suppliers)" onfocus="acOpen(this,AC_OPTS.suppliers)" autocomplete="off">
       ${supplierDatalist()}
+      <label>Number</label>
+      <input id="p_number" value="${esc(p.number || previewNumber('purchase'))}" placeholder="PO-2026-0001">
       <label>Date</label><input id="p_date" type="date" value="${p.date}">
       <label>Status</label>
       <select id="p_status">
@@ -3109,10 +3126,12 @@ function savePurchase(id){
   if(!supplier){ toast('Enter a supplier name'); return; }
   const items=readPurchaseItemsFromDOM();
   if(items.length===0){ toast('Add at least one item'); return; }
+  const numberInput = document.getElementById('p_number').value.trim();
   const isNew=!id; let p;
-  if(isNew){ p={id:uid(),number:nextNumber('purchase'),stockApplied:false}; S.purchases.push(p); }
+  if(isNew){ const generated=nextNumber('purchase'); p={id:uid(),number:numberInput || generated,stockApplied:false}; S.purchases.push(p); }
   else {
     p=S.purchases.find(x=>x.id===id);
+    p.number = numberInput || p.number;
     if(p.stockApplied) reversePurchaseStock(p); // undo old quantities before applying edited ones
   }
   p.supplier=supplier;
@@ -3162,6 +3181,8 @@ function renderRfqForm(id){
     <div class="card">
       <label>Title</label>
       <input id="rfq_title" value="${esc(rfq.title)}" placeholder="e.g. CCTV materials for Bahiya Villa">
+      <label>Number</label>
+      <input id="rfq_number" value="${esc(rfq.number || previewNumber('rfq'))}" placeholder="RFQ-2026-0001">
       <label>Date</label>
       <input id="rfq_date" type="date" value="${rfq.date}">
       <label>Notes for suppliers (optional)</label>
@@ -3212,9 +3233,10 @@ function saveRfq(id){
   if(!title){ toast('Enter a title'); return; }
   const items=readRfqItemsFromDOM();
   if(items.length===0){ toast('Add at least one item'); return; }
+  const numberInput = document.getElementById('rfq_number').value.trim();
   const isNew=!id; let r;
-  if(isNew){ r={id:uid(), number:nextNumber('rfq'), status:'open'}; S.rfqs.push(r); }
-  else { r=S.rfqs.find(x=>x.id===id); }
+  if(isNew){ const generated=nextNumber('rfq'); r={id:uid(), number:numberInput || generated, status:'open'}; S.rfqs.push(r); }
+  else { r=S.rfqs.find(x=>x.id===id); r.number = numberInput || r.number; }
   r.title=title;
   r.date=document.getElementById('rfq_date').value||todayISO();
   r.notes=document.getElementById('rfq_notes').value;
@@ -3646,6 +3668,8 @@ function renderProjectForm(id){
       <label>Customer</label>
       <input id="pj_customer" value="${esc(p.customer)}" placeholder="Customer or company name" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
       ${customerDatalist()}
+      <label>Number</label>
+      <input id="pj_number" value="${esc(p.number || previewNumber('project'))}" placeholder="PRJ-2026-0001">
       <div class="item-grid">
         <div><label>Phone</label><input id="pj_phone" value="${esc(p.phone)}"></div>
         <div><label>Email</label><input id="pj_email" value="${esc(p.email)}"></div>
@@ -3678,9 +3702,10 @@ function saveProject(id){
   const name=document.getElementById('pj_name').value.trim();
   const customer=document.getElementById('pj_customer').value.trim();
   if(!name||!customer){ toast('Enter a project name and customer'); return; }
+  const numberInput = document.getElementById('pj_number').value.trim();
   const isNew=!id; let p;
-  if(isNew){ p={id:uid(), number:nextNumber('project'), boq:[], payments:[], charges:[]}; S.projects.push(p); }
-  else { p=S.projects.find(x=>x.id===id); }
+  if(isNew){ const generated=nextNumber('project'); p={id:uid(), number:numberInput || generated, boq:[], payments:[], charges:[]}; S.projects.push(p); }
+  else { p=S.projects.find(x=>x.id===id); p.number = numberInput || p.number; }
   p.name=name; p.customer=customer;
   p.phone=document.getElementById('pj_phone').value.trim();
   p.email=document.getElementById('pj_email').value.trim();
