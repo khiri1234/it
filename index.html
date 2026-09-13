@@ -458,13 +458,29 @@
     .ds-logout svg{width:12px;height:12px;}
     .ds-logout:hover{background:var(--glass-bg-strong);color:var(--ink);}
 
-    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;background:transparent;}
+    /* every #app variant sits on the body's glass mesh now, not a flat opaque
+       fill — the pre-auth screens below turn themselves into a glass card so
+       that mesh reads as one consistent background instead of only showing in
+       the leftover gutters around a plain white 520px column */
+    #app{background:transparent;}
+    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;}
     .desktop-sidebar:not(:empty) ~ #app .tabbar{display:none !important;}
     .desktop-sidebar:not(:empty) ~ #app .fab{right:32px;bottom:32px;}
     /* client portal has no sidebar at all — still needs to escape the 520px mobile
        #app cap, just with a narrower centered reading column than the admin/staff app */
-    #app.client-portal{max-width:none;margin:0;padding-bottom:0;min-height:100vh;}
+    #app.client-portal{max-width:none;margin:0;padding-bottom:0;min-height:100vh;background:var(--bg);}
     #app.client-portal .content{max-width:760px;padding-top:28px;padding-bottom:40px;}
+    /* login / first-run setup / connection-error — no sidebar, not a portal —
+       become a single floating glass card centered over the mesh */
+    .desktop-sidebar:empty ~ #app:not(.client-portal){
+      max-width:440px;margin:8vh auto;min-height:auto;padding:36px 34px 34px;
+      background:var(--glass-bg-strong);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      border:1px solid var(--glass-border);border-radius:24px;
+      box-shadow:0 30px 70px rgba(21,32,51,.22), inset 0 1px 0 var(--glass-highlight);
+    }
+    .desktop-sidebar:empty ~ #app:not(.client-portal) .content{padding:0;max-width:none;}
+    .desktop-sidebar:empty ~ #app:not(.client-portal) .auth-content{padding-top:8px !important;}
+    .desktop-sidebar:empty ~ #app:not(.client-portal) .fab{display:none;}
     .topbar{padding-left:28px;padding-right:28px;}
     .content{padding-left:28px;padding-right:28px;max-width:936px;margin:0 auto;}
     .dash-hero{padding-left:28px;padding-right:28px;}
@@ -1368,7 +1384,7 @@ function adjustStock(id, delta){
 /* ---------- AUTH ---------- */
 function renderSetup(){
   return `
-  <div class="content" style="padding-top:60px">
+  <div class="content auth-content" style="padding-top:60px">
     <div style="text-align:center;margin-bottom:22px">
       <div class="display" style="font-size:22px;font-weight:700">Set up Ledger</div>
       <div class="tiny muted">Create the first admin account for your team</div>
@@ -1404,7 +1420,7 @@ function renderLogin(){
   const rid = rememberedUserId();
   const rememberedUser = rid ? S.users.find(u=>u.id===rid) : null;
   return `
-  <div class="content" style="padding-top:110px">
+  <div class="content auth-content" style="padding-top:110px">
     <div style="text-align:center;margin-bottom:22px">
       <div class="display" style="font-size:22px;font-weight:700">${esc(S.settings.companyName||'Ledger')}</div>
       <div class="tiny muted">Sign in to continue</div>
