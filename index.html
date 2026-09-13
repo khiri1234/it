@@ -61,7 +61,7 @@
   }
   h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
   .mono{font-family:'IBM Plex Mono',monospace;}
-  #app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:84px;}
+  #app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));}
   .topbar{
     position:sticky;top:0;z-index:20;
     background:var(--navy);
