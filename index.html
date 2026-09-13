@@ -158,7 +158,20 @@
   .field{margin-bottom:2px;}
   .item-row,.item-row-p{
     border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:var(--row-bg);
+    transition:box-shadow .15s,opacity .15s;
   }
+  .item-row.dragging,.item-row-p.dragging,.card.dragging{
+    opacity:.55;box-shadow:0 10px 24px rgba(21,32,51,.22);cursor:grabbing;
+  }
+  .drag-row{display:flex;align-items:center;gap:8px;}
+  .drag-row>:first-child{flex:1;min-width:0;}
+  .drag-handle{
+    width:34px;height:34px;flex-shrink:0;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;color:var(--ink-soft);
+    cursor:grab;touch-action:none;background:var(--chip-bg);
+  }
+  .drag-handle svg{width:16px;height:16px;}
+  .drag-handle:active{cursor:grabbing;}
   .item-grid{display:flex;gap:8px;margin-top:8px;}
   .item-grid>div{flex:1 1 0;min-width:0;}
   .item-grid input,.item-grid select{min-width:0;max-width:100%;}
@@ -659,6 +672,7 @@ const ICO = {
   chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
   logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
   card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
+  grip:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
 };
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
@@ -2051,8 +2065,11 @@ function renderItemRows(items){
   AC_OPTS.inventoryNames = S.inventory.map(i=>i.name);
   return items.map((it,idx)=>`
     <div class="item-row" data-idx="${idx}">
-      <input placeholder="Item / service description" value="${esc(it.desc)}"
-        oninput="onItemDescChange(${idx}, this.value);acOpen(this,AC_OPTS.inventoryNames)" onfocus="acOpen(this,AC_OPTS.inventoryNames)" autocomplete="off" class="rowDesc">
+      <div class="drag-row">
+        <input placeholder="Item / service description" value="${esc(it.desc)}"
+          oninput="onItemDescChange(${idx}, this.value);acOpen(this,AC_OPTS.inventoryNames)" onfocus="acOpen(this,AC_OPTS.inventoryNames)" autocomplete="off" class="rowDesc">
+        <div class="drag-handle" title="Drag to reorder">${ic('grip')}</div>
+      </div>
       <div class="item-grid">
         <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" oninput="liveTotals()" class="rowQty"></div>
         <div><label style="margin-top:8px">Unit price</label><input type="number" min="0" step="0.01" value="${it.price}" oninput="liveTotals()" class="rowPrice"></div>
@@ -3003,7 +3020,10 @@ function renderPurchaseRows(items){
   AC_OPTS.inventoryNames = S.inventory.map(i=>i.name);
   return items.map((it,idx)=>`
     <div class="item-row-p" data-idx="${idx}" data-boqid="${it.boqItemId||''}">
-      <input placeholder="Item description" value="${esc(it.desc)}" oninput="onPurchaseDescChange(${idx},this.value);acOpen(this,AC_OPTS.inventoryNames)" onfocus="acOpen(this,AC_OPTS.inventoryNames)" autocomplete="off" class="pDesc">
+      <div class="drag-row">
+        <input placeholder="Item description" value="${esc(it.desc)}" oninput="onPurchaseDescChange(${idx},this.value);acOpen(this,AC_OPTS.inventoryNames)" onfocus="acOpen(this,AC_OPTS.inventoryNames)" autocomplete="off" class="pDesc">
+        <div class="drag-handle" title="Drag to reorder">${ic('grip')}</div>
+      </div>
       <div class="item-grid">
         <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" oninput="purchaseLiveTotals()" class="pQty"></div>
         <div><label style="margin-top:8px">Unit cost</label><input type="number" min="0" step="0.01" value="${it.cost}" oninput="purchaseLiveTotals()" class="pCost"></div>
@@ -3200,7 +3220,10 @@ function renderRfqForm(id){
 function renderRfqRows(items){
   return items.map((it,idx)=>`
     <div class="item-row-p" data-idx="${idx}" data-itemid="${it.id}">
-      <input placeholder="Item description" value="${esc(it.desc)}" class="rfqDesc">
+      <div class="drag-row">
+        <input placeholder="Item description" value="${esc(it.desc)}" class="rfqDesc">
+        <div class="drag-handle" title="Drag to reorder">${ic('grip')}</div>
+      </div>
       <div class="item-grid">
         <div><label style="margin-top:8px">Item code (optional)</label><input value="${esc(it.code||'')}" class="rfqCode"></div>
         <div><label style="margin-top:8px">Qty</label><input type="number" min="0" step="1" value="${it.qty}" class="rfqQty"></div>
@@ -3783,12 +3806,16 @@ function renderProjectView(id){
       <div class="bar-wrap"><div style="width:74px" class="tiny muted">Purchased</div><div class="bar-track"><div class="bar-fill" style="width:${purchasedPct}%;background:var(--navy-2)"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(purchasedPct)}%</div></div>
       <div class="bar-wrap" style="margin-bottom:0"><div style="width:74px" class="tiny muted">Installed</div><div class="bar-track"><div class="bar-fill" style="width:${installedPct}%"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(installedPct)}%</div></div>
     </div>
+    <div id="boqWrap">
     ${(p.boq&&p.boq.length)? p.boq.map(item=>{
       const boqStatus = boqLineStatus(item);
       return `
       <div class="card stripe ${boqStatus}" data-boqid="${item.id}">
         <div class="row-between">
-          <div style="font-weight:600;font-size:14px">${esc(item.desc)}</div>
+          <div class="drag-row" style="flex:1;min-width:0;margin-right:8px">
+            <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.desc)}</div>
+            <div class="drag-handle" title="Drag to reorder">${ic('grip')}</div>
+          </div>
           <div class="mono tiny muted">${fmtMoney(boqLineTotal(item))}</div>
         </div>
         <div class="row-between" style="margin-bottom:8px">
@@ -3811,6 +3838,7 @@ function renderProjectView(id){
         </div>
       </div>`;
     }).join('') : `<div class="card"><div class="tiny muted">No BOQ lines yet — add the scope of work below.</div></div>`}
+    </div>
     <button class="btn btn-ghost btn-block" onclick="showBoqLineForm('${p.id}')">${ic('plus')} Add BOQ line</button>
 
     <div class="section-title">Additional costs</div>
@@ -4576,9 +4604,84 @@ function saveSettings(){
 }
 
 /* ---------- AFTER RENDER HOOKS ---------- */
+/* ---------- DRAG-TO-REORDER (pointer events — works for mouse, touch, pen) ----------
+   Binds a delegated pointerdown listener on `container` (once — the flag survives
+   the container's children being replaced by a re-render, but not the container
+   itself, so this is safe to call again after every full-page render()). Dragging
+   a row by its `.drag-handle` moves the actual DOM node live; on release, `onDrop`
+   decides how to reconcile that new DOM order back into the data model. */
+function enableRowDrag(containerId, rowSelector, onDrop){
+  const container = document.getElementById(containerId);
+  if(!container || container._dragBound) return;
+  container._dragBound = true;
+  let dragEl = null;
+  container.addEventListener('pointerdown', e=>{
+    const handle = e.target.closest('.drag-handle');
+    if(!handle || !container.contains(handle)) return;
+    const row = handle.closest(rowSelector);
+    if(!row) return;
+    e.preventDefault();
+    dragEl = row;
+    row.classList.add('dragging');
+    try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+    const onMove = ev=>{
+      if(!dragEl) return;
+      const rows = [...container.querySelectorAll(rowSelector)].filter(r=>r!==dragEl);
+      const y = ev.clientY;
+      let target = null;
+      for(const r of rows){
+        const rect = r.getBoundingClientRect();
+        if(y < rect.top + rect.height/2){ target = r; break; }
+      }
+      if(target) container.insertBefore(dragEl, target);
+      else container.appendChild(dragEl);
+    };
+    const onUp = ev=>{
+      container.removeEventListener('pointermove', onMove);
+      container.removeEventListener('pointerup', onUp);
+      container.removeEventListener('pointercancel', onUp);
+      try{ handle.releasePointerCapture(ev.pointerId); }catch(err){}
+      if(dragEl) dragEl.classList.remove('dragging');
+      dragEl = null;
+      if(onDrop) onDrop();
+    };
+    container.addEventListener('pointermove', onMove);
+    container.addEventListener('pointerup', onUp);
+    container.addEventListener('pointercancel', onUp);
+  });
+}
+
 function afterRender(){
-  if(['invoice-form','quote-form'].includes(VIEW.name)) liveTotals();
-  if(VIEW.name==='purchase-form') purchaseLiveTotals();
+  if(['invoice-form','quote-form'].includes(VIEW.name)){
+    liveTotals();
+    enableRowDrag('itemsWrap', '.item-row', ()=>{
+      document.getElementById('itemsWrap').innerHTML = renderItemRows(readItemsFromDOM());
+      liveTotals();
+    });
+  }
+  if(VIEW.name==='purchase-form'){
+    purchaseLiveTotals();
+    enableRowDrag('pItemsWrap', '.item-row-p', ()=>{
+      document.getElementById('pItemsWrap').innerHTML = renderPurchaseRows(readPurchaseItemsFromDOM());
+      purchaseLiveTotals();
+    });
+  }
+  if(VIEW.name==='rfq-form'){
+    enableRowDrag('rfqItemsWrap', '.item-row-p', ()=>{
+      document.getElementById('rfqItemsWrap').innerHTML = renderRfqRows(readRfqItemsFromDOM());
+    });
+  }
+  if(VIEW.name==='project-view'){
+    enableRowDrag('boqWrap', '.card[data-boqid]', ()=>{
+      const wrap = document.getElementById('boqWrap');
+      if(!wrap) return;
+      const project = S.projects.find(x=>x.id===VIEW.params.id);
+      if(!project) return;
+      const order = [...wrap.querySelectorAll('.card[data-boqid]')].map(el=>el.dataset.boqid);
+      project.boq = order.map(bid=>project.boq.find(b=>b.id===bid)).filter(Boolean);
+      persist('projects');
+    });
+  }
   if(VIEW.name==='chat'){
     const scroller = document.getElementById('chatScroll');
     if(scroller) scroller.scrollIntoView({block:'end'});
