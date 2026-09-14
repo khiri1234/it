@@ -1631,6 +1631,9 @@ function handleProjectDocInput(projectId, inputEl){
   inputEl.value = '';
   if(file) uploadProjectDoc(projectId, file);
 }
+function uploadTimeoutPromise(ms){
+  return new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')), ms));
+}
 async function uploadProjectDoc(projectId, file){
   if(!FIREBASE_ENABLED || !fbStorage){ toast('File uploads need Firebase Storage set up — see the setup notes in index.html'); return; }
   const maxBytes = 15*1024*1024;
@@ -1642,10 +1645,15 @@ async function uploadProjectDoc(projectId, file){
   // an upload that's taking a while is still working or has silently failed.
   UPLOADING_PROJECT_DOC = {projectId, name:file.name};
   render();
+  const path = `projectDocs/${projectId}/${uid()}-${file.name}`;
+  const ref = fbStorage.ref().child(path);
+  const uploadTask = ref.put(file);
   try{
-    const path = `projectDocs/${projectId}/${uid()}-${file.name}`;
-    const ref = fbStorage.ref().child(path);
-    await ref.put(file);
+    // A stalled upload — Storage not actually enabled on the Firebase project, the
+    // app backgrounded mid-upload, a dropped connection — would otherwise leave the
+    // UI stuck on "Uploading…" forever with no way to retry. Give up after 45s so
+    // there's always a clear failure instead of an indefinite spinner.
+    await Promise.race([uploadTask, uploadTimeoutPromise(45000)]);
     const url = await ref.getDownloadURL();
     if(!p.docs) p.docs=[];
     p.docs.push({id:uid(), name:file.name, url, size:file.size, type:file.type, path, uploadedAt:Date.now(), uploadedByName:CURRENT_USER.name});
@@ -1654,7 +1662,8 @@ async function uploadProjectDoc(projectId, file){
     toast('Uploaded');
   }catch(e){
     console.error('project doc upload failed',e);
-    toast('Upload failed — check your connection and Storage rules');
+    try{ uploadTask.cancel(); }catch(_){}
+    toast(e && e.message==='timeout' ? 'Upload timed out — check Storage is enabled in Firebase' : 'Upload failed — check your connection and Storage rules');
   }finally{
     UPLOADING_PROJECT_DOC = null;
     render();
