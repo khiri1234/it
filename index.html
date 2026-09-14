@@ -694,6 +694,7 @@ let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
+let SCROLL_TO_PROJECT_DOCS=false; // set true to jump straight to the Documents section on the next project-view render
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
 let CLIENT_CHAT_DRAFT='';
@@ -1681,7 +1682,7 @@ function renderProjectDocsSection(p, canManage){
   const uploading = UPLOADING_PROJECT_DOC && UPLOADING_PROJECT_DOC.projectId===p.id ? UPLOADING_PROJECT_DOC : null;
   if(!canManage && docs.length===0) return '';
   return `
-    <div class="section-title">Documents</div>
+    <div id="projectDocsSection" class="section-title">Documents</div>
     <div class="card">
       ${uploading?`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
         <div style="min-width:0;flex:1;display:flex;align-items:center;gap:10px">
@@ -3804,10 +3805,16 @@ function renderProjectsList(){
             <div class="bar-track"><div class="bar-fill" style="width:${boqProgressPct(p,'installedQty')}%"></div></div>
             <div class="tiny mono" style="width:36px;text-align:right">${Math.round(boqProgressPct(p,'installedQty'))}%</div>
           </div>`:''}
+          ${(p.docs&&p.docs.length)?`
+          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:10px" onclick="event.stopPropagation();viewProjectDocuments('${p.id}')">${ic('file')} View documents (${p.docs.length})</button>`:''}
         </div>`;
       }).join('')}
   </div>
   <button class="fab" onclick="newProject()">${ic('plus')}</button>`;
+}
+function viewProjectDocuments(id){
+  SCROLL_TO_PROJECT_DOCS = true;
+  go('project-view',{id});
 }
 function renderProjectForm(id){
   const editing = id? S.projects.find(p=>p.id===id): null;
@@ -4905,6 +4912,11 @@ function afterRender(){
       project.boq = order.map(bid=>project.boq.find(b=>b.id===bid)).filter(Boolean);
       persist('projects');
     });
+    if(SCROLL_TO_PROJECT_DOCS){
+      SCROLL_TO_PROJECT_DOCS = false;
+      const docsSection = document.getElementById('projectDocsSection');
+      if(docsSection) docsSection.scrollIntoView({block:'start'});
+    }
   }
   if(VIEW.name==='chat'){
     const scroller = document.getElementById('chatScroll');
