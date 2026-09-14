@@ -679,14 +679,14 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos','clientDocs'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ', rfqPrefix:'RFQ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1, rfqNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], clientDocs:{} };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
@@ -1545,6 +1545,15 @@ function renderClientPortal(){
             <div class="small">${fmtMoney(pay.amount)}</div>
             <div class="tiny mono muted">${fmtDate(pay.date)}</div>
           </div>`).join('')}` : ''}
+          ${(p.docs&&p.docs.length)? `
+          <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Documents</div>
+          ${p.docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>`<a href="${esc(d.url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit">
+            <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
+            <div style="min-width:0;flex:1">
+              <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
+              <div class="tiny muted">${fmtFileSize(d.size)}</div>
+            </div>
+          </a>`).join('')}` : ''}
         </div>`;
       }).join('')}
 
@@ -1571,8 +1580,6 @@ function renderClientPortal(){
           </div>`:''}
         </div>`;
       }).join('')}
-
-    ${renderClientDocsSection(customer, false)}
 
     <div class="section-title">Messages</div>
     <div class="card">
@@ -1610,57 +1617,61 @@ function sendClientChatMessage(){
   render();
 }
 
-/* ---------- CLIENT DOCUMENTS (PDFs/certificates admin uploads for a customer) ----------
-   Stored in Firebase Storage like purchase attachments — S.clientDocs[customer] only
-   keeps the small {name,url,size,type,path} pointers. Visible read-only in the client's
-   own portal; upload/delete is admin-only, from that customer's message thread. */
-function handleClientDocInput(customer, inputEl){
+/* ---------- PROJECT DOCUMENTS (PDFs/certificates admin uploads for a project) ----------
+   Stored in Firebase Storage like purchase attachments — each project only keeps the
+   small {name,url,size,type,path} pointers in its own p.docs array. Visible read-only
+   to the client in their portal (inside that project's card); upload/delete is
+   admin-only, from the project view. */
+function handleProjectDocInput(projectId, inputEl){
   const file = inputEl.files && inputEl.files[0];
   inputEl.value = '';
-  if(file) uploadClientDoc(customer, file);
+  if(file) uploadProjectDoc(projectId, file);
 }
-async function uploadClientDoc(customer, file){
+async function uploadProjectDoc(projectId, file){
   if(!FIREBASE_ENABLED || !fbStorage){ toast('File uploads need Firebase Storage set up — see the setup notes in index.html'); return; }
   const maxBytes = 15*1024*1024;
   if(file.size > maxBytes){ toast('That file is too large — max 15MB'); return; }
+  const p = S.projects.find(x=>x.id===projectId);
+  if(!p) return;
   toast('Uploading…');
   try{
-    const path = `clientDocs/${slugifyTopic(customer)}/${uid()}-${file.name}`;
+    const path = `projectDocs/${projectId}/${uid()}-${file.name}`;
     const ref = fbStorage.ref().child(path);
     await ref.put(file);
     const url = await ref.getDownloadURL();
-    if(!S.clientDocs) S.clientDocs={};
-    if(!S.clientDocs[customer]) S.clientDocs[customer]=[];
-    S.clientDocs[customer].push({id:uid(), name:file.name, url, size:file.size, type:file.type, path, uploadedAt:Date.now(), uploadedByName:CURRENT_USER.name});
-    await persist('clientDocs');
-    logActivity(`Uploaded "${file.name}" for ${customer}`);
+    if(!p.docs) p.docs=[];
+    p.docs.push({id:uid(), name:file.name, url, size:file.size, type:file.type, path, uploadedAt:Date.now(), uploadedByName:CURRENT_USER.name});
+    await persist('projects');
+    logActivity(`Uploaded "${file.name}" to project ${p.number}`);
     toast('Uploaded');
     render();
   }catch(e){
-    console.error('client doc upload failed',e);
+    console.error('project doc upload failed',e);
     toast('Upload failed — check your connection and Storage rules');
   }
 }
-function removeClientDoc(customer, docId){
+function removeProjectDoc(projectId, docId){
   showConfirm('Remove this document?', async ()=>{
-    const list = (S.clientDocs && S.clientDocs[customer]) || [];
-    const doc = list.find(d=>d.id===docId);
+    const p = S.projects.find(x=>x.id===projectId);
+    if(!p) return;
+    const doc = (p.docs||[]).find(d=>d.id===docId);
     if(doc && doc.path && fbStorage){
-      try{ await fbStorage.ref().child(doc.path).delete(); }catch(e){ console.error('client doc delete failed',e); }
+      try{ await fbStorage.ref().child(doc.path).delete(); }catch(e){ console.error('project doc delete failed',e); }
     }
-    S.clientDocs[customer] = list.filter(d=>d.id!==docId);
-    await persist('clientDocs');
-    logActivity(`Removed "${doc?doc.name:'a document'}" from ${customer}`);
+    p.docs = (p.docs||[]).filter(d=>d.id!==docId);
+    await persist('projects');
+    logActivity(`Removed "${doc?doc.name:'a document'}" from project ${p.number}`);
     toast('Removed');
     render();
   });
 }
-function renderClientDocsSection(customer, canManage){
-  const docs = (S.clientDocs && S.clientDocs[customer]) || [];
+function renderProjectDocsSection(p, canManage){
+  const docs = p.docs||[];
+  if(!canManage && docs.length===0) return '';
   return `
     <div class="section-title">Documents</div>
     <div class="card">
-      ${docs.length===0? `<div class="tiny muted" style="padding:2px 0 8px">${canManage?'No files uploaded yet.':'Nothing uploaded for you yet.'}</div>` :
+      ${docs.length===0? `<div class="tiny muted" style="padding:2px 0 8px">No files uploaded yet.</div>` :
         docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
           <a href="${esc(d.url)}" target="_blank" rel="noopener" style="min-width:0;flex:1;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
             <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
@@ -1669,10 +1680,10 @@ function renderClientDocsSection(customer, canManage){
               <div class="tiny muted">${fmtFileSize(d.size)} · ${fmtDate(new Date(d.uploadedAt).toISOString().slice(0,10))}</div>
             </div>
           </a>
-          ${canManage?`<button class="icon-btn" style="flex-shrink:0" onclick="removeClientDoc('${onclickStr(customer)}','${d.id}')">${ic('trash')}</button>`:''}
+          ${canManage?`<button class="icon-btn" style="flex-shrink:0" onclick="removeProjectDoc('${p.id}','${d.id}')">${ic('trash')}</button>`:''}
         </div>`).join('')}
-      ${canManage?`<input type="file" id="clientDocInput" accept="image/*,application/pdf" style="display:none" onchange="handleClientDocInput('${onclickStr(customer)}',this)">
-      <button class="btn btn-ghost btn-block" style="margin-top:${docs.length?'10px':'0'}" onclick="document.getElementById('clientDocInput').click()">${ic('download')} Upload document / certificate</button>`:''}
+      ${canManage?`<input type="file" id="projectDocInput" accept="image/*,application/pdf" style="display:none" onchange="handleProjectDocInput('${p.id}',this)">
+      <button class="btn btn-ghost btn-block" style="margin-top:${docs.length?'10px':'0'}" onclick="document.getElementById('projectDocInput').click()">${ic('download')} Upload document / certificate</button>`:''}
     </div>`;
 }
 
@@ -3945,6 +3956,8 @@ function renderProjectView(id){
 
     ${p.notes?`<div class="card"><div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:4px">Notes</div><div class="small">${esc(p.notes)}</div></div>`:''}
 
+    ${renderProjectDocsSection(p, isAdmin())}
+
     <label>Update status</label>
     <select onchange="quickProjectStatus('${p.id}',this.value)">
       ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1).replace('-',' ')}</option>`).join('')}
@@ -4560,8 +4573,6 @@ function renderClientChatThread(customer){
   return `
   ${topbar(customer,'Private conversation', true)}
   <div class="content">
-    ${renderClientDocsSection(customer, true)}
-    <div class="section-title">Messages</div>
     ${msgs.length===0? emptyState('chat','No messages yet','Send the first message below.') :
       `<div id="chatScroll">${msgs.map((m,idx)=>{
         const mine = m.from==='staff';
