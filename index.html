@@ -1549,16 +1549,8 @@ function renderClientPortal(){
             <div class="small">${fmtMoney(pay.amount)}</div>
             <div class="tiny mono muted">${fmtDate(pay.date)}</div>
           </div>`).join('')}` : ''}
-          ${(p.docs&&p.docs.length)? `
-          <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:14px;margin-bottom:6px">Documents</div>
-          ${p.docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>`<a href="${esc(d.url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit">
-            <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
-            <div style="min-width:0;flex:1">
-              <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
-              <div class="tiny muted">${fmtFileSize(d.size)}</div>
-            </div>
-          </a>`).join('')}` : ''}
-        </div>`;
+        </div>
+        ${renderProjectDocsSection(p, false)}`;
       }).join('')}
 
     <div class="section-title">Invoices &amp; quotes</div>
