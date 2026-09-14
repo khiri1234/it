@@ -678,6 +678,7 @@ const ICO = {
   grip:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
   todo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6.5l1 1 2-2"/><path d="M3.5 12.5l1 1 2-2"/><path d="M3.5 18.5l1 1 2-2"/></svg>',
   file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
@@ -1694,15 +1695,18 @@ function renderProjectDocsSection(p, canManage){
         </div>
       </div>`:''}
       ${docs.length===0 && !uploading? `<div class="tiny muted" style="padding:2px 0 8px">No files uploaded yet.</div>` :
-        docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
-          <a href="${esc(d.url)}" target="_blank" rel="noopener" style="min-width:0;flex:1;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:8px">
+          <div style="min-width:0;flex:1;display:flex;align-items:center;gap:10px">
             <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
             <div style="min-width:0">
               <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
               <div class="tiny muted">${fmtFileSize(d.size)} · ${fmtDate(new Date(d.uploadedAt).toISOString().slice(0,10))}</div>
             </div>
-          </a>
-          ${canManage?`<button class="icon-btn" style="flex-shrink:0" onclick="removeProjectDoc('${p.id}','${d.id}')">${ic('trash')}</button>`:''}
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <a class="icon-btn" href="${esc(d.url)}" target="_blank" rel="noopener" title="View">${ic('eye')}</a>
+            ${canManage?`<button class="icon-btn" onclick="removeProjectDoc('${p.id}','${d.id}')">${ic('trash')}</button>`:''}
+          </div>
         </div>`).join('')}
       ${canManage?`<input type="file" id="projectDocInput" accept="image/*,application/pdf" style="display:none" onchange="handleProjectDocInput('${p.id}',this)">
       <button class="btn btn-ghost btn-block" style="margin-top:${(docs.length||uploading)?'10px':'0'}" ${uploading?'disabled':''} onclick="document.getElementById('projectDocInput').click()">${ic('download')} ${uploading?'Uploading…':'Upload document / certificate'}</button>`:''}
