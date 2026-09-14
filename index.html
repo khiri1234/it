@@ -673,20 +673,22 @@ const ICO = {
   logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
   card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
   grip:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
+  todo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6.5l1 1 2-2"/><path d="M3.5 12.5l1 1 2-2"/><path d="M3.5 18.5l1 1 2-2"/></svg>',
 };
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ', rfqPrefix:'RFQ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1, rfqNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[] };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
+let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
 let CLIENT_CHAT_DRAFT='';
@@ -1766,6 +1768,7 @@ function render(){
     case 'client-chat': body = renderClientChatThread(VIEW.params.customer); break;
     case 'rfq-form': body = renderRfqForm(VIEW.params.id); break;
     case 'rfq-view': body = renderRfqView(VIEW.params.id); break;
+    case 'todos': body = renderTodos(); break;
     default: body = renderDashboard();
   }
   CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='chatInput';
@@ -1804,6 +1807,7 @@ const TAB_SECTIONS={
   'reports':'more',
   'chat':'more',
   'client-chats':'more','client-chat':'more',
+  'todos':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){ STACK=[]; go(id); }
@@ -4250,6 +4254,13 @@ function renderMore(){
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('client-chats')">
         <div class="small" style="font-weight:600">Client messages</div>${ic('chev')}
       </div>
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('todos')">
+        <div class="small" style="font-weight:600">To-Do list</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${(S.todos||[]).filter(t=>!t.done).length>0?`<span class="badge pending">${(S.todos||[]).filter(t=>!t.done).length} open</span>`:''}
+          ${ic('chev')}
+        </div>
+      </div>
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('reports')">
         <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
       </div>
@@ -4301,6 +4312,91 @@ function renderActivityLog(){
           </div>`).join('')}
       </div>`}
   </div>`;
+}
+
+/* ---------- TO-DO LIST ---------- */
+function todoStaffList(){ return S.users.filter(u=>u.role!=='client' && u.role!=='supplier'); }
+function todoIsOverdue(t){ return !t.done && t.dueDate && t.dueDate < todayISO(); }
+function renderTodos(){
+  const all = S.todos||[];
+  const open = all.filter(t=>!t.done).sort((a,b)=> (a.dueDate||'9999-99-99').localeCompare(b.dueDate||'9999-99-99') || (a.createdAt||0)-(b.createdAt||0));
+  const done = all.filter(t=>t.done).sort((a,b)=> (b.doneAt||0)-(a.doneAt||0));
+  const shown = TODO_FILTER==='done' ? done : TODO_FILTER==='open' ? open : [...open,...done];
+  const staff = todoStaffList();
+  const todoRow = t=>{
+    const assignee = staff.find(u=>u.id===t.assigneeId);
+    const overdue = todoIsOverdue(t);
+    const canDelete = isAdmin() || t.createdBy===CURRENT_USER.id;
+    return `<div class="row-between" style="padding:11px 0;border-bottom:1px solid var(--line);gap:10px;align-items:flex-start">
+      <button onclick="toggleTodo('${t.id}')" style="flex-shrink:0;margin-top:1px;width:22px;height:22px;border-radius:50%;border:2px solid ${t.done?'var(--green)':'var(--line)'};background:${t.done?'var(--green)':'transparent'};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0">${t.done?ic('check'):''}</button>
+      <div style="flex:1;min-width:0">
+        <div class="small" style="font-weight:600;${t.done?'text-decoration:line-through;color:var(--ink-soft)':''}">${esc(t.text)}</div>
+        <div class="tiny muted" style="margin-top:2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          ${assignee?`<span>${esc(assignee.name)}</span>`:''}
+          ${t.dueDate?`<span style="${overdue?'color:var(--red);font-weight:600':''}">${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`:''}
+          ${!assignee && !t.dueDate?`<span>Added by ${esc(t.createdByName||'—')}</span>`:''}
+        </div>
+      </div>
+      ${canDelete?`<button class="icon-btn" style="flex-shrink:0" onclick="deleteTodo('${t.id}')">${ic('trash')}</button>`:''}
+    </div>`;
+  };
+  return `
+  ${topbar('To-Do','Tasks for the team', true)}
+  <div class="content">
+    <div class="card">
+      <input id="todoInput" placeholder="Add a task…" value="${esc(TODO_DRAFT)}" oninput="TODO_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();addTodo();}">
+      <div class="item-grid" style="margin-top:8px">
+        <div>
+          <select id="todoAssignee" onchange="TODO_ASSIGNEE=this.value">
+            <option value="">Unassigned</option>
+            ${staff.map(u=>`<option value="${u.id}" ${TODO_ASSIGNEE===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <input id="todoDue" type="date" value="${TODO_DUE}" onchange="TODO_DUE=this.value">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="addTodo()">${ic('plus')} Add task</button>
+    </div>
+    <div class="segmented" style="margin:14px 0 10px">
+      <button class="${TODO_FILTER==='open'?'active':''}" onclick="TODO_FILTER='open';render()">Open${open.length?` (${open.length})`:''}</button>
+      <button class="${TODO_FILTER==='done'?'active':''}" onclick="TODO_FILTER='done';render()">Done${done.length?` (${done.length})`:''}</button>
+      <button class="${TODO_FILTER==='all'?'active':''}" onclick="TODO_FILTER='all';render()">All</button>
+    </div>
+    ${shown.length===0? emptyState('todo','Nothing here','Add a task above to get started.') :
+      `<div class="card" style="padding:0 14px">${shown.map(todoRow).join('')}</div>`}
+  </div>`;
+}
+function addTodo(){
+  const input = document.getElementById('todoInput');
+  const text = (input?input.value:TODO_DRAFT).trim();
+  if(!text) return;
+  if(!S.todos) S.todos=[];
+  S.todos.push({
+    id:uid(), text, done:false,
+    assigneeId: TODO_ASSIGNEE||null, dueDate: TODO_DUE||null,
+    createdBy:CURRENT_USER.id, createdByName:CURRENT_USER.name, createdAt:Date.now()
+  });
+  TODO_DRAFT=''; TODO_ASSIGNEE=''; TODO_DUE='';
+  persist('todos');
+  render();
+}
+function toggleTodo(id){
+  const t = (S.todos||[]).find(x=>x.id===id);
+  if(!t) return;
+  t.done = !t.done;
+  t.doneAt = t.done ? Date.now() : null;
+  t.doneBy = t.done ? CURRENT_USER.name : null;
+  persist('todos');
+  render();
+}
+function deleteTodo(id){
+  const t = (S.todos||[]).find(x=>x.id===id);
+  if(!t || !(isAdmin() || t.createdBy===CURRENT_USER.id)) return;
+  if(!confirm('Delete this task?')) return;
+  S.todos = S.todos.filter(x=>x.id!==id);
+  persist('todos');
+  render();
 }
 
 /* ---------- TEAM CHAT ---------- */
