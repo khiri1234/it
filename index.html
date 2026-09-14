@@ -141,6 +141,7 @@
   .btn-teal{background:linear-gradient(135deg,var(--teal),#0C8378);color:#fff;box-shadow:0 6px 16px rgba(14,156,144,.22);}
   .btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line);}
   .btn-danger{background:var(--red-soft);color:var(--red);}
+  .btn:disabled{opacity:.6;cursor:not-allowed;}
   @media (hover:hover){
     .btn-primary:hover,.btn-teal:hover{transform:translateY(-1px);filter:brightness(1.05);}
     .btn-ghost:hover{background:var(--chip-bg);}
@@ -379,6 +380,8 @@
   .chip.active{background:var(--navy);border-color:var(--navy);color:#fff;}
   ::-webkit-scrollbar{display:none;}
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
   .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
   /* ---------- AUTOCOMPLETE (custom scrollable dropdown, replaces native <datalist> —
      iOS renders datalist suggestions in the keyboard's QuickType bar, not a real list) ---------- */
@@ -690,6 +693,7 @@ let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], 
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
+let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
 let CLIENT_CHAT_DRAFT='';
@@ -1633,7 +1637,11 @@ async function uploadProjectDoc(projectId, file){
   if(file.size > maxBytes){ toast('That file is too large — max 15MB'); return; }
   const p = S.projects.find(x=>x.id===projectId);
   if(!p) return;
-  toast('Uploading…');
+  // Visible for as long as the upload actually takes (unlike a toast, which times out on
+  // its own) — an inline pending row + a disabled button, so it's never ambiguous whether
+  // an upload that's taking a while is still working or has silently failed.
+  UPLOADING_PROJECT_DOC = {projectId, name:file.name};
+  render();
   try{
     const path = `projectDocs/${projectId}/${uid()}-${file.name}`;
     const ref = fbStorage.ref().child(path);
@@ -1644,10 +1652,12 @@ async function uploadProjectDoc(projectId, file){
     await persist('projects');
     logActivity(`Uploaded "${file.name}" to project ${p.number}`);
     toast('Uploaded');
-    render();
   }catch(e){
     console.error('project doc upload failed',e);
     toast('Upload failed — check your connection and Storage rules');
+  }finally{
+    UPLOADING_PROJECT_DOC = null;
+    render();
   }
 }
 function removeProjectDoc(projectId, docId){
@@ -1667,11 +1677,21 @@ function removeProjectDoc(projectId, docId){
 }
 function renderProjectDocsSection(p, canManage){
   const docs = p.docs||[];
+  const uploading = UPLOADING_PROJECT_DOC && UPLOADING_PROJECT_DOC.projectId===p.id ? UPLOADING_PROJECT_DOC : null;
   if(!canManage && docs.length===0) return '';
   return `
     <div class="section-title">Documents</div>
     <div class="card">
-      ${docs.length===0? `<div class="tiny muted" style="padding:2px 0 8px">No files uploaded yet.</div>` :
+      ${uploading?`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+        <div style="min-width:0;flex:1;display:flex;align-items:center;gap:10px">
+          <span class="spinner"></span>
+          <div style="min-width:0">
+            <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(uploading.name)}</div>
+            <div class="tiny muted">Uploading…</div>
+          </div>
+        </div>
+      </div>`:''}
+      ${docs.length===0 && !uploading? `<div class="tiny muted" style="padding:2px 0 8px">No files uploaded yet.</div>` :
         docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
           <a href="${esc(d.url)}" target="_blank" rel="noopener" style="min-width:0;flex:1;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
             <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
@@ -1683,7 +1703,7 @@ function renderProjectDocsSection(p, canManage){
           ${canManage?`<button class="icon-btn" style="flex-shrink:0" onclick="removeProjectDoc('${p.id}','${d.id}')">${ic('trash')}</button>`:''}
         </div>`).join('')}
       ${canManage?`<input type="file" id="projectDocInput" accept="image/*,application/pdf" style="display:none" onchange="handleProjectDocInput('${p.id}',this)">
-      <button class="btn btn-ghost btn-block" style="margin-top:${docs.length?'10px':'0'}" onclick="document.getElementById('projectDocInput').click()">${ic('download')} Upload document / certificate</button>`:''}
+      <button class="btn btn-ghost btn-block" style="margin-top:${(docs.length||uploading)?'10px':'0'}" ${uploading?'disabled':''} onclick="document.getElementById('projectDocInput').click()">${ic('download')} ${uploading?'Uploading…':'Upload document / certificate'}</button>`:''}
     </div>`;
 }
 
