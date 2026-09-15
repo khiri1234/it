@@ -3716,6 +3716,13 @@ async function uploadPurchaseAttachment(purchaseId, file){
     toast('Upload failed — check your connection and Storage rules');
   }
 }
+function viewPurchaseAttachment(url, name){
+  if(isWrappedApp() && navigator.share){
+    navigator.share({url, title:name}).catch(()=>{});
+    return;
+  }
+  window.open(url,'_blank');
+}
 function removePurchaseAttachment(purchaseId, attId){
   showConfirm('Remove this attachment?', async ()=>{
     const p = S.purchases.find(x=>x.id===purchaseId);
@@ -3737,13 +3744,19 @@ function renderPurchaseAttachments(p){
     <div class="section-title">Invoice / receipt</div>
     <div class="card">
       ${atts.length===0? `<div class="tiny muted" style="padding:2px 0 8px">No files attached yet.</div>` :
-        atts.map(a=>`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
-          <a href="${esc(a.url)}" target="_blank" rel="noopener" style="min-width:0;flex:1;text-decoration:none;color:inherit">
-            <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</div>
-            <div class="tiny muted">${fmtFileSize(a.size)}</div>
-          </a>
+        atts.map(a=>{
+          const isImg=(a.type||'').startsWith('image/');
+          return `<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;cursor:pointer" onclick="viewPurchaseAttachment('${onclickStr(a.url)}','${onclickStr(a.name)}')">
+            ${isImg?`<img src="${esc(a.url)}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid var(--line)">`
+              :`<div style="width:44px;height:44px;border-radius:8px;background:var(--line);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('file')}</div>`}
+            <div style="min-width:0">
+              <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</div>
+              <div class="tiny muted">${fmtFileSize(a.size)}</div>
+            </div>
+          </div>
           <button class="icon-btn" style="flex-shrink:0" onclick="removePurchaseAttachment('${p.id}','${a.id}')">${ic('trash')}</button>
-        </div>`).join('')}
+        </div>`;}).join('')}
       <input type="file" id="pAttachInput" accept="image/*,application/pdf" style="display:none" onchange="handlePurchaseAttachInput('${p.id}',this)">
       <button class="btn btn-ghost btn-block" style="margin-top:${atts.length?'10px':'0'}" onclick="document.getElementById('pAttachInput').click()">${ic('download')} Upload invoice / receipt</button>
     </div>`;
