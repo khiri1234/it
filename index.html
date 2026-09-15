@@ -1742,33 +1742,34 @@ function renderProjectDocsSection(p, canManage){
   if(!canManage && docs.length===0) return '';
   return `
     <div id="projectDocsSection" class="section-title">Documents</div>
-    <div class="card">
-      ${uploading?`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)">
-        <div style="min-width:0;flex:1;display:flex;align-items:center;gap:10px">
-          <span class="spinner"></span>
-          <div style="min-width:0">
-            <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(uploading.name)}</div>
-            <div class="tiny muted">Uploading…</div>
-          </div>
+    ${uploading?`<div class="card" style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="spinner"></span>
+        <div style="min-width:0">
+          <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(uploading.name)}</div>
+          <div class="tiny muted">Uploading…</div>
         </div>
-      </div>`:''}
-      ${docs.length===0 && !uploading? `<div class="tiny muted" style="padding:2px 0 8px">No files uploaded yet.</div>` :
-        docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>`<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:8px">
-          <div style="min-width:0;flex:1;display:flex;align-items:center;gap:10px">
-            <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
-            <div style="min-width:0">
-              <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
-              <div class="tiny muted">${fmtFileSize(d.size)} · ${fmtDate(new Date(d.uploadedAt).toISOString().slice(0,10))}</div>
+      </div>
+    </div>`:''}
+    ${docs.length===0 && !uploading? `<div class="card" style="margin-bottom:8px"><div class="tiny muted">No files uploaded yet.</div></div>` :
+      docs.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(d=>{
+        const isPdf=(d.type||'')==='application/pdf';
+        return `<div class="card" style="margin-bottom:8px">
+          <div class="row-between">
+            <div style="min-width:0;flex:1;display:flex;align-items:center;gap:10px">
+              <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
+              <div style="min-width:0">
+                <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
+                <div class="tiny muted">${fmtFileSize(d.size)} · ${fmtDate(new Date(d.uploadedAt).toISOString().slice(0,10))}</div>
+              </div>
             </div>
+            ${canManage?`<button class="icon-btn" style="flex-shrink:0" onclick="removeProjectDoc('${p.id}','${d.id}')">${ic('trash')}</button>`:''}
           </div>
-          <div style="display:flex;gap:6px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" style="white-space:nowrap" onclick="viewProjectDoc('${onclickStr(d.url)}','${onclickStr(d.name)}','${onclickStr(d.type||'')}')">View / Download${(d.type||'')==='application/pdf'?' PDF':''}</button>
-            ${canManage?`<button class="icon-btn" onclick="removeProjectDoc('${p.id}','${d.id}')">${ic('trash')}</button>`:''}
-          </div>
-        </div>`).join('')}
-      ${canManage?`<input type="file" id="projectDocInput" accept="image/*,application/pdf" style="display:none" onchange="handleProjectDocInput('${p.id}',this)">
-      <button class="btn btn-ghost btn-block" style="margin-top:${(docs.length||uploading)?'10px':'0'}" ${uploading?'disabled':''} onclick="document.getElementById('projectDocInput').click()">${ic('download')} ${uploading?'Uploading…':'Upload document / certificate'}</button>`:''}
-    </div>`;
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="viewProjectDoc('${onclickStr(d.url)}','${onclickStr(d.name)}','${onclickStr(d.type||'')}')">${ic('download')} View / download${isPdf?' PDF':''}</button>
+        </div>`;
+      }).join('')}
+    ${canManage?`<input type="file" id="projectDocInput" accept="image/*,application/pdf" style="display:none" onchange="handleProjectDocInput('${p.id}',this)">
+    <button class="btn btn-ghost btn-block" ${uploading?'disabled':''} onclick="document.getElementById('projectDocInput').click()">${ic('download')} ${uploading?'Uploading…':'Upload document / certificate'}</button>`:''}`;
 }
 
 /* ---------- FACE ID (native app shell only — no-ops in a plain browser) ----------
