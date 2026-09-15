@@ -1698,29 +1698,30 @@ function viewProjectDoc(url, name, type){
 // the browser to the raw Firebase Storage URL — suppliers/clients viewing a document
 // or attachment shouldn't see our storage bucket's address bar behind it.
 function openFileViewer(url, name, type){
-  if(isWrappedApp() && navigator.share){
-    // Sharing {url} instead of the file itself puts the raw Storage link straight into
-    // the OS share sheet (visible via Copy, Messages, etc.) — fetch the actual bytes and
-    // share those as a file instead, so the link is never exposed.
-    shareUploadedFileNative(url, name);
-    return;
-  }
   const isImg = (type||'').startsWith('image/');
   const isPdf = (type||'')==='application/pdf' || /\.pdf$/i.test(name||'');
+  // The native app shell can't window.open() or <a download> (no WKWebView delegate
+  // for either), so it needs an explicit Share button to hand the file to the OS
+  // share sheet — but show the file here first, same as everywhere else, instead
+  // of jumping straight to the share sheet on tap.
+  const showShareBtn = isWrappedApp() && !!navigator.share;
   ensureModalRoot().innerHTML = `
   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal-sheet" style="max-width:760px;width:94vw;max-height:92vh;display:flex;flex-direction:column">
       <div class="modal-handle"></div>
-      <div class="row-between" style="margin-bottom:10px">
+      <div class="row-between" style="margin-bottom:10px;gap:8px">
         <div class="small" style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">${esc(name)}</div>
-        <button class="icon-btn" style="flex-shrink:0" onclick="closeModal()">${ic('x')}</button>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          ${showShareBtn?`<button class="icon-btn" title="Share" onclick="shareUploadedFileNative('${onclickStr(url)}','${onclickStr(name)}')">${ic('share')}</button>`:''}
+          <button class="icon-btn" onclick="closeModal()">${ic('x')}</button>
+        </div>
       </div>
       <div style="flex:1;min-height:0;overflow:auto;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center">
         ${isImg?`<img src="${esc(url)}" alt="${esc(name)}" style="max-width:100%;max-height:78vh;object-fit:contain">`
          :isPdf?`<iframe id="fileViewerFrame" src="${esc(url)}" title="${esc(name)}" style="width:100%;height:78vh;border:none;border-radius:10px;background:#fff"></iframe>`
          :`<div style="padding:40px;text-align:center" class="tiny muted">Preview isn't available for this file type.</div>`}
       </div>
-      ${isPdf?`<div class="tiny muted" style="margin-top:8px;text-align:center">Use the download/print icons in the PDF viewer above to save or print it.</div>`:''}
+      ${isPdf?`<div class="tiny muted" style="margin-top:8px;text-align:center">${showShareBtn?'Tap the share icon above to save or print it.':'Use the download/print icons in the PDF viewer above to save or print it.'}</div>`:''}
     </div>
   </div>`;
 }
