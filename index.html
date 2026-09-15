@@ -1944,16 +1944,26 @@ function render(){
 }
 
 /* ---------- TOPBAR helper ---------- */
-function topbar(title, sub, showBack, rightBtn, showSearch){
+// Shared by the topbar and the dashboard hero — includes seconds, so a lightweight
+// 1s interval (tickHeaderClocks, below) keeps every .topbar-datetime/.dash-date
+// element in the current DOM ticking without a full render().
+function nowHeaderStr(){
   const now = new Date();
-  const dtStr = now.toLocaleDateString(undefined,{weekday:'short',day:'2-digit',month:'short'})+' · '+now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  return now.toLocaleDateString(undefined,{weekday:'short',day:'2-digit',month:'short'})+' · '+now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function tickHeaderClocks(){
+  const str = nowHeaderStr();
+  document.querySelectorAll('.topbar-datetime, .dash-date').forEach(el=>{ el.textContent = str; });
+}
+setInterval(tickHeaderClocks, 1000);
+function topbar(title, sub, showBack, rightBtn, showSearch){
   return `<div class="topbar">
     ${showBack?`<button class="back" onclick="goBack()">${ICO.back}</button>`:''}
     <div style="flex:1;min-width:0">
       <div class="title">${esc(title)}</div>
       ${sub?`<div class="sub">${esc(sub)}</div>`:''}
     </div>
-    <div class="topbar-datetime">${esc(dtStr)}</div>
+    <div class="topbar-datetime">${esc(nowHeaderStr())}</div>
     ${showSearch?`<div class="topbar-search-wrap">${ic('search')}<input class="topbar-search" type="text" placeholder="Search this list" oninput="quickFilterList(this.value)"></div>`:''}
     <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
     ${rightBtn||''}
@@ -2064,7 +2074,7 @@ function renderDashboard(){
         <div class="dash-company">${esc(S.settings.companyName||'Dashboard')}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div class="dash-date">${now.toLocaleDateString(undefined,{weekday:'short',day:'2-digit',month:'short'})} · ${now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="dash-date">${esc(nowHeaderStr())}</div>
         <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:8px">
           <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
           <button class="dash-hero-menu" onclick="go('more')">${ic('more')}</button>
