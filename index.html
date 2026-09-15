@@ -1854,7 +1854,9 @@ function render(){
   // submit their prices, nothing else of the app is reachable
   if(CURRENT_USER.role==='supplier'){
     app.className='client-portal';
-    app.innerHTML = VIEW.name==='supplier-rfq' ? renderSupplierRfqForm(VIEW.params.id) : renderSupplierPortal();
+    app.innerHTML = VIEW.name==='supplier-rfq' ? renderSupplierRfqForm(VIEW.params.id)
+      : VIEW.name==='supplier-purchase-view' ? renderSupplierPurchaseView(VIEW.params.id)
+      : renderSupplierPortal();
     sidebar.innerHTML='';
     return;
   }
@@ -3614,6 +3616,7 @@ function renderSupplierPortal(){
   const supplierName = CURRENT_USER.supplierName;
   const rfqs = [...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const myQuotes = (S.supplierQuotes||[]).filter(q=>q.supplierName===supplierName);
+  const myPurchases = S.purchases.filter(p=>p.supplier===supplierName).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return `
   ${topbar(S.settings.companyName||'Ledger', `Supplier portal — ${supplierName}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
@@ -3633,6 +3636,49 @@ function renderSupplierPortal(){
           </div>
         </div>`;
       }).join('')}
+    <div class="section-title dash-section">Purchase orders</div>
+    ${myPurchases.length===0? `<div class="card"><div class="tiny muted">No purchase orders yet.</div></div>` :
+      myPurchases.map(p=>{
+        const attCount = (p.attachments||[]).length;
+        return `<div class="card" onclick="goPush('supplier-purchase-view',{id:'${p.id}'})">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:600">${esc(p.number)}</div>
+              <div class="tiny mono muted">${fmtDate(p.date)}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="mono" style="font-weight:600">${fmtMoney(purchaseTotal(p))}</div>
+              <span class="badge ${p.status}">${p.status}</span>
+            </div>
+          </div>
+          ${attCount?`<div class="tiny muted" style="margin-top:6px">${ic('file')} ${attCount} file${attCount===1?'':'s'} attached</div>`:''}
+        </div>`;
+      }).join('')}
+  </div>`;
+}
+function renderSupplierPurchaseView(id){
+  const supplierName = CURRENT_USER.supplierName;
+  const p = S.purchases.find(x=>x.id===id && x.supplier===supplierName);
+  if(!p) return topbar('Not found','',true)+`<div class="content">${emptyState('cart','Not found','This purchase order may have been removed.')}</div>`;
+  const total = purchaseTotal(p);
+  return `
+  ${topbar(p.number, fmtDate(p.date), true)}
+  <div class="content">
+    <div class="card">
+      <div class="row-between"><div style="font-weight:600">${esc(p.number)}</div><span class="badge ${p.status}">${p.status}</span></div>
+      <div class="tiny muted">${fmtDate(p.date)}</div>
+    </div>
+    <div class="card">
+      ${p.items.map(it=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
+        <div class="small">${esc(it.desc)} <span class="muted tiny mono">×${it.qty}</span></div>
+        <div class="mono">${fmtMoney(it.qty*it.cost)}</div></div>`).join('')}
+      ${(p.charges&&p.charges.length)? p.charges.map(c=>`<div class="row-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
+        <div class="small">${esc(c.desc)}</div>
+        <div class="mono">${fmtMoney(c.amount)}</div></div>`).join('') : ''}
+      <div class="totals"><div class="line grand"><span>Total</span><span class="mono">${fmtMoney(total)}</span></div></div>
+    </div>
+    ${p.notes?`<div class="card"><div class="small">${esc(p.notes)}</div></div>`:''}
+    ${renderPurchaseAttachments(p, false)}
   </div>`;
 }
 function renderSupplierRfqForm(id){
@@ -3738,7 +3784,8 @@ function removePurchaseAttachment(purchaseId, attId){
     render();
   });
 }
-function renderPurchaseAttachments(p){
+function renderPurchaseAttachments(p, canManage){
+  if(canManage===undefined) canManage=true;
   const atts = p.attachments||[];
   return `
     <div class="section-title">Invoice / receipt</div>
@@ -3755,10 +3802,10 @@ function renderPurchaseAttachments(p){
               <div class="tiny muted">${fmtFileSize(a.size)}</div>
             </div>
           </div>
-          <button class="icon-btn" style="flex-shrink:0" onclick="removePurchaseAttachment('${p.id}','${a.id}')">${ic('trash')}</button>
+          ${canManage?`<button class="icon-btn" style="flex-shrink:0" onclick="removePurchaseAttachment('${p.id}','${a.id}')">${ic('trash')}</button>`:''}
         </div>`;}).join('')}
-      <input type="file" id="pAttachInput" accept="image/*,application/pdf" style="display:none" onchange="handlePurchaseAttachInput('${p.id}',this)">
-      <button class="btn btn-ghost btn-block" style="margin-top:${atts.length?'10px':'0'}" onclick="document.getElementById('pAttachInput').click()">${ic('download')} Upload invoice / receipt</button>
+      ${canManage?`<input type="file" id="pAttachInput" accept="image/*,application/pdf" style="display:none" onchange="handlePurchaseAttachInput('${p.id}',this)">
+      <button class="btn btn-ghost btn-block" style="margin-top:${atts.length?'10px':'0'}" onclick="document.getElementById('pAttachInput').click()">${ic('download')} Upload invoice / receipt</button>`:''}
     </div>`;
 }
 function renderPurchaseView(id){
