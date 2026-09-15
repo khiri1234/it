@@ -35,6 +35,15 @@
     --glass-border:rgba(255,255,255,.7);
     --glass-highlight:rgba(255,255,255,.85);
     --glass-blur:blur(24px) saturate(180%);
+    /* desktop sidebar — a solid deep-navy rail (same brand navy as the mobile
+       topbar) rather than glass, for a calmer, more corporate identity that
+       doesn't shift with light/dark content theme */
+    --ds-bg:linear-gradient(180deg,#101E38 0%,#16294B 55%,#1C3157 100%);
+    --ds-text:rgba(255,255,255,.94);
+    --ds-text-soft:rgba(255,255,255,.56);
+    --ds-hover-bg:rgba(255,255,255,.07);
+    --ds-active-bg:linear-gradient(135deg,rgba(14,156,144,.4),rgba(14,156,144,.16));
+    --ds-border:rgba(255,255,255,.09);
   }
   :root[data-theme="dark"]{
     --bg:#10161F;
@@ -49,6 +58,8 @@
     --glass-bg-strong:rgba(27,36,49,.85);
     --glass-border:rgba(255,255,255,.1);
     --glass-highlight:rgba(255,255,255,.08);
+    --ds-bg:linear-gradient(180deg,#0A1424 0%,#0E1B2F 60%,#101F38 100%);
+    --ds-border:rgba(255,255,255,.06);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -417,62 +428,62 @@
   .desktop-sidebar{display:none;}
   .topbar-search-wrap{display:none;}
   @media (min-width:960px){
-    /* liquid-glass backdrop: a soft, colorful mesh sitting behind every translucent
-       panel below, fixed so it doesn't scroll away — without it backdrop-filter
-       has nothing to blur and just looks like plain frosted grey */
+    /* subtle brand-tinted backdrop: quiet navy + teal ambience behind the
+       translucent topbar/cards — restrained (two hues, low opacity) rather
+       than a multicolor mesh, so backdrop-filter still has something to
+       blur but the overall read is corporate, not decorative */
     body{
       background:
-        radial-gradient(1000px 700px at 10% 6%, rgba(14,156,144,.48), transparent 62%),
-        radial-gradient(1100px 780px at 90% 12%, rgba(42,109,176,.42), transparent 60%),
-        radial-gradient(950px 820px at 65% 88%, rgba(155,92,220,.30), transparent 62%),
-        radial-gradient(900px 700px at 15% 95%, rgba(224,168,50,.20), transparent 60%),
+        radial-gradient(1100px 760px at 6% 0%, rgba(21,58,99,.09), transparent 62%),
+        radial-gradient(1000px 900px at 100% 100%, rgba(14,156,144,.10), transparent 60%),
         var(--bg);
       background-attachment:fixed;
     }
     :root[data-theme="dark"] body{
       background:
-        radial-gradient(1000px 700px at 10% 6%, rgba(14,156,144,.55), transparent 62%),
-        radial-gradient(1100px 780px at 90% 12%, rgba(42,109,176,.5), transparent 60%),
-        radial-gradient(950px 820px at 65% 88%, rgba(155,92,220,.38), transparent 62%),
-        radial-gradient(900px 700px at 15% 95%, rgba(224,168,50,.26), transparent 60%),
+        radial-gradient(1100px 760px at 6% 0%, rgba(42,109,176,.16), transparent 62%),
+        radial-gradient(1000px 900px at 100% 100%, rgba(14,156,144,.16), transparent 60%),
         var(--bg);
       background-attachment:fixed;
     }
+    /* a solid deep-navy rail, not glass — the one constant, confident brand
+       surface in the shell (same navy as the mobile topbar) that anchors the
+       whole layout and reads the same in light or dark content mode */
     .desktop-sidebar{
       display:flex;flex-direction:column;justify-content:space-between;
       position:fixed;top:0;left:0;bottom:0;width:248px;
-      background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
-      color:var(--ink);border-right:1px solid var(--glass-border);
-      box-shadow:6px 0 32px rgba(21,32,51,.06), inset -1px 0 0 var(--glass-highlight);
+      background:var(--ds-bg);
+      color:var(--ds-text);border-right:1px solid var(--ds-border);
+      box-shadow:6px 0 28px rgba(8,14,26,.22);
       padding:20px 14px;z-index:50;
     }
     .desktop-sidebar:empty{display:none;}
     .ds-head{display:flex;align-items:center;gap:10px;margin-bottom:22px;padding:0 6px;}
-    .ds-logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--navy),var(--navy-2));display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 14px rgba(21,32,51,.28);}
+    .ds-logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--teal),#0C8378);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 14px rgba(0,0,0,.28);}
     .ds-logo img{width:24px;height:24px;object-fit:contain;}
-    .ds-company{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;line-height:1.2;color:var(--ink);}
-    .ds-sub{font-size:10px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
-    .ds-section-label{font-size:10.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;padding:0 12px;margin:14px 0 6px;}
+    .ds-company{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;line-height:1.2;color:var(--ds-text);}
+    .ds-sub{font-size:10px;color:var(--ds-text-soft);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+    .ds-section-label{font-size:10.5px;font-weight:700;color:var(--ds-text-soft);text-transform:uppercase;letter-spacing:.08em;padding:0 12px;margin:14px 0 6px;}
     .ds-section-label:first-of-type{margin-top:4px;}
     .ds-nav{display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto;}
     .ds-navbtn{
       display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;border:none;
-      background:none;color:var(--ink-soft);font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;
+      background:none;color:var(--ds-text-soft);font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;
       cursor:pointer;text-align:left;transition:background .18s,color .18s,transform .18s;width:100%;position:relative;
     }
     .ds-navbtn svg{width:17px;height:17px;flex-shrink:0;transition:transform .18s;}
-    .ds-navbtn:hover{background:var(--glass-highlight);color:var(--ink);transform:translateX(2px);}
-    .ds-navbtn.active{background:linear-gradient(135deg,rgba(42,109,176,.22),rgba(14,156,144,.18));color:var(--blue);box-shadow:inset 0 0 0 1px rgba(42,109,176,.16);backdrop-filter:blur(6px);}
-    .ds-navbtn.active svg{transform:scale(1.08);}
-    .ds-navbtn.active::before{content:'';position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--blue),var(--teal));}
-    .ds-foot{border-top:1px solid var(--line);padding-top:14px;margin-top:14px;}
+    .ds-navbtn:hover{background:var(--ds-hover-bg);color:var(--ds-text);transform:translateX(2px);}
+    .ds-navbtn.active{background:var(--ds-active-bg);color:#fff;box-shadow:inset 0 0 0 1px rgba(14,156,144,.4);}
+    .ds-navbtn.active svg{transform:scale(1.08);color:#5FE3C9;}
+    .ds-navbtn.active::before{content:'';position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--teal);}
+    .ds-foot{border-top:1px solid var(--ds-border);padding-top:14px;margin-top:14px;}
     .ds-user{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:0 6px;}
-    .ds-avatar{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;box-shadow:0 3px 8px rgba(14,156,144,.3);}
-    .ds-uname{font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .ds-urole{font-size:10.5px;color:var(--ink-soft);}
-    .ds-logout{width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--ink-soft);border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif;transition:background .15s,color .15s;}
+    .ds-avatar{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;box-shadow:0 3px 8px rgba(0,0,0,.3);}
+    .ds-uname{font-size:12.5px;font-weight:600;color:var(--ds-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ds-urole{font-size:10.5px;color:var(--ds-text-soft);}
+    .ds-logout{width:100%;background:var(--ds-hover-bg);border:1px solid var(--ds-border);color:var(--ds-text-soft);border-radius:9px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif;transition:background .15s,color .15s;}
     .ds-logout svg{width:12px;height:12px;}
-    .ds-logout:hover{background:var(--glass-bg-strong);color:var(--ink);}
+    .ds-logout:hover{background:rgba(255,255,255,.12);color:var(--ds-text);}
 
     /* every #app variant sits on the body's glass mesh now, not a flat opaque
        fill — the pre-auth screens below turn themselves into a glass card so
