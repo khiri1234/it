@@ -516,35 +516,27 @@
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
 
-    /* airy, light desktop page header + working list search, in the style of
-       modern task-board apps — the navy mobile topbar reads too heavy once it's
-       sitting next to a light sidebar instead of filling the whole screen */
+    /* keep the same navy header color across every section on desktop — the
+       dashboard's hero banner is navy, so the topbar on every other page (Projects,
+       Invoices, etc.) stays navy too instead of switching to a lighter glass bar */
     .desktop-sidebar:not(:empty) ~ #app .topbar{
-      background:var(--glass-bg-strong);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
-      color:var(--ink);border-bottom:1px solid var(--glass-border);
-      box-shadow:0 1px 0 var(--glass-highlight) inset, 0 4px 20px rgba(21,32,51,.05);
+      background:var(--navy);color:#fff;border-bottom:1px solid rgba(255,255,255,.08);
+      box-shadow:0 4px 20px rgba(8,14,26,.12);
     }
-    .desktop-sidebar:not(:empty) ~ #app .topbar .title{color:var(--ink);font-size:21px;font-weight:700;}
-    .desktop-sidebar:not(:empty) ~ #app .topbar .sub{color:var(--ink-soft);}
-    .desktop-sidebar:not(:empty) ~ #app .topbar .back{background:var(--glass-bg);color:var(--ink);transition:background .15s;}
-    .desktop-sidebar:not(:empty) ~ #app .topbar .back:hover{background:var(--glass-bg-strong);}
-    /* the mobile topbar is navy, so its icon-btn actions (share, logout) are inline-styled
-       white-on-transparent — invisible against this light glass bar, so force them back
-       to a readable, theme-matched glass chip here */
-    .desktop-sidebar:not(:empty) ~ #app .topbar .icon-btn{
-      background:var(--glass-bg) !important;color:var(--ink) !important;border-color:var(--glass-border) !important;
-    }
-    .desktop-sidebar:not(:empty) ~ #app .topbar .icon-btn:hover{background:var(--glass-bg-strong) !important;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .title{color:#fff;font-size:21px;font-weight:700;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .sub{color:rgba(255,255,255,.55);}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .back{background:rgba(255,255,255,.08);color:#fff;transition:background .15s;}
+    .desktop-sidebar:not(:empty) ~ #app .topbar .back:hover{background:rgba(255,255,255,.16);}
     .desktop-sidebar:not(:empty) ~ #app .topbar-search-wrap{
-      display:flex;align-items:center;gap:8px;background:var(--glass-bg);border-radius:10px;
+      display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:10px;
       backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
       padding:8px 12px;margin-right:4px;width:220px;flex-shrink:0;
-      border:1px solid var(--glass-border);transition:border-color .15s,background .15s,box-shadow .15s;
+      border:1px solid rgba(255,255,255,.14);transition:border-color .15s,background .15s,box-shadow .15s;
     }
-    .topbar-search-wrap:focus-within{border-color:var(--teal);background:var(--glass-bg-strong);box-shadow:0 0 0 3px var(--teal-soft);}
-    .topbar-search-wrap svg{width:15px;height:15px;color:var(--ink-soft);flex-shrink:0;}
-    .topbar-search{border:none;background:none;outline:none;font-size:13px;color:var(--ink);width:100%;font-family:'IBM Plex Sans',sans-serif;}
-    .topbar-search::placeholder{color:var(--ink-soft);}
+    .topbar-search-wrap:focus-within{border-color:var(--teal);background:rgba(255,255,255,.16);box-shadow:0 0 0 3px var(--teal-soft);}
+    .topbar-search-wrap svg{width:15px;height:15px;color:rgba(255,255,255,.6);flex-shrink:0;}
+    .topbar-search{border:none;background:none;outline:none;font-size:13px;color:#fff;width:100%;font-family:'IBM Plex Sans',sans-serif;}
+    .topbar-search::placeholder{color:rgba(255,255,255,.5);}
     /* readability pass: the glass panels stay translucent at the chrome level
        (sidebar/topbar/inputs) but anywhere text actually lives gets a much more
        opaque backing + roomier line-height, so the colorful mesh reads as
