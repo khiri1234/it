@@ -1699,7 +1699,10 @@ function viewProjectDoc(url, name, type){
 // or attachment shouldn't see our storage bucket's address bar behind it.
 function openFileViewer(url, name, type){
   if(isWrappedApp() && navigator.share){
-    navigator.share({url, title:name}).catch(()=>{});
+    // Sharing {url} instead of the file itself puts the raw Storage link straight into
+    // the OS share sheet (visible via Copy, Messages, etc.) — fetch the actual bytes and
+    // share those as a file instead, so the link is never exposed.
+    shareUploadedFileNative(url, name);
     return;
   }
   const isImg = (type||'').startsWith('image/');
@@ -2788,6 +2791,48 @@ function retrySharePdf(){
   if(!window.__pendingShareFile) return;
   navigator.share({files:[window.__pendingShareFile], title:window.__pendingShareTitle}).catch(()=>{ toast('Could not open the share sheet'); });
   closeModal();
+}
+// Fetches an uploaded document/attachment's bytes and hands the OS share sheet an
+// actual File — never the Storage URL itself — so Copy/Messages/etc. from the share
+// sheet can't expose our storage bucket's link. Mirrors shareNativePdf's retry
+// pattern below: the fetch can take long enough that iOS revokes the tap's share
+// permission, so a rejected first attempt falls back to a one-more-tap retry
+// sheet (retrySharePdf, already generic — it just shares whatever's pending).
+function shareUploadedFileNative(url, name){
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:8px">Preparing to share…</div>
+      <div class="small muted">This only takes a moment.</div>
+    </div>
+  </div>`;
+  fetch(url).then(res=>{
+    if(!res.ok) throw new Error('fetch failed');
+    return res.blob();
+  }).then(blob=>{
+    const file = new File([blob], name, {type: blob.type || 'application/octet-stream'});
+    if(!(navigator.canShare && navigator.canShare({files:[file]}))){
+      closeModal();
+      toast('Sharing files needs a newer iOS version — try the web version instead');
+      return;
+    }
+    navigator.share({files:[file], title:name}).then(closeModal).catch(()=>{
+      window.__pendingShareFile = file;
+      window.__pendingShareTitle = name;
+      const sheet = document.querySelector('.modal-sheet');
+      if(sheet){
+        sheet.innerHTML = `<div class="modal-handle"></div>
+          <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:14px">File ready</div>
+          <button class="btn btn-primary btn-block" style="margin-bottom:8px" onclick="retrySharePdf()">${ic('share')} Tap to save or share</button>
+          <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>`;
+      }
+    });
+  }).catch(()=>{
+    // Never fall back to sharing {url} here — that's the exact exposure this avoids.
+    closeModal();
+    toast('Could not load this file — check your connection');
+  });
 }
 function shareNativePdf(kind,id,opts){
   const sheet = document.querySelector('.modal-sheet');
