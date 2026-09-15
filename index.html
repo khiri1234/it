@@ -2958,6 +2958,7 @@ function renderStockList(){
     if(PURCHASE_PAYMENT_FILTER) list=list.filter(p=>purchasePaymentStatus(p)===PURCHASE_PAYMENT_FILTER);
     const sortedProjects=[...S.projects].sort((a,b)=>(a.number||'').localeCompare(b.number||''));
     const hasFilter = PURCHASE_PROJECT_FILTER || PURCHASE_PAYMENT_FILTER;
+    const listTotal = list.reduce((a,p)=>a+purchaseTotal(p),0);
     return `
     ${topbar('Stock','Inventory & purchases', false, null, true)}
     <div class="content">
@@ -2977,6 +2978,9 @@ function renderStockList(){
         <option value="paid" ${PURCHASE_PAYMENT_FILTER==='paid'?'selected':''}>Paid</option>
       </select>
       <div style="height:12px"></div>
+      ${list.length>0? `<div class="stat" style="margin-bottom:12px">
+        <div class="num">${fmtMoney(listTotal)}</div><div class="lbl">${list.length} purchase${list.length===1?'':'s'} · Total amount</div>
+      </div>` : ''}
       ${list.length===0? emptyState('cart', hasFilter?'No purchases for this filter':'No purchases yet', hasFilter?'Try a different filter, or clear the filters.':'Record a purchase to stock up your inventory.') :
         list.map(p=>{
           const total=purchaseTotal(p);
