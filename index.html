@@ -2746,7 +2746,11 @@ function shareNativePdf(kind,id,opts){
     const s = buildShareSummary(kind,id);
     if(!html || !s){ toast('Could not generate PDF'); closeModal(); return; }
     const hider=document.createElement('div');
-    hider.style.cssText='position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;';
+    // width must be at least .pdf-page's own width (210mm) — a 0-width hider makes
+    // wrap's own box measure as 0-wide even though the overflowing .pdf-page paints
+    // at full size, so html2canvas's bounding-rect-based crop (sized off wrap's box,
+    // not its visible overflow) only captures a sliver of the invoice.
+    hider.style.cssText='position:fixed;left:0;top:0;width:210mm;height:0;overflow:hidden;';
     const wrap=document.createElement('div');
     wrap.innerHTML = html;
     hider.appendChild(wrap);
@@ -2859,7 +2863,11 @@ function shareMenuPDF(kind,id){
     // the clone escape html2pdf's container, capturing a blank page. Keep the element
     // we hand to html2pdf unpositioned, and hide it via a plain zero-size ancestor instead.
     const hider=document.createElement('div');
-    hider.style.cssText='position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;';
+    // width must be at least .pdf-page's own width (210mm) — a 0-width hider makes
+    // wrap's own box measure as 0-wide even though the overflowing .pdf-page paints
+    // at full size, so html2canvas's bounding-rect-based crop (sized off wrap's box,
+    // not its visible overflow) only captures a sliver of the invoice.
+    hider.style.cssText='position:fixed;left:0;top:0;width:210mm;height:0;overflow:hidden;';
     const wrap=document.createElement('div');
     wrap.innerHTML = html;
     hider.appendChild(wrap);
