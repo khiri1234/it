@@ -3413,7 +3413,7 @@ function rfqBadgeClass(status){ return status==='closed' ? 'completed' : 'sent';
 function newRfq(){ goPush('rfq-form',{id:null}); }
 function renderRfqForm(id){
   const editing = id ? S.rfqs.find(r=>r.id===id) : null;
-  const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}]};
+  const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'Please, provide us quote with model number and best price', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}]};
   return `
   ${topbar(editing?'Edit RFQ':'New RFQ', editing?rfq.number:'', true)}
   <div class="content">
