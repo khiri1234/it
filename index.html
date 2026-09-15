@@ -87,6 +87,7 @@
   }
   .topbar .title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .topbar .sub{font-size:11px;color:rgba(255,255,255,.55);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+  .topbar-datetime{display:none;}
   .content{padding:14px 14px 8px;}
   .card{
     background:var(--surface);
@@ -527,6 +528,12 @@
     .desktop-sidebar:not(:empty) ~ #app .topbar .sub{color:rgba(255,255,255,.55);}
     .desktop-sidebar:not(:empty) ~ #app .topbar .back{background:rgba(255,255,255,.08);color:#fff;transition:background .15s;}
     .desktop-sidebar:not(:empty) ~ #app .topbar .back:hover{background:rgba(255,255,255,.16);}
+    /* the dashboard shows date/time in its own hero banner, but every other page's
+       topbar didn't — keep it visible everywhere on desktop, not just the dashboard */
+    .desktop-sidebar:not(:empty) ~ #app .topbar-datetime{
+      display:block;font-size:11.5px;color:rgba(255,255,255,.6);font-family:'IBM Plex Mono',monospace;
+      white-space:nowrap;flex-shrink:0;margin-right:2px;
+    }
     .desktop-sidebar:not(:empty) ~ #app .topbar-search-wrap{
       display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:10px;
       backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -1938,12 +1945,15 @@ function render(){
 
 /* ---------- TOPBAR helper ---------- */
 function topbar(title, sub, showBack, rightBtn, showSearch){
+  const now = new Date();
+  const dtStr = now.toLocaleDateString(undefined,{weekday:'short',day:'2-digit',month:'short'})+' · '+now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
   return `<div class="topbar">
     ${showBack?`<button class="back" onclick="goBack()">${ICO.back}</button>`:''}
     <div style="flex:1;min-width:0">
       <div class="title">${esc(title)}</div>
       ${sub?`<div class="sub">${esc(sub)}</div>`:''}
     </div>
+    <div class="topbar-datetime">${esc(dtStr)}</div>
     ${showSearch?`<div class="topbar-search-wrap">${ic('search')}<input class="topbar-search" type="text" placeholder="Search this list" oninput="quickFilterList(this.value)"></div>`:''}
     <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
     ${rightBtn||''}
