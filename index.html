@@ -959,9 +959,22 @@ function acPosition(inputEl){
   const panel = document.getElementById('acPanel');
   if(!panel || panel.style.display==='none') return;
   const rect = inputEl.getBoundingClientRect();
+  // visualViewport shrinks to exclude the on-screen keyboard on mobile, so sizing
+  // against it (rather than window.innerHeight) keeps the panel from ending up
+  // partly hidden behind the keyboard.
+  const vv = window.visualViewport;
+  const viewTop = vv ? vv.offsetTop : 0;
+  const viewBottom = vv ? vv.offsetTop+vv.height : window.innerHeight;
+  const margin = 8, gap = 4, minUseful = 120;
+  const spaceBelow = viewBottom - rect.bottom - gap - margin;
+  const spaceAbove = rect.top - viewTop - gap - margin;
+  // prefer opening below; flip above only when below is cramped and above has more room
+  const openAbove = spaceBelow < minUseful && spaceAbove > spaceBelow;
+  const maxH = Math.max(minUseful, Math.min(220, openAbove ? spaceAbove : spaceBelow));
+  panel.style.maxHeight = maxH+'px';
   panel.style.left = rect.left+'px';
-  panel.style.top = (rect.bottom+4)+'px';
   panel.style.width = rect.width+'px';
+  panel.style.top = (openAbove ? rect.top-maxH-gap : rect.bottom+gap)+'px';
 }
 function acOpen(inputEl, options){
   const val = (inputEl.value||'').toLowerCase();
