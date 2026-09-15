@@ -1663,6 +1663,18 @@ async function uploadProjectDoc(projectId, file){
     render();
   }
 }
+// Same reasoning as clientPayViaWhatsapp/clientPayViaPaypal above: a plain
+// <a target="_blank"> silently does nothing in the Xcode-wrapped WKWebView
+// (no native delegate to open new windows) — only the OS's own long-press
+// link preview works there, which is why tapping the eye icon looked dead.
+// Route through the Web Share sheet instead when running inside that shell.
+function viewProjectDoc(url, name){
+  if(isWrappedApp() && navigator.share){
+    navigator.share({url, title:name}).catch(()=>{});
+    return;
+  }
+  window.open(url,'_blank');
+}
 function removeProjectDoc(projectId, docId){
   showConfirm('Remove this document?', async ()=>{
     const p = S.projects.find(x=>x.id===projectId);
@@ -1704,7 +1716,7 @@ function renderProjectDocsSection(p, canManage){
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            <a class="icon-btn" href="${esc(d.url)}" target="_blank" rel="noopener" title="View">${ic('eye')}</a>
+            <button class="icon-btn" onclick="viewProjectDoc('${onclickStr(d.url)}','${onclickStr(d.name)}')" title="View">${ic('eye')}</button>
             ${canManage?`<button class="icon-btn" onclick="removeProjectDoc('${p.id}','${d.id}')">${ic('trash')}</button>`:''}
           </div>
         </div>`).join('')}
