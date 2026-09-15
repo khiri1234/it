@@ -4902,7 +4902,28 @@ function renderSettingsForm(){
       <label>Purchase order prefix</label><input id="s_ppo" value="${esc(s.poPrefix)}">
     </div>
     <button class="btn btn-primary btn-block" onclick="saveSettings()">${ic('check')} Save settings</button>
+    <div class="card" style="margin-top:14px">
+      <label>Danger zone</label>
+      <div class="tiny muted" style="margin-bottom:10px">Permanently deletes every Team chat message and every client conversation, for all customers. Use this to wipe out test messages before going live — it can't be undone.</div>
+      <button class="btn btn-danger btn-block" onclick="clearAllChats()">${ic('trash')} Clear all chat messages</button>
+    </div>
   </div>`;
+}
+function clearAllChats(){
+  if(!isAdmin()){ toast('Only admins can clear chat history'); return; }
+  showConfirm('Clear all Team chat and client messages? This deletes every message for everyone and can\'t be undone.', async ()=>{
+    S.chat=[];
+    S.clientChats={};
+    S.chatReads={};
+    S.clientChatReads={};
+    await persist('chat');
+    await persist('clientChats');
+    await persist('chatReads');
+    await persist('clientChatReads');
+    logActivity('Cleared all Team chat and client message history');
+    toast('All chat messages cleared');
+    goBack();
+  });
 }
 function saveSettings(){
   if(!isAdmin()){ toast('Only admins can change settings'); return; }
