@@ -3181,11 +3181,13 @@ function renderStockList(){
       ${list.length===0? emptyState('mail','No RFQs yet','Create one to request pricing from your suppliers.') :
         list.map(r=>{
           const quoteCount = new Set((S.supplierQuotes||[]).filter(q=>q.rfqId===r.id).map(q=>q.supplierName)).size;
+          const proj = r.projectId ? S.projects.find(x=>x.id===r.projectId) : null;
           return `<div class="card stripe ${rfqBadgeClass(r.status)}" onclick="go('rfq-view',{id:'${r.id}'})">
             <div class="row-between">
               <div>
                 <div style="font-weight:600">${esc(r.title||'Untitled RFQ')}</div>
                 <div class="tiny mono muted">${esc(r.number)} · ${fmtDate(r.date)}</div>
+                ${proj?`<div class="tiny muted" style="margin-top:2px">${esc(proj.number)} — ${esc(proj.name)}</div>`:''}
               </div>
               <span class="badge ${rfqBadgeClass(r.status)}">${r.status}</span>
             </div>
@@ -3599,7 +3601,7 @@ function rfqBadgeClass(status){ return status==='closed' ? 'completed' : 'sent';
 function newRfq(){ goPush('rfq-form',{id:null}); }
 function renderRfqForm(id){
   const editing = id ? S.rfqs.find(r=>r.id===id) : null;
-  const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'Please, provide us quote with model number and best price', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}]};
+  const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'Please, provide us quote with model number and best price', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}], projectId:null};
   return `
   ${topbar(editing?'Edit RFQ':'New RFQ', editing?rfq.number:'', true)}
   <div class="content">
@@ -3610,6 +3612,12 @@ function renderRfqForm(id){
       <input id="rfq_number" value="${esc(rfq.number || previewNumber('rfq'))}" placeholder="RFQ-2026-0001">
       <label>Date</label>
       <input id="rfq_date" type="date" value="${rfq.date}">
+      <label>Project (optional)</label>
+      <select id="rfq_project">
+        <option value="">— Not tied to a project —</option>
+        ${S.projects.map(pr=>`<option value="${pr.id}" ${rfq.projectId===pr.id?'selected':''}>${esc(pr.number)} — ${esc(pr.name)}</option>`).join('')}
+      </select>
+      ${S.projects.length?`<button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" onclick="importProjectBoqIntoRfq()">${ic('box')} Import outstanding BOQ items from selected project</button>`:''}
       <label>Notes for suppliers (optional)</label>
       <textarea id="rfq_notes" rows="2" placeholder="Any extra instructions">${esc(rfq.notes)}</textarea>
     </div>
@@ -3656,6 +3664,25 @@ function removeRfqRow(idx){
   if(items.length===0) items.push({id:uid(),desc:'',code:'',qty:1,unit:''});
   document.getElementById('rfqItemsWrap').innerHTML=renderRfqRows(items);
 }
+// Mirrors importProjectBoqIntoPurchase() — pulls whatever's still outstanding on the
+// selected project's BOQ (ordered qty minus what's already been purchased against it)
+// into this RFQ's item list, so suppliers get quoted on exactly what the project still needs.
+function importProjectBoqIntoRfq(){
+  const projId=document.getElementById('rfq_project').value;
+  if(!projId){ toast('Select a project first'); return; }
+  const proj=S.projects.find(x=>x.id===projId); if(!proj) return;
+  const outstanding=(proj.boq||[]).filter(b=>(Number(b.qty)||0) > (Number(b.purchasedQty)||0));
+  if(outstanding.length===0){ toast('Nothing outstanding — everything on this BOQ is already purchased'); return; }
+  let items=readRfqItemsFromDOM();
+  items = items.filter(it=>it.desc || it.code || it.unit); // drop the lone blank starter row (qty defaults to 1, so it alone isn't a signal)
+  outstanding.forEach(b=>{
+    const remainingQty=(Number(b.qty)||0)-(Number(b.purchasedQty)||0);
+    items.push({id:uid(), desc:b.desc, code:'', qty:remainingQty, unit:b.unit||''});
+  });
+  if(items.length===0) items.push({id:uid(),desc:'',code:'',qty:1,unit:''});
+  document.getElementById('rfqItemsWrap').innerHTML=renderRfqRows(items);
+  toast(`Imported ${outstanding.length} item${outstanding.length>1?'s':''} from BOQ`);
+}
 function saveRfq(id){
   const title=document.getElementById('rfq_title').value.trim();
   if(!title){ toast('Enter a title'); return; }
@@ -3667,6 +3694,7 @@ function saveRfq(id){
   else { r=S.rfqs.find(x=>x.id===id); r.number = numberInput || r.number; }
   r.title=title;
   r.date=document.getElementById('rfq_date').value||todayISO();
+  r.projectId=document.getElementById('rfq_project').value||null;
   r.notes=document.getElementById('rfq_notes').value;
   r.items=items;
   persist('rfqs'); persist('settings');
@@ -3725,6 +3753,7 @@ function renderRfqView(id){
   if(!rfq) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This RFQ may have been deleted.')}</div>`;
   const quotes = (S.supplierQuotes||[]).filter(q=>q.rfqId===id);
   const supplierNames = [...new Set(quotes.map(q=>q.supplierName))].sort();
+  const rfqProj = rfq.projectId ? S.projects.find(x=>x.id===rfq.projectId) : null;
   return `
   ${topbar(rfq.number, rfq.title, true)}
   <div class="content">
@@ -3733,6 +3762,10 @@ function renderRfqView(id){
         <span class="badge ${rfqBadgeClass(rfq.status)}">${rfq.status}</span>
         <div class="tiny muted">${fmtDate(rfq.date)}</div>
       </div>
+      ${rfqProj?`<div class="row-between" style="margin-top:8px;cursor:pointer" onclick="go('project-view',{id:'${rfqProj.id}'})">
+        <div class="tiny muted">Project</div>
+        <div class="small" style="font-weight:600">${esc(rfqProj.number)} — ${esc(rfqProj.name)}</div>
+      </div>`:''}
       ${rfq.notes?`<div class="small" style="margin-top:8px">${esc(rfq.notes)}</div>`:''}
     </div>
 
@@ -3804,7 +3837,7 @@ function createPurchaseFromSupplierQuote(rfqId, supplierName){
     return {desc:it.desc, qty:it.qty, cost:Number(qi.price), invId:findInventoryByName(it.desc)?.id||null, boqItemId:null};
   }).filter(Boolean);
   if(items.length===0){ toast("This supplier didn't price any items"); return; }
-  const p={id:uid(), number:nextNumber('purchase'), supplier:supplierName, date:todayISO(), status:'pending', items, notes:`From ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:null};
+  const p={id:uid(), number:nextNumber('purchase'), supplier:supplierName, date:todayISO(), status:'pending', items, notes:`From ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:rfq.projectId||null};
   S.purchases.push(p);
   q.status='accepted';
   persist('purchases'); persist('supplierQuotes'); persist('settings');
@@ -3839,7 +3872,7 @@ function createPurchasesFromLowestPrices(rfqId){
   if(supplierNames.length===0){ toast('No items have been priced yet'); return; }
   const createdIds=[];
   supplierNames.forEach(sn=>{
-    const p={id:uid(), number:nextNumber('purchase'), supplier:sn, date:todayISO(), status:'pending', items:bySupplier[sn], notes:`Lowest price per item from ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:null};
+    const p={id:uid(), number:nextNumber('purchase'), supplier:sn, date:todayISO(), status:'pending', items:bySupplier[sn], notes:`Lowest price per item from ${rfq.number} — ${rfq.title||''}`, stockApplied:false, projectId:rfq.projectId||null};
     S.purchases.push(p);
     createdIds.push(p.id);
     const q=quotes.find(x=>x.supplierName===sn);
