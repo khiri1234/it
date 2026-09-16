@@ -2589,7 +2589,7 @@ function buildPdfHTML(kind, id, opts){
         </div>
       </div>
       <table class="pdf-table">
-        <thead><tr><th style="width:26px">#</th><th>${kind==='invoice'?'Item Description':'Description'}</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:90px">Unit price</th><th class="num" style="width:60px">Disc.</th><th class="num" style="width:100px">Amount</th></tr></thead>
+        <thead><tr><th style="width:26px">#</th><th>${kind==='invoice'?'Item Description':'Description'}</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:110px">Unit price</th><th class="num" style="width:60px">Disc.</th><th class="num" style="width:120px">Amount</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="pdf-totals">
@@ -2632,7 +2632,7 @@ function buildPdfHTML(kind, id, opts){
         </div>
       </div>
       <table class="pdf-table">
-        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Qty</th>${showPrices?`<th class="num" style="width:100px">Unit cost</th><th class="num" style="width:110px">Amount</th>`:''}</tr></thead>
+        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Qty</th>${showPrices?`<th class="num" style="width:110px">Unit cost</th><th class="num" style="width:120px">Amount</th>`:''}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${showPrices?`<div class="pdf-totals">
@@ -2672,7 +2672,7 @@ function buildPdfHTML(kind, id, opts){
         </div>
       </div>
       <table class="pdf-table">
-        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Unit</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:90px">Rate</th><th class="num" style="width:100px">Amount</th></tr></thead>
+        <thead><tr><th style="width:26px">#</th><th>Description</th><th class="num" style="width:60px">Unit</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:110px">Rate</th><th class="num" style="width:120px">Amount</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="pdf-totals">
@@ -2856,7 +2856,12 @@ function shareNativePdf(kind,id,opts){
     document.body.appendChild(hider);
     window.html2pdf().set({
       margin:0,
-      html2canvas:{scale:2,useCORS:true,windowWidth:794,scrollX:0,scrollY:0},
+      // No windowWidth override: html2canvas clones the page into an offscreen iframe
+      // sized to that width, but still positions the target element using coordinates
+      // measured against the real (often wider) browser window — on desktop that crops
+      // the left portion of the page clean off. .pdf-page has a fixed 210mm width, so
+      // it renders identically regardless of the real viewport; no override needed.
+      html2canvas:{scale:2,useCORS:true,scrollX:0,scrollY:0},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
       pagebreak:{mode:['css','avoid-all']}
     }).from(wrap).outputPdf('blob').then(blob=>{
@@ -2974,7 +2979,12 @@ function shareMenuPDF(kind,id){
     window.html2pdf().set({
       filename:`${s.number}.pdf`, margin:0,
       image:{type:'jpeg',quality:0.98},
-      html2canvas:{scale:2,useCORS:true,windowWidth:794,scrollX:0,scrollY:0},
+      // No windowWidth override: html2canvas clones the page into an offscreen iframe
+      // sized to that width, but still positions the target element using coordinates
+      // measured against the real (often wider) browser window — on desktop that crops
+      // the left portion of the page clean off. .pdf-page has a fixed 210mm width, so
+      // it renders identically regardless of the real viewport; no override needed.
+      html2canvas:{scale:2,useCORS:true,scrollX:0,scrollY:0},
       pagebreak:{mode:['css','avoid-all']},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
     }).from(wrap).save()
