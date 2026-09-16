@@ -1698,30 +1698,32 @@ function viewProjectDoc(url, name, type){
 // the browser to the raw Firebase Storage URL — suppliers/clients viewing a document
 // or attachment shouldn't see our storage bucket's address bar behind it.
 function openFileViewer(url, name, type){
+  if(isWrappedApp() && navigator.share){
+    // navigator.share({files:[file]}) on a real File (fetched below) makes iOS show
+    // its own clean full-page document preview directly — the same one-tap flow the
+    // generated invoice/quote PDFs already use via shareNativePdf(). No need for our
+    // own preview-then-share modal in between; that was only there as a workaround
+    // while the Storage bucket lacked CORS (fixed now, so the fetch behind this call
+    // reliably succeeds instead of falling into the "could not load this file" error).
+    shareUploadedFileNative(url, name);
+    return;
+  }
   const isImg = (type||'').startsWith('image/');
   const isPdf = (type||'')==='application/pdf' || /\.pdf$/i.test(name||'');
-  // The native app shell can't window.open() or <a download> (no WKWebView delegate
-  // for either), so it needs an explicit Share button to hand the file to the OS
-  // share sheet — but show the file here first, same as everywhere else, instead
-  // of jumping straight to the share sheet on tap.
-  const showShareBtn = isWrappedApp() && !!navigator.share;
   ensureModalRoot().innerHTML = `
   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal-sheet" style="max-width:760px;width:94vw;max-height:92vh;display:flex;flex-direction:column">
       <div class="modal-handle"></div>
-      <div class="row-between" style="margin-bottom:10px;gap:8px">
+      <div class="row-between" style="margin-bottom:10px">
         <div class="small" style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">${esc(name)}</div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          ${showShareBtn?`<button class="icon-btn" title="Share" onclick="shareUploadedFileNative('${onclickStr(url)}','${onclickStr(name)}')">${ic('share')}</button>`:''}
-          <button class="icon-btn" onclick="closeModal()">${ic('x')}</button>
-        </div>
+        <button class="icon-btn" style="flex-shrink:0" onclick="closeModal()">${ic('x')}</button>
       </div>
       <div style="flex:1;min-height:0;overflow:auto;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center">
         ${isImg?`<img src="${esc(url)}" alt="${esc(name)}" style="max-width:100%;max-height:78vh;object-fit:contain">`
          :isPdf?`<iframe id="fileViewerFrame" src="${esc(url)}" title="${esc(name)}" style="width:100%;height:78vh;border:none;border-radius:10px;background:#fff"></iframe>`
          :`<div style="padding:40px;text-align:center" class="tiny muted">Preview isn't available for this file type.</div>`}
       </div>
-      ${isPdf?`<div class="tiny muted" style="margin-top:8px;text-align:center">${showShareBtn?'Tap the share icon above to save or print it.':'Use the download/print icons in the PDF viewer above to save or print it.'}</div>`:''}
+      ${isPdf?`<div class="tiny muted" style="margin-top:8px;text-align:center">Use the download/print icons in the PDF viewer above to save or print it.</div>`:''}
     </div>
   </div>`;
 }
