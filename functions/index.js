@@ -1,54 +1,121 @@
-const {onDocumentWritten} = require('firebase-functions/v2/firestore');
-const {initializeApp} = require('firebase-admin/app');
-const {getFirestore} = require('firebase-admin/firestore');
-const {getMessaging} = require('firebase-admin/messaging');
+const { setGlobalOptions } = require("firebase-functions/v2");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { initializeApp } = require("firebase-admin/app");
+const { getMessaging } = require("firebase-admin/messaging");
+
+// Matches where these were already deployed by hand — keep new deploys in the same region.
+setGlobalOptions({ region: "europe-west1" });
 
 initializeApp();
+const messaging = getMessaging();
 
-// The web app stores each data type as a single Firestore doc holding a JSON-stringified
-// array (see persist()/loadAll() in index.html) — there's no per-record collection to
-// trigger on. So this fires on every write to ledger/supplierQuotes, diffs the array
-// against its previous version to find quotes that are brand new or were just
-// (re)submitted (submittedAt changed), and sends one push per quote to the "staff" FCM
-// topic — which every signed-in admin/staff device on the native iOS app is already
-// subscribed to via syncPushTopic() in the web app (see pushTopicsForUser()).
-exports.notifyNewSupplierQuotes = onDocumentWritten('ledger/supplierQuotes', async (event) => {
-  const afterSnap = event.data && event.data.after;
-  if (!afterSnap || !afterSnap.exists) return; // document deleted — nothing to notify
-  const afterJson = afterSnap.data().json;
-  if (!afterJson) return;
+function slugifyTopic(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100) || "unknown";
+}
 
-  const beforeSnap = event.data && event.data.before;
-  const beforeJson = beforeSnap && beforeSnap.exists ? beforeSnap.data().json : null;
+function parseJsonField(data) {
+  if (!data || !data.json) return null;
+  try { return JSON.parse(data.json); } catch (e) { return null; }
+}
 
-  let before = [], after = [];
-  try { if (beforeJson) before = JSON.parse(beforeJson); } catch (e) { before = []; }
-  try { after = JSON.parse(afterJson); } catch (e) { return; }
-
-  const beforeSubmittedAt = new Map(before.map(q => [q.id, q.submittedAt]));
-  const newOrUpdated = after.filter(q => beforeSubmittedAt.get(q.id) !== q.submittedAt);
-  if (newOrUpdated.length === 0) return;
-
-  let rfqs = [];
+async function sendPush(topic, title, body, data) {
   try {
-    const rfqsSnap = await getFirestore().collection('ledger').doc('rfqs').get();
-    rfqs = JSON.parse((rfqsSnap.data() || {}).json || '[]');
-  } catch (e) {
-    console.error('could not load rfqs for notification context', e);
+    await messaging.send({ topic, notification: { title, body }, ...(data ? { data } : {}) });
+  } catch (err) {
+    console.error(`Failed to send push to topic ${topic}`, err);
   }
+}
 
-  const messaging = getMessaging();
-  await Promise.all(newOrUpdated.map(q => {
-    const rfq = rfqs.find(r => r.id === q.rfqId);
-    const rfqLabel = rfq ? (rfq.title ? `${rfq.number} — ${rfq.title}` : rfq.number) : 'an RFQ';
-    return messaging.send({
-      topic: 'staff',
-      notification: {
-        title: 'New supplier quote',
-        body: `${q.supplierName} quoted on ${rfqLabel}`,
-      },
-      data: { type: 'supplier_quote', rfqId: q.rfqId || '' },
-      apns: { payload: { aps: { sound: 'default' } } },
-    }).catch(err => console.error('FCM send failed for quote', q.id, err));
-  }));
+// Client <-> staff chat: notify whichever side didn't send the message.
+exports.notifyOnClientMessage = onDocumentWritten("ledger/clientChats", async (event) => {
+  const beforeChats = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || {};
+  const afterChats = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterChats) return;
+
+  for (const customer of Object.keys(afterChats)) {
+    const beforeMsgs = beforeChats[customer] || [];
+    const afterMsgs = afterChats[customer] || [];
+    if (afterMsgs.length <= beforeMsgs.length) continue;
+
+    const newMsgs = afterMsgs.slice(beforeMsgs.length);
+    for (const msg of newMsgs) {
+      const body = String(msg.text || "").slice(0, 150) || "(no message)";
+      if (msg.from === "client") {
+        await sendPush("staff", `New message from ${customer}`, body);
+      } else if (msg.from === "staff") {
+        await sendPush(`client_${slugifyTopic(customer)}`, `New message from ${msg.authorName || "the team"}`, body);
+      }
+    }
+  }
+});
+
+// Team chat: notify all staff whenever anyone posts.
+exports.notifyOnTeamChatMessage = onDocumentWritten("ledger/chat", async (event) => {
+  const beforeMsgs = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterMsgs = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterMsgs || afterMsgs.length <= beforeMsgs.length) return;
+
+  const newMsgs = afterMsgs.slice(beforeMsgs.length);
+  for (const msg of newMsgs) {
+    const body = String(msg.text || "").slice(0, 150) || "(no message)";
+    await sendPush("staff", msg.userName || "Team chat", body);
+  }
+});
+
+// New RFQ: notify every supplier.
+exports.notifyOnNewRfq = onDocumentWritten("ledger/rfqs", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeIds = new Set(beforeList.map((r) => r.id));
+  const newRfqs = afterList.filter((r) => !beforeIds.has(r.id));
+  for (const rfq of newRfqs) {
+    await sendPush("suppliers", "New request for quotation", rfq.title || rfq.number || "New RFQ posted");
+  }
+});
+
+// Supplier submits (or resubmits) a quote: notify staff. Includes the RFQ id in the data
+// payload so a tap on the notification (handled natively in LedgerApp.swift/ContentView.swift)
+// jumps straight to that RFQ via the web app's #rfq=<id> deep link.
+exports.notifyOnSupplierQuoteSubmitted = onDocumentWritten("ledger/supplierQuotes", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeByKey = {};
+  beforeList.forEach((q) => { beforeByKey[`${q.rfqId}|${q.supplierName}`] = q; });
+
+  for (const q of afterList) {
+    const key = `${q.rfqId}|${q.supplierName}`;
+    const before = beforeByKey[key];
+    const isNew = !before;
+    const isResubmitted = before && before.submittedAt !== q.submittedAt;
+    if (isNew || isResubmitted) {
+      await sendPush(
+        "staff",
+        `New quote from ${q.supplierName}`,
+        "Submitted pricing for an RFQ.",
+        { type: "supplier_quote", rfqId: q.rfqId || "" }
+      );
+    }
+  }
+});
+
+// Supplier quote accepted (a purchase was created from it): notify that supplier.
+exports.notifyOnSupplierQuoteAccepted = onDocumentWritten("ledger/supplierQuotes", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeByKey = {};
+  beforeList.forEach((q) => { beforeByKey[`${q.rfqId}|${q.supplierName}`] = q; });
+
+  for (const q of afterList) {
+    const key = `${q.rfqId}|${q.supplierName}`;
+    const before = beforeByKey[key];
+    if (q.status === "accepted" && (!before || before.status !== "accepted")) {
+      await sendPush(`supplier_${slugifyTopic(q.supplierName)}`, "Your quote was accepted", "A purchase order has been created from your quote.");
+    }
+  }
 });
