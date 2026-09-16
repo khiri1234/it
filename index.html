@@ -3120,7 +3120,7 @@ function shareMenuPDF(kind,id){
 }
 /* Deep-link routing: #invoice=ID / #quote=ID / #purchase=ID / #project=ID opens that record directly after sign-in */
 function applyHashRoute(){
-  const m=location.hash.match(/^#(invoice|quote|purchase|project)=(.+)$/);
+  const m=location.hash.match(/^#(invoice|quote|purchase|project|rfq)=(.+)$/);
   if(!m) return false;
   const kind=m[1], id=m[2];
   const view = kind==='purchase' ? 'purchase-view' : kind+'-view';
