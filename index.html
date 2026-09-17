@@ -2051,7 +2051,14 @@ const TAB_SECTIONS={
   'todos':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
-function switchTab(id){ STACK=[]; go(id); }
+function switchTab(id){
+  if(id==='stock'){
+    const alreadyOnStock = (TAB_SECTIONS[VIEW.name] || 'dashboard')==='stock';
+    const order=['purchases','rfqs','inventory'];
+    STOCK_TAB = alreadyOnStock ? order[(order.indexOf(STOCK_TAB)+1)%order.length] : 'purchases';
+  }
+  STACK=[]; go(id);
+}
 function openReportsFromSidebar(){ switchTab('more'); goPush('reports'); }
 function openChatFromSidebar(){ switchTab('more'); goPush('chat'); }
 function toggleSidebarCollapse(){
