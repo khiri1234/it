@@ -2057,6 +2057,11 @@ function switchTab(id){
     const order=['purchases','rfqs','inventory'];
     STOCK_TAB = alreadyOnStock ? order[(order.indexOf(STOCK_TAB)+1)%order.length] : 'purchases';
   }
+  if(id==='sales'){
+    const alreadyOnSales = (TAB_SECTIONS[VIEW.name] || 'dashboard')==='sales';
+    const order=['invoices','quotes'];
+    SALES_TAB = alreadyOnSales ? order[(order.indexOf(SALES_TAB)+1)%order.length] : 'invoices';
+  }
   STACK=[]; go(id);
 }
 function openReportsFromSidebar(){ switchTab('more'); goPush('reports'); }
