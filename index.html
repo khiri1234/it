@@ -2302,7 +2302,7 @@ function emptyState(icon,title,sub){
 /* ---------- SALES (Invoices / Quotes) ---------- */
 function renderSalesList(){
   const list = SALES_TAB==='invoices'? S.invoices : S.quotes;
-  const sorted=[...list].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const sorted=[...list].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
   return `
   ${topbar('Sales','Invoices & quotes', false, null, true)}
   <div class="content">
@@ -3172,7 +3172,7 @@ function renderStockList(){
     </div>
     <button class="fab" onclick="goPush('item-form',{id:null})">${ic('plus')}</button>`;
   } else if(STOCK_TAB==='rfqs'){
-    const list=[...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const list=[...(S.rfqs||[])].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
     return `
     ${topbar('Stock','Inventory & purchases', false, null, true)}
     <div class="content">
@@ -3197,7 +3197,7 @@ function renderStockList(){
     </div>
     <button class="fab" onclick="newRfq()">${ic('plus')}</button>`;
   } else {
-    let list=[...S.purchases].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    let list=[...S.purchases].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
     if(PURCHASE_PROJECT_FILTER==='__none__') list=list.filter(p=>!p.projectId);
     else if(PURCHASE_PROJECT_FILTER) list=list.filter(p=>p.projectId===PURCHASE_PROJECT_FILTER);
     if(PURCHASE_PAYMENT_FILTER) list=list.filter(p=>purchasePaymentStatus(p)===PURCHASE_PAYMENT_FILTER);
