@@ -4137,7 +4137,7 @@ function quickPurchaseStatus(id,val){
 /* ---------- PROJECTS ---------- */
 function newProject(){ goPush('project-form',{id:null}); }
 function renderProjectsList(){
-  const list=[...S.projects].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const list=[...S.projects].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
   return `
   ${topbar('Projects','Bill of quantities & site progress', false, null, true)}
   <div class="content">
