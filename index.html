@@ -1376,6 +1376,95 @@ function removePayment(kind, id, payId){
   });
 }
 
+/* ---------- E-SIGNATURE (client accepts a quote / supplier confirms a PO) ----------
+   Stored inline as a base64 PNG on the quote/purchase object itself (a sparse
+   signature stroke is only a few KB) rather than in Firebase Storage like the
+   larger purchase/project file attachments — no async upload step needed for
+   something this small. */
+let SIGNATURE_TARGET = null; // {kind:'quote'|'purchase', id}
+let SIGNATURE_DRAWING = false;
+let SIGNATURE_CTX = null;
+function openSignatureModal(kind, id){
+  SIGNATURE_TARGET = {kind, id};
+  SIGNATURE_DRAWING = false;
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:2px">${kind==='quote'?'Sign to accept this quote':'Sign to confirm this purchase order'}</div>
+      <div class="tiny muted" style="margin-bottom:10px">Draw your signature below with your finger, stylus, or mouse.</div>
+      <canvas id="sigCanvas" width="600" height="220" style="width:100%;height:180px;background:#fff;border-radius:12px;touch-action:none;cursor:crosshair;display:block"></canvas>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn btn-ghost btn-block" onclick="clearSignaturePad()">Clear</button>
+        <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary btn-block" onclick="saveSignature()">${ic('check')} Confirm</button>
+      </div>
+    </div>
+  </div>`;
+  initSignaturePad();
+}
+function initSignaturePad(){
+  const canvas = document.getElementById('sigCanvas');
+  if(!canvas) return;
+  const ratio = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * ratio;
+  canvas.height = rect.height * ratio;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(ratio, ratio);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#152033';
+  SIGNATURE_CTX = ctx;
+  let drawing = false;
+  const pos = e => { const r=canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+  canvas.addEventListener('pointerdown', e=>{
+    drawing = true; SIGNATURE_DRAWING = true;
+    const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y);
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e=>{
+    if(!drawing) return;
+    const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke();
+  });
+  const stop = ()=>{ drawing=false; };
+  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointerleave', stop);
+  canvas.addEventListener('pointercancel', stop);
+}
+function clearSignaturePad(){
+  const canvas = document.getElementById('sigCanvas');
+  if(!canvas || !SIGNATURE_CTX) return;
+  SIGNATURE_CTX.clearRect(0,0,canvas.width,canvas.height);
+  SIGNATURE_DRAWING = false;
+}
+function saveSignature(){
+  if(!SIGNATURE_DRAWING){ toast('Please draw your signature first'); return; }
+  const canvas = document.getElementById('sigCanvas');
+  const dataUrl = canvas.toDataURL('image/png');
+  const {kind, id} = SIGNATURE_TARGET;
+  if(kind==='quote'){
+    const q = S.quotes.find(x=>x.id===id); if(!q) return;
+    q.clientSignature = dataUrl;
+    q.signedAt = Date.now();
+    q.signedBy = CURRENT_USER.name;
+    q.status = 'accepted';
+    persist('quotes');
+    logActivity(`${CURRENT_USER.name} signed and accepted quote ${q.number}`);
+  } else if(kind==='purchase'){
+    const p = S.purchases.find(x=>x.id===id); if(!p) return;
+    p.supplierSignature = dataUrl;
+    p.signedAt = Date.now();
+    p.confirmedBySupplier = true;
+    persist('purchases');
+    logActivity(`${CURRENT_USER.name} confirmed purchase order ${p.number} by signature`);
+  }
+  closeModal();
+  toast('Signed — thank you!');
+  render();
+}
+
 /* ---------- SAVED CONTACT NAMES (so customer/supplier names don't need retyping) ---------- */
 function allCustomerNames(){
   return [...new Set([...S.invoices, ...S.quotes, ...S.projects].map(x=>x.customer).filter(Boolean))].sort();
@@ -1661,6 +1750,11 @@ function renderClientPortal(){
             ${S.settings.paypalMeUsername?`<button class="btn btn-primary" style="flex:1" onclick="clientPayViaPaypal(${bal})">${ic('card')} PayPal</button>`:''}
             <button class="btn btn-teal" style="flex:1" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay the balance of ${fmtMoney(bal)} on invoice ${d.number}.`)}')">${ic('chat')} WhatsApp</button>
           </div>`:''}
+          ${d.kind==='quote' ? (d.clientSignature ? `
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+            <div class="tiny muted">Signed by ${esc(d.signedBy||'')} · ${fmtDate(new Date(d.signedAt).toISOString().slice(0,10))}</div>
+            <img src="${d.clientSignature}" style="max-height:60px;margin-top:4px;background:#fff;border-radius:6px;padding:4px">
+          </div>` : `<button class="btn btn-teal btn-block" style="margin-top:8px" onclick="openSignatureModal('quote','${d.id}')">${ic('edit')} Sign &amp; accept this quote</button>`) : ''}
         </div>`;
       }).join('')}
 
@@ -2645,6 +2739,7 @@ function renderDocView(type,id){
       </div>
     </div>` : ''}
     ${d.notes?`<div class="card"><div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:4px">Notes</div><div class="small">${esc(d.notes)}</div></div>`:''}
+    ${type==='quote' && d.clientSignature?`<div class="card"><div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:4px">Client signature</div><div class="tiny muted">Signed by ${esc(d.signedBy||'')} · ${fmtDate(new Date(d.signedAt).toISOString().slice(0,10))}</div><img src="${d.clientSignature}" style="max-height:60px;margin-top:4px;background:#fff;border-radius:6px;padding:4px"></div>`:''}
   </div>
   <div class="content" style="padding-top:0">
     <label>Update status</label>
@@ -3982,6 +4077,12 @@ function renderSupplierPurchaseView(id){
     </div>
     ${p.notes?`<div class="card"><div class="small">${esc(p.notes)}</div></div>`:''}
     ${renderPurchaseAttachments(p, false)}
+    <div class="card">
+      ${p.confirmedBySupplier ? `
+        <div class="tiny muted">Confirmed by signature · ${fmtDate(new Date(p.signedAt).toISOString().slice(0,10))}</div>
+        <img src="${p.supplierSignature}" style="max-height:60px;margin-top:4px;background:#fff;border-radius:6px;padding:4px">
+      ` : `<button class="btn btn-teal btn-block" onclick="openSignatureModal('purchase','${p.id}')">${ic('edit')} Sign &amp; confirm this order</button>`}
+    </div>
   </div>`;
 }
 function renderSupplierRfqForm(id){
@@ -4129,6 +4230,7 @@ function renderPurchaseView(id){
     </div>
     ${p.notes?`<div class="card"><div class="small">${esc(p.notes)}</div></div>`:''}
     ${renderPurchaseAttachments(p)}
+    ${p.confirmedBySupplier?`<div class="card"><div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:4px">Supplier signature</div><div class="tiny muted">Confirmed ${fmtDate(new Date(p.signedAt).toISOString().slice(0,10))}</div><img src="${p.supplierSignature}" style="max-height:60px;margin-top:4px;background:#fff;border-radius:6px;padding:4px"></div>`:''}
 
     <div class="section-title">Payments to supplier</div>
     <div class="card">
