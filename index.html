@@ -289,6 +289,7 @@
   .faceid-sub{font-size:12px;color:var(--ink-soft);transition:color .2s;}
   .faceid-sub.error{color:var(--red);font-weight:600;}
   .faceid-divider{font-size:11px;color:var(--ink-soft);text-align:center;margin-bottom:14px;}
+  body.role-readonly .fab{display:none;}
   .fab{
     position:fixed;bottom:calc(78px + 1cm);right:max(16px,calc(50vw - 260px + 16px));
     width:52px;height:52px;border-radius:16px;background:var(--teal);color:#fff;
@@ -775,6 +776,12 @@ async function sha256(str){
   return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 function isAdmin(){ return CURRENT_USER && CURRENT_USER.role==='admin'; }
+function isReadOnly(){ return CURRENT_USER && CURRENT_USER.role==='readonly'; }
+function isPurchasingOnly(){ return CURRENT_USER && CURRENT_USER.role==='purchasing'; }
+function denyIfReadOnly(){
+  if(isReadOnly()){ toast('View only — ask an admin to make changes'); return true; }
+  return false;
+}
 function logActivity(action){
   if(!S.activityLog) S.activityLog=[];
   S.activityLog.unshift({id:uid(), ts:Date.now(), user:CURRENT_USER?CURRENT_USER.name:'System', action});
@@ -899,7 +906,7 @@ async function loadAll(){
   if(FIREBASE_ENABLED){ attachFirestoreListeners(); }
   else if(STORAGE_MODE!=='none'){ startSync(); }
 }
-const FORM_VIEWS=['invoice-form','quote-form','item-form','purchase-form','settings-form','team-form','bulk-payment','project-form','inventory-import'];
+const FORM_VIEWS=['invoice-form','quote-form','item-form','purchase-form','settings-form','team-form','bulk-payment','project-form','inventory-import','rfq-form'];
 
 /* Realtime path (Firebase) */
 function attachFirestoreListeners(){
@@ -1296,6 +1303,7 @@ function readPaymentRowsFromDOM(){
   }));
 }
 function showPaymentModal(kind, id){
+  if(denyIfReadOnly()) return;
   const d=payKindStore(kind).find(x=>x.id===id); if(!d) return;
   const rem=payKindRemaining(kind,d);
   AC_OPTS.team=[...new Set(S.users.map(u=>u.name))];
@@ -1895,7 +1903,7 @@ function slugifyTopic(s){
 }
 function pushTopicsForUser(u){
   if(!u) return [];
-  if(u.role==='admin' || u.role==='staff') return ['staff'];
+  if(['admin','staff','purchasing','readonly'].includes(u.role)) return ['staff'];
   if(u.role==='client' && u.clientCustomer) return ['client_'+slugifyTopic(u.clientCustomer)];
   if(u.role==='supplier' && u.supplierName) return ['suppliers', 'supplier_'+slugifyTopic(u.supplierName)];
   return [];
@@ -1932,6 +1940,7 @@ function renderConnectionError(){
 }
 function render(){
   acClose();
+  document.body.classList.toggle('role-readonly', isReadOnly());
   const app = document.getElementById('app');
   const sidebar = document.getElementById('desktopSidebar');
   if(STORAGE_MODE==='error'){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
@@ -1967,6 +1976,10 @@ function render(){
   app.className='';
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
+  // purchasing-only accounts are confined to the Stock section (purchases/RFQs/inventory)
+  if(isPurchasingOnly() && (TAB_SECTIONS[VIEW.name]||'dashboard')!=='stock'){ VIEW={name:'stock',params:{}}; }
+  // read-only accounts can browse everything but never reach a create/edit form
+  if(isReadOnly() && FORM_VIEWS.includes(VIEW.name)){ VIEW={name:TAB_SECTIONS[VIEW.name]||'dashboard',params:{}}; }
   let body='';
   switch(VIEW.name){
     case 'dashboard': body = renderDashboard(); break;
@@ -2073,7 +2086,8 @@ function toggleSidebarCollapse(){
 }
 function renderSidebar(){
   if(!CURRENT_USER) return '';
-  const tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['reports','reports','Reports'],['more','more','More']];
+  let tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['reports','reports','Reports'],['more','more','More']];
+  if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
   const activeId = ['reports','chat'].includes(VIEW.name) ? VIEW.name : (TAB_SECTIONS[VIEW.name] || 'dashboard');
   return `
   <button class="ds-toggle" onclick="toggleSidebarCollapse()" title="${DS_COLLAPSED?'Expand':'Collapse'} sidebar">${ic('chev')}</button>
@@ -2090,7 +2104,7 @@ function renderSidebar(){
       <span class="ds-status-dot"></span>
     </div>
     <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
-    <div class="ds-urole">${CURRENT_USER.role==='admin'?'Admin':'Staff'}</div>
+    <div class="ds-urole">${{admin:'Admin',purchasing:'Purchasing',readonly:'Read only'}[CURRENT_USER.role] || 'Staff'}</div>
   </div>
   <div class="ds-search-btn" onclick="openCommandPalette()" title="Jump to (Ctrl/Cmd K)">
     ${ic('search')}<span>Search</span><span class="ds-search-kbd">${navigator.platform.includes('Mac')?'⌘K':'Ctrl K'}</span>
@@ -2111,6 +2125,7 @@ function renderSidebar(){
 }
 /* ---------- COMMAND PALETTE (desktop sidebar search / Cmd-Ctrl-K) ---------- */
 function commandPaletteItems(){
+  if(isPurchasingOnly()) return [{label:'Stock & Purchases', icon:'stock', action:()=>switchTab('stock')}];
   const items = [
     {label:'Dashboard', icon:'home', action:()=>switchTab('dashboard')},
     {label:'Sales — Invoices & quotes', icon:'sales', action:()=>switchTab('sales')},
@@ -2171,7 +2186,8 @@ document.addEventListener('keydown', e=>{
   }
 });
 function renderTabbar(){
-  const tabs=[['sales','sales','Sales'],['stock','stock','Stock'],['dashboard','home','Home'],['projects','box','Projects'],['more','more','More']];
+  let tabs=[['sales','sales','Sales'],['stock','stock','Stock'],['dashboard','home','Home'],['projects','box','Projects'],['more','more','More']];
+  if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
   const active = TAB_SECTIONS[VIEW.name] || 'dashboard';
   return `<div class="tabbar">
     ${tabs.map(([id,icon,label])=>{
@@ -2642,6 +2658,7 @@ function renderDocView(type,id){
   </div>`;
 }
 function quickStatus(type,id,val){
+  if(denyIfReadOnly()) return;
   const list = type==='invoice'? S.invoices : S.quotes;
   const d=list.find(x=>x.id===id); d.status=val;
   persist(type==='invoice'?'invoices':'quotes');
@@ -4137,6 +4154,7 @@ function renderPurchaseView(id){
   </div>`;
 }
 function quickPurchaseStatus(id,val){
+  if(denyIfReadOnly()) return;
   const p=S.purchases.find(x=>x.id===id);
   p.status=val;
   if(val==='received' && !p.stockApplied){ applyPurchaseStock(p); persist('inventory'); toast('Stock added to inventory'); }
@@ -5074,6 +5092,8 @@ function renderTeamForm(){
       <select id="t_role" onchange="toggleTeamRoleWraps(this.value)">
         <option value="staff" ${role==='staff'?'selected':''}>Staff — can't delete, edit prices, or change settings</option>
         <option value="admin" ${role==='admin'?'selected':''}>Admin — full access</option>
+        <option value="purchasing" ${role==='purchasing'?'selected':''}>Purchasing — only Stock, Purchases & RFQs</option>
+        <option value="readonly" ${role==='readonly'?'selected':''}>Read only — can browse everything, can't change anything</option>
         <option value="client" ${role==='client'?'selected':''}>Client — view-only access to their own project(s)</option>
         <option value="supplier" ${role==='supplier'?'selected':''}>Supplier — logs in to submit prices for RFQs</option>
       </select>
@@ -5098,7 +5118,7 @@ function renderTeamForm(){
     <div class="section-title">Team</div>
     ${staff.length===0? `<div class="card"><div class="tiny muted">Just you so far — add teammates above.</div></div>` :
       staff.map(u=>`<div class="card row-between">
-        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:'Staff'}</div></div>
+        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:u.role==='purchasing'?'Purchasing':u.role==='readonly'?'Read only':'Staff'}</div></div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost btn-sm" onclick="editTeamMember('${u.id}')">${ic('edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
