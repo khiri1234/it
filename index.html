@@ -1468,9 +1468,10 @@ function saveSignature(){
 }
 
 /* ---------- BARCODE / QR SCANNING (inventory lookup and receiving) ----------
-   Decodes with jsQR, loaded lazily from cdnjs the same way ensureHtml2Pdf() loads
-   html2pdf — QR only for now (no 1D barcode formats like UPC/EAN); a business
-   that labels its own stock with printed QR codes is the target case. */
+   Decodes with jsQR, vendored locally at vendor/jsQR.js and served same-origin
+   (not loaded from a third-party CDN, which can be blocked on some networks) —
+   QR only for now (no 1D barcode formats like UPC/EAN); a business that labels
+   its own stock with printed QR codes is the target case. */
 let PENDING_SCANNED_BARCODE = '';
 let _scannerStream = null;
 let _scannerLoadingLib = null;
@@ -1480,7 +1481,7 @@ function ensureBarcodeLib(){
   if(_scannerLoadingLib) return _scannerLoadingLib;
   _scannerLoadingLib = new Promise((resolve,reject)=>{
     const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js';
+    s.src='vendor/jsQR.js';
     s.onload=()=>resolve();
     s.onerror=()=>reject(new Error('load failed'));
     document.head.appendChild(s);
