@@ -1774,6 +1774,9 @@ async function doLogin(){
   syncPushTopic();
   AUTH_ERR='';
   setRememberedUserId(user.id);
+  user.lastLoginAt=Date.now();
+  persist('users');
+  logActivity('Logged in');
   if(!applyHashRoute()) render();
 }
 function logout(){ CURRENT_USER=null; syncPushTopic(); setRememberedUserId(null); go('dashboard'); }

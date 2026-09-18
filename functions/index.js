@@ -183,3 +183,22 @@ exports.notifyOverdueInvoices = onSchedule("0 9 * * *", async () => {
     await ref.set({ json: JSON.stringify(invoices), updatedAt: Date.now() });
   }
 });
+
+// Someone signs in (doLogin() in index.html stamps lastLoginAt on their user record):
+// notify staff so admins can see who's accessing the system and when.
+exports.notifyOnLogin = onDocumentWritten("ledger/users", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeById = {};
+  beforeList.forEach((u) => { beforeById[u.id] = u; });
+
+  for (const u of afterList) {
+    const before = beforeById[u.id];
+    if (u.lastLoginAt && (!before || before.lastLoginAt !== u.lastLoginAt)) {
+      const roleLabel = { admin: "Admin", staff: "Staff", purchasing: "Purchasing", readonly: "Read only", client: "Client", supplier: "Supplier" }[u.role] || u.role;
+      await sendPush("staff", `${u.name} logged in`, roleLabel, { type: "login" });
+    }
+  }
+});
