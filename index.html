@@ -744,6 +744,7 @@ const ICO = {
   todo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6.5l1 1 2-2"/><path d="M3.5 12.5l1 1 2-2"/><path d="M3.5 18.5l1 1 2-2"/></svg>',
   file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>',
   eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>',
 };
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
@@ -1464,6 +1465,107 @@ function saveSignature(){
   closeModal();
   toast('Signed — thank you!');
   render();
+}
+
+/* ---------- BARCODE / QR SCANNING (inventory lookup and receiving) ----------
+   Decodes with jsQR, loaded lazily from cdnjs the same way ensureHtml2Pdf() loads
+   html2pdf — QR only for now (no 1D barcode formats like UPC/EAN); a business
+   that labels its own stock with printed QR codes is the target case. */
+let PENDING_SCANNED_BARCODE = '';
+let _scannerStream = null;
+let _scannerLoadingLib = null;
+let _scannerOnResult = null;
+function ensureBarcodeLib(){
+  if(window.jsQR) return Promise.resolve();
+  if(_scannerLoadingLib) return _scannerLoadingLib;
+  _scannerLoadingLib = new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js';
+    s.onload=()=>resolve();
+    s.onerror=()=>reject(new Error('load failed'));
+    document.head.appendChild(s);
+  });
+  return _scannerLoadingLib;
+}
+function scanBarcodeInto(inputId){
+  openBarcodeScanner(code=>{
+    const el = document.getElementById(inputId);
+    if(el) el.value = code;
+  });
+}
+function scanToFindItem(){
+  openBarcodeScanner(code=>{
+    const found = S.inventory.find(it=>it.barcode && it.barcode===code);
+    if(found){
+      toast('Found: '+found.name);
+      goPush('item-form',{id:found.id});
+    } else {
+      toast('No item with that code — add it below');
+      PENDING_SCANNED_BARCODE = code;
+      goPush('item-form',{id:null});
+    }
+  });
+}
+async function openBarcodeScanner(onResult){
+  _scannerOnResult = onResult;
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeBarcodeScanner()">
+    <div class="modal-sheet" style="padding:0;overflow:hidden">
+      <div style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px">Scan a code</div>
+        <button class="icon-btn" onclick="closeBarcodeScanner()">${ic('x')}</button>
+      </div>
+      <div id="scannerStatus" class="tiny muted" style="padding:0 16px 10px">Starting camera…</div>
+      <video id="scannerVideo" autoplay playsinline muted style="width:100%;display:block;background:#000;max-height:70vh"></video>
+    </div>
+  </div>`;
+  try{
+    await ensureBarcodeLib();
+  }catch(e){
+    setScannerStatus('Could not load the scanner — check your connection.');
+    return;
+  }
+  if(!document.getElementById('scannerVideo')) return; // closed while loading the library
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video = document.getElementById('scannerVideo');
+    if(!video){ stream.getTracks().forEach(t=>t.stop()); return; } // closed while awaiting permission
+    _scannerStream = stream;
+    video.srcObject = stream;
+    setScannerStatus('Point the camera at a barcode or QR code.');
+    scanFrame();
+  }catch(e){
+    console.error('camera access failed', e);
+    setScannerStatus('Camera access was denied or is unavailable — type the code in manually instead.');
+  }
+}
+function setScannerStatus(msg){
+  const el=document.getElementById('scannerStatus');
+  if(el) el.textContent = msg;
+}
+function scanFrame(){
+  const video = document.getElementById('scannerVideo');
+  if(!video || !_scannerStream) return; // scanner was closed
+  if(video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth){
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code = window.jsQR(imgData.data, imgData.width, imgData.height);
+    if(code && code.data){
+      const cb = _scannerOnResult;
+      closeBarcodeScanner();
+      if(cb) cb(code.data);
+      return;
+    }
+  }
+  requestAnimationFrame(scanFrame);
+}
+function closeBarcodeScanner(){
+  if(_scannerStream){ _scannerStream.getTracks().forEach(t=>t.stop()); _scannerStream=null; }
+  _scannerOnResult = null;
+  closeModal();
 }
 
 /* ---------- SAVED CONTACT NAMES (so customer/supplier names don't need retyping) ---------- */
@@ -3294,6 +3396,7 @@ function renderStockList(){
     ${topbar('Stock','Inventory & purchases', false, null, true)}
     <div class="content">
       ${stockSegmented('inventory')}
+      <div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="scanToFindItem()">${ic('camera')} Scan a barcode / QR code</button></div>
       ${S.projects.length?`<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('inventory-import',{})">${ic('box')} Import items from projects' BOQs</button></div>`:''}
       <div style="height:12px"></div>
       ${items.length===0? emptyState('box','No items yet','Tap + to add your first product or service.') : itemsHtml}
@@ -3380,7 +3483,8 @@ function renderStockList(){
 
 function renderItemForm(id){
   const editing = id ? S.inventory.find(i=>i.id===id) : null;
-  const i = editing || {id:null,name:'',sku:'',stock:0,costPrice:0,sellPrice:0,lowStockThreshold:2};
+  const i = editing || {id:null,name:'',sku:'',barcode:PENDING_SCANNED_BARCODE||'',stock:0,costPrice:0,sellPrice:0,lowStockThreshold:2};
+  PENDING_SCANNED_BARCODE = '';
   return `
   ${topbar(editing?'Edit item':'New item','',true)}
   <div class="content">
@@ -3389,6 +3493,11 @@ function renderItemForm(id){
       <input id="i_name" value="${esc(i.name)}" placeholder="e.g. Cat6 Cable (m), Router config">
       <label>Item description</label>
       <input id="i_sku" value="${esc(i.sku)}" placeholder="Extra details about this item">
+      <label>Barcode / QR code (optional)</label>
+      <div style="display:flex;gap:8px">
+        <input id="i_barcode" value="${esc(i.barcode||'')}" placeholder="Scan or type" style="flex:1">
+        <button type="button" class="btn btn-ghost" onclick="scanBarcodeInto('i_barcode')">${ic('camera')}</button>
+      </div>
       <div class="item-grid">
         <div><label>Cost price</label><input id="i_cost" type="number" min="0" step="0.01" value="${i.costPrice}" ${isAdmin()?'':'disabled style="opacity:.6"'}></div>
         <div><label>Sell price</label><input id="i_sell" type="number" min="0" step="0.01" value="${i.sellPrice}" ${isAdmin()?'':'disabled style="opacity:.6"'}></div>
@@ -3412,6 +3521,7 @@ function saveItem(id){
   if(!id){ it={id:uid()}; S.inventory.push(it); } else { it=S.inventory.find(x=>x.id===id); }
   it.name=name;
   it.sku=document.getElementById('i_sku').value.trim();
+  it.barcode=document.getElementById('i_barcode').value.trim();
   if(isAdmin()){
     it.costPrice=Number(document.getElementById('i_cost').value)||0;
     it.sellPrice=Number(document.getElementById('i_sell').value)||0;
