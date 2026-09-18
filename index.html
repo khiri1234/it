@@ -4683,6 +4683,29 @@ function rangeDates(){
 }
 function inRange(dateStr,start,end){ return dateStr>=start && dateStr<=end; }
 
+function cashFlowForecast(){
+  const today = todayISO();
+  const thisYm = today.slice(0,7);
+  const [ny,nm] = [Number(today.slice(0,4)), Number(today.slice(5,7))];
+  const nextYm = (nm===12? `${ny+1}-01` : `${ny}-${String(nm+1).padStart(2,'0')}`);
+  function bucketFor(dateStr){
+    if(!dateStr || dateStr<=today || dateStr.slice(0,7)===thisYm) return 'thisMonth';
+    if(dateStr.slice(0,7)===nextYm) return 'nextMonth';
+    return 'later';
+  }
+  const buckets = {thisMonth:{incoming:0,outgoing:0}, nextMonth:{incoming:0,outgoing:0}, later:{incoming:0,outgoing:0}};
+  S.invoices.forEach(inv=>{
+    const rem = remaining(inv);
+    if(rem<=0.005 || inv.status==='paid') return;
+    buckets[bucketFor(inv.dueDate)].incoming += rem;
+  });
+  S.purchases.forEach(p=>{
+    const rem = purchaseRemaining(p);
+    if(rem<=0.005) return;
+    buckets[bucketFor(p.date)].outgoing += rem;
+  });
+  return buckets;
+}
 function renderReports(){
   const {start,end} = rangeDates();
   const invs = S.invoices.filter(i=>inRange(i.date,start,end));
@@ -4704,6 +4727,9 @@ function renderReports(){
   const maxTop = topItems.length? topItems[0][1] : 1;
   const lowStock = S.inventory.filter(i=>Number(i.stock)<=Number(i.lowStockThreshold||0));
   const outstandingInvoices = S.invoices.filter(i=>remaining(i)>0);
+  const cf = cashFlowForecast();
+  const cfBuckets = [['thisMonth','This month'],['nextMonth','Next month'],['later','Later']];
+  const cfMax = Math.max(1, ...cfBuckets.map(([k])=>Math.max(cf[k].incoming,cf[k].outgoing)));
 
   return `
   ${topbar('Reports','Business overview', true)}
@@ -4720,6 +4746,31 @@ function renderReports(){
       <div class="stat"><div class="num" style="color:${outstanding>0?'var(--amber)':'inherit'}">${fmtMoney(outstanding)}</div><div class="lbl">Outstanding</div></div>
       <div class="stat"><div class="num">${fmtMoney(purchasesTotal)}</div><div class="lbl">Purchases</div></div>
       <div class="stat"><div class="num" style="color:${grossMargin>=0?'var(--green)':'var(--red)'}">${fmtMoney(grossMargin)}</div><div class="lbl">Gross margin</div></div>
+    </div>
+
+    <div class="section-title">Cash-flow forecast</div>
+    <div class="tiny muted" style="margin:-4px 0 10px">Incoming = unpaid invoices, grouped by due date. Outgoing = unpaid purchase orders, grouped by order date (purchases don't yet track a separate due date) — so it reflects what's owed now rather than a future schedule.</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+        <div class="tiny"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-right:6px;vertical-align:middle"></span>Incoming</div>
+        <div class="tiny"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--red);margin-right:6px;vertical-align:middle"></span>Outgoing</div>
+      </div>
+      ${cfBuckets.map(([k,label],idx)=>{
+        const b=cf[k], net=b.incoming-b.outgoing;
+        return `${idx>0?'<div style="height:1px;background:var(--line);margin:12px 0"></div>':''}
+        <div class="tiny muted" style="margin-bottom:4px;font-weight:600">${label}</div>
+        <div class="bar-wrap">
+          <div style="width:56px" class="tiny muted">In</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${b.incoming?Math.max(4,(b.incoming/cfMax)*100):0}%;background:var(--teal)"></div></div>
+          <div class="mono tiny" style="width:80px;text-align:right">${fmtMoney(b.incoming)}</div>
+        </div>
+        <div class="bar-wrap" style="margin-bottom:2px">
+          <div style="width:56px" class="tiny muted">Out</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${b.outgoing?Math.max(4,(b.outgoing/cfMax)*100):0}%;background:var(--red)"></div></div>
+          <div class="mono tiny" style="width:80px;text-align:right">${fmtMoney(b.outgoing)}</div>
+        </div>
+        <div class="tiny" style="text-align:right;font-weight:600;color:${net>=0?'var(--teal)':'var(--red)'}">Net ${net>=0?'+':'-'}${fmtMoney(Math.abs(net))}</div>`;
+      }).join('')}
     </div>
 
     <div class="section-title">Top items / services</div>
