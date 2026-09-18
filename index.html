@@ -1191,6 +1191,7 @@ const PAY_METHODS=['Cash','Card','Bank transfer','Stripe','Cheque','Other'];
 function docTotal(d){ return calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct,d.charges).total; }
 function paymentsSum(d){ return (d.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0); }
 function remaining(d){ return Math.max(0, docTotal(d) - paymentsSum(d)); }
+function invoiceIsOverdue(d){ return d.status!=='paid' && !!d.dueDate && d.dueDate<todayISO() && remaining(d)>0.005; }
 function refreshPaymentStatus(d){
   const total=docTotal(d), paid=paymentsSum(d);
   if(total>0 && paid>=total-0.005) d.status='paid';
@@ -2437,7 +2438,9 @@ function renderSalesList(){
     ${sorted.length===0? emptyState('sales', SALES_TAB==='invoices'?'No invoices yet':'No quotes yet', 'Tap the + button to create one.') :
       sorted.map(d=>{
         const t = calcTotals(d.items,d.vatOn,d.vatRate,d.discountPct,d.charges);
-        return `<div class="card stripe ${d.status}" onclick="go('${SALES_TAB==='invoices'?'invoice':'quote'}-view',{id:'${d.id}'})">
+        const overdue = SALES_TAB==='invoices' && invoiceIsOverdue(d);
+        const displayStatus = overdue ? 'overdue' : d.status;
+        return `<div class="card stripe ${displayStatus}" onclick="go('${SALES_TAB==='invoices'?'invoice':'quote'}-view',{id:'${d.id}'})">
           <div class="row-between">
             <div>
               <div style="font-weight:600">${esc(d.customer||'Untitled')}</div>
@@ -2445,7 +2448,7 @@ function renderSalesList(){
             </div>
             <div style="text-align:right">
               <div class="mono" style="font-weight:600">${fmtMoney(t.total)}</div>
-              <span class="badge ${d.status}">${d.status}</span>
+              <span class="badge ${displayStatus}">${displayStatus}</span>
             </div>
           </div>
         </div>`;
@@ -2671,6 +2674,7 @@ function renderDocView(type,id){
   const statusOptions = type==='invoice' ? ['draft','sent','partial','paid','overdue'] : ['draft','sent','accepted'];
   const paid = type==='invoice' ? paymentsSum(d) : 0;
   const rem = type==='invoice' ? Math.max(0,t.total-paid) : 0;
+  const displayStatus = type==='invoice' && invoiceIsOverdue(d) ? 'overdue' : d.status;
 
   return `
   ${topbar(d.number, d.customer, true, `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="showShareMenu('${type}','${d.id}')">${ic('share')}</button>`)}
@@ -2682,7 +2686,7 @@ function renderDocView(type,id){
           <div class="tiny muted">${esc(S.settings.companyPhone||'')} ${S.settings.companyPhone&&S.settings.companyEmail?'·':''} ${esc(S.settings.companyEmail||'')}</div>
           <div class="tiny muted">${esc(S.settings.companyAddress||'')}</div>
         </div>
-        <span class="badge ${d.status}">${d.status}</span>
+        <span class="badge ${displayStatus}">${displayStatus}</span>
       </div>
       <div class="divider"></div>
       <div class="grid2">
@@ -4890,9 +4894,10 @@ function renderReports(){
     ${outstandingInvoices.length===0? `<div class="card"><div class="tiny muted">All caught up — nothing outstanding.</div></div>` :
       `<div class="card" style="padding:6px 14px">
         ${outstandingInvoices.map(i=>{
+          const overdue = invoiceIsOverdue(i);
           return `<div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--line)" onclick="go('invoice-view',{id:'${i.id}'})">
-            <div><div class="small" style="font-weight:600">${esc(i.customer)}</div><div class="tiny muted mono">${i.number}${paymentsSum(i)>0?' · partly paid':''}</div></div>
-            <div class="mono">${fmtMoney(remaining(i))}</div>
+            <div><div class="small" style="font-weight:600">${esc(i.customer)}</div><div class="tiny muted mono">${i.number}${paymentsSum(i)>0?' · partly paid':''}${overdue?' · <span style="color:var(--red)">overdue</span>':''}</div></div>
+            <div class="mono" style="color:${overdue?'var(--red)':'inherit'}">${fmtMoney(remaining(i))}</div>
           </div>`;
         }).join('')}
       </div>`}
