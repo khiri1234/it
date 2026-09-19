@@ -1837,13 +1837,23 @@ function renderLogin(){
           <path class="fi-corner fi-bl" pathLength="1" d="M18,66 L18,80 Q18,82 20,82 L34,82"/>
           <path class="fi-corner fi-br" pathLength="1" d="M82,66 L82,80 Q82,82 80,82 L66,82"/>
           ${kind==='touch' ? `
-          <g class="fi-face fi-fingerprint">
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" d="M50,20 C33,20 21,33 21,50 C21,62 27,72 36,79"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" d="M50,20 C67,20 79,33 79,50 C79,62 73,72 64,79"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" d="M50,29 C39,29 30,38 30,50 C30,59 34,66 40,71"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" d="M50,29 C61,29 70,38 70,50 C70,59 66,66 60,71"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" d="M50,38 C45,38 40,43 40,50 C40,55 43,60 47,63"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" d="M50,38 C55,38 60,43 60,50 C60,55 57,60 53,63"/>
+          <defs>
+            <linearGradient id="tidGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#5EEAD4"/>
+              <stop offset="100%" stop-color="#3B82F6"/>
+            </linearGradient>
+            <filter id="tidGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <g class="fi-face fi-fingerprint" filter="url(#tidGlow)">
+            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,20 C33,20 21,33 21,50 C21,62 27,72 36,79"/>
+            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,20 C67,20 79,33 79,50 C79,62 73,72 64,79"/>
+            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,29 C39,29 30,38 30,50 C30,59 34,66 40,71"/>
+            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,29 C61,29 70,38 70,50 C70,59 66,66 60,71"/>
+            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,38 C45,38 40,43 40,50 C40,55 43,60 47,63"/>
+            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,38 C55,38 60,43 60,50 C60,55 57,60 53,63"/>
           </g>` : `
           <g class="fi-face">
             <circle class="fi-eye" cx="38" cy="45" r="3.4"/>
