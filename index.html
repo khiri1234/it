@@ -2343,7 +2343,7 @@ function renderSidebar(){
   </div>
   <div class="ds-user-card">
     <div class="ds-avatar-wrap">
-      <div class="ds-avatar">${esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
+      <div class="ds-avatar" style="${CURRENT_USER.photoURL?`background:url('${esc(CURRENT_USER.photoURL)}') center/cover`:''}">${CURRENT_USER.photoURL?'':esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
       <span class="ds-status-dot"></span>
     </div>
     <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
