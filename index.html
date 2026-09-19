@@ -2284,6 +2284,7 @@ function topbar(title, sub, showBack, rightBtn, showSearch){
     <div class="topbar-datetime">${esc(nowHeaderStr())}</div>
     ${showSearch?`<div class="topbar-search-wrap">${ic('search')}<input class="topbar-search" type="text" placeholder="Search this list" oninput="quickFilterList(this.value)"></div>`:''}
     <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
+    <button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff;flex-shrink:0" onclick="toggleDarkMode()" title="${DARK_MODE?'Switch to light mode':'Switch to dark mode'}">${ic(DARK_MODE?'sun':'moon')}</button>
     ${rightBtn||''}
   </div>`;
 }
@@ -2481,6 +2482,7 @@ function renderDashboard(){
         <div class="dash-date">${esc(nowHeaderStr())}</div>
         <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:8px">
           <span id="syncDot" title="Synced" style="width:7px;height:7px;border-radius:50%;background:#3DDC97;opacity:0;transition:opacity .3s;flex-shrink:0"></span>
+          <button class="dash-hero-menu" onclick="toggleDarkMode()" title="${DARK_MODE?'Switch to light mode':'Switch to dark mode'}">${ic(DARK_MODE?'sun':'moon')}</button>
           <button class="dash-hero-menu" onclick="go('more')">${ic('more')}</button>
         </div>
       </div>
@@ -5069,7 +5071,7 @@ function renderReports(){
 /* ---------- MORE / SETTINGS ---------- */
 function renderMore(){
   return `
-  ${topbar('More','Settings & tools', false, `<button class="icon-btn" onclick="toggleDarkMode()" title="${DARK_MODE?'Switch to light mode':'Switch to dark mode'}">${ic(DARK_MODE?'sun':'moon')}</button>`)}
+  ${topbar('More','Settings & tools')}
   <div class="content">
     <div class="card">
       <div class="row-between">
