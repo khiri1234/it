@@ -202,3 +202,49 @@ exports.notifyOnLogin = onDocumentWritten("ledger/users", async (event) => {
     }
   }
 });
+
+// Client signs a quote (saveSignature() in index.html stamps signedAt/clientSignature):
+// notify staff that it's been accepted and signed.
+exports.notifyOnQuoteSigned = onDocumentWritten("ledger/quotes", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeById = {};
+  beforeList.forEach((q) => { beforeById[q.id] = q; });
+
+  for (const q of afterList) {
+    const before = beforeById[q.id];
+    if (q.signedAt && (!before || before.signedAt !== q.signedAt)) {
+      await sendPush(
+        "staff",
+        `Quote ${q.number} signed`,
+        `${q.signedBy || q.customer || "Client"} accepted and signed the quote.`,
+        { type: "quote_signed", quoteId: q.id || "" }
+      );
+    }
+  }
+});
+
+// Supplier signs a purchase order (saveSignature() in index.html stamps signedAt/confirmedBySupplier):
+// notify staff that it's been confirmed.
+exports.notifyOnPurchaseSigned = onDocumentWritten("ledger/purchases", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeById = {};
+  beforeList.forEach((p) => { beforeById[p.id] = p; });
+
+  for (const p of afterList) {
+    const before = beforeById[p.id];
+    if (p.confirmedBySupplier && (!before || before.signedAt !== p.signedAt)) {
+      await sendPush(
+        "staff",
+        `Purchase order ${p.number} confirmed`,
+        `${p.supplier || "Supplier"} confirmed the order by signature.`,
+        { type: "purchase_signed", purchaseId: p.id || "" }
+      );
+    }
+  }
+});
