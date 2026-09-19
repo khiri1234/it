@@ -965,6 +965,16 @@ async function loadAll(){
     render();
     return;
   }
+  if(FIREBASE_ENABLED && (!S.users || S.users.length===0) &&
+     (S.invoices.length || S.quotes.length || S.purchases.length || S.inventory.length || S.projects.length)){
+    // The 'users' read came back empty but other business data did not — a genuinely
+    // fresh ledger has EVERYTHING empty, so this is an anomalous/partial read (not a
+    // fresh install). Never show "Set up Ledger" here: creating an admin account would
+    // collide with the real team's data. Show the retry screen instead.
+    STORAGE_MODE='error';
+    render();
+    return;
+  }
   if(!S.settings || !S.settings.companyName) S.settings = {...DEFAULT_SETTINGS, ...(S.settings||{})};
   render();
 
@@ -982,7 +992,17 @@ function attachFirestoreListeners(){
       if(json===undefined) return;
       const current = JSON.stringify(S[k]);
       if(json!==current){
-        S[k]=JSON.parse(json);
+        const parsed = JSON.parse(json);
+        if(k==='users' && (!parsed || parsed.length===0) && S.users && S.users.length>0){
+          // A live update just tried to empty a team list that a moment ago had people
+          // in it — that transition is never a real business event (even bulk-removing
+          // every teammate through the app still leaves the account doing it), so this
+          // is a bad or racing snapshot. Ignoring it is what stops "Set up Ledger" from
+          // popping up on a working account, whether mid-session or sitting at login.
+          console.error('ignoring live users update that would empty a non-empty team list', snap.data());
+          return;
+        }
+        S[k]=parsed;
         if(!FORM_VIEWS.includes(VIEW.name) && CURRENT_USER){ render(); flashSync(); }
       }
     }, err=>console.error('firestore listener error',k,err));
