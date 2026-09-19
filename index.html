@@ -1518,25 +1518,52 @@ function saveSignature(){
 }
 
 /* ---------- BARCODE / QR SCANNING (inventory lookup and receiving) ----------
-   Decodes with jsQR, vendored locally at vendor/jsQR.js and served same-origin
+   Decodes with ZXing, vendored locally at vendor/zxing.js and served same-origin
    (not loaded from a third-party CDN, which can be blocked on some networks) —
-   QR only for now (no 1D barcode formats like UPC/EAN); a business that labels
-   its own stock with printed QR codes is the target case. */
+   covers both QR codes and normal 1D product barcodes (UPC-A/E, EAN-13/8,
+   Code 128/39/93, ITF, Codabar, RSS/GS1 DataBar), so real retail packaging
+   scans as well as a business's own printed QR labels. */
 let PENDING_SCANNED_BARCODE = '';
 let _scannerStream = null;
 let _scannerLoadingLib = null;
 let _scannerOnResult = null;
+let _zxingReader = null;
 function ensureBarcodeLib(){
-  if(window.jsQR) return Promise.resolve();
+  if(window.ZXing) return Promise.resolve();
   if(_scannerLoadingLib) return _scannerLoadingLib;
   _scannerLoadingLib = new Promise((resolve,reject)=>{
     const s=document.createElement('script');
-    s.src='vendor/jsQR.js';
+    s.src='vendor/zxing.js';
     s.onload=()=>resolve();
     s.onerror=()=>reject(new Error('load failed'));
     document.head.appendChild(s);
   });
   return _scannerLoadingLib;
+}
+function getZxingReader(){
+  if(_zxingReader) return _zxingReader;
+  const hints = new Map();
+  hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    window.ZXing.BarcodeFormat.QR_CODE,
+    window.ZXing.BarcodeFormat.EAN_13, window.ZXing.BarcodeFormat.EAN_8,
+    window.ZXing.BarcodeFormat.UPC_A, window.ZXing.BarcodeFormat.UPC_E,
+    window.ZXing.BarcodeFormat.CODE_128, window.ZXing.BarcodeFormat.CODE_39, window.ZXing.BarcodeFormat.CODE_93,
+    window.ZXing.BarcodeFormat.ITF, window.ZXing.BarcodeFormat.CODABAR,
+    window.ZXing.BarcodeFormat.RSS_14, window.ZXing.BarcodeFormat.RSS_EXPANDED,
+  ]);
+  _zxingReader = new window.ZXing.MultiFormatReader();
+  _zxingReader.setHints(hints);
+  return _zxingReader;
+}
+// ImageData is RGBA (4 bytes/pixel); ZXing's RGBLuminanceSource wants one
+// grayscale byte per pixel when not given a packed Int32Array, so convert here.
+function imageDataToLuminance(imgData){
+  const {data, width, height} = imgData;
+  const out = new Uint8ClampedArray(width*height);
+  for(let i=0, j=0; i<data.length; i+=4, j++){
+    out[j] = (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114) | 0;
+  }
+  return out;
 }
 function scanBarcodeInto(inputId){
   openBarcodeScanner(code=>{
@@ -1603,13 +1630,18 @@ function scanFrame(){
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code = window.jsQR(imgData.data, imgData.width, imgData.height);
-    if(code && code.data){
-      const cb = _scannerOnResult;
-      closeBarcodeScanner();
-      if(cb) cb(code.data);
-      return;
-    }
+    try{
+      const luminanceSource = new window.ZXing.RGBLuminanceSource(imageDataToLuminance(imgData), imgData.width, imgData.height);
+      const bitmap = new window.ZXing.BinaryBitmap(new window.ZXing.HybridBinarizer(luminanceSource));
+      const result = getZxingReader().decodeWithState(bitmap);
+      const text = result && result.getText && result.getText();
+      if(text){
+        const cb = _scannerOnResult;
+        closeBarcodeScanner();
+        if(cb) cb(text);
+        return;
+      }
+    }catch(e){ /* no code found in this frame — normal, keep scanning */ }
   }
   requestAnimationFrame(scanFrame);
 }
