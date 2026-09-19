@@ -927,7 +927,14 @@ async function loadAll(){
   if(FIREBASE_ENABLED){
     await Promise.all(KEYS.map(async k=>{
       try{
-        const snap = await fbDB.collection('ledger').doc(k).get();
+        // {source:'server'} forces a real round-trip instead of letting the SDK silently
+        // resolve from local cache when the connection is flaky (e.g. a phone with a weak
+        // signal) — on a device with no cached copy yet, that fallback can otherwise resolve
+        // as "document doesn't exist" instead of throwing, which for 'users' would wrongly
+        // show "Set up Ledger" even though the real team data is safe on the server. Forcing
+        // the server round-trip means a bad connection now correctly throws (caught below)
+        // instead of masquerading as an empty database.
+        const snap = await fbDB.collection('ledger').doc(k).get({source:'server'});
         if(snap.exists && snap.data().json) S[k]=JSON.parse(snap.data().json);
       }catch(e){ console.error('firestore read failed',k,e); if(k==='users') usersLoadFailed=true; }
     }));
