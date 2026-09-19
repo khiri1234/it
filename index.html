@@ -765,6 +765,7 @@ let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
+let UPLOADING_PROFILE_PHOTO=false;
 let SCROLL_TO_PROJECT_DOCS=false; // set true to jump straight to the Documents section on the next project-view render
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
@@ -1950,6 +1951,38 @@ async function uploadProjectDoc(projectId, file){
     toast(e && e.message==='timeout' ? 'Upload timed out — check Storage is enabled in Firebase' : 'Upload failed — check your connection and Storage rules');
   }finally{
     UPLOADING_PROJECT_DOC = null;
+    render();
+  }
+}
+function handleProfilePhotoInput(inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  inputEl.value = '';
+  if(file) uploadProfilePhoto(file);
+}
+async function uploadProfilePhoto(file){
+  if(!FIREBASE_ENABLED || !fbStorage){ toast('Photo uploads need Firebase Storage set up — see the setup notes in index.html'); return; }
+  if(!(file.type||'').startsWith('image/')){ toast('Please choose an image file'); return; }
+  const maxBytes = 8*1024*1024;
+  if(file.size > maxBytes){ toast('That image is too large — max 8MB'); return; }
+  const user = S.users.find(u=>u.id===CURRENT_USER.id);
+  if(!user) return;
+  UPLOADING_PROFILE_PHOTO = true;
+  render();
+  const path = `profilePhotos/${user.id}/${uid()}-${file.name}`;
+  const ref = fbStorage.ref().child(path);
+  const uploadTask = ref.put(file);
+  try{
+    await Promise.race([uploadTask, uploadTimeoutPromise(45000)]);
+    const url = await ref.getDownloadURL();
+    user.photoURL = url;
+    await persist('users');
+    toast('Profile photo updated');
+  }catch(e){
+    console.error('profile photo upload failed',e);
+    try{ uploadTask.cancel(); }catch(_){}
+    toast(e && e.message==='timeout' ? 'Upload timed out — check Storage is enabled in Firebase' : 'Upload failed — check your connection and Storage rules');
+  }finally{
+    UPLOADING_PROFILE_PHOTO = false;
     render();
   }
 }
@@ -5036,9 +5069,16 @@ function renderMore(){
   <div class="content">
     <div class="card">
       <div class="row-between">
-        <div>
-          <div style="font-weight:600">${esc(CURRENT_USER.name)}</div>
-          <div class="tiny muted">@${esc(CURRENT_USER.username)} · ${CURRENT_USER.role==='admin'?'Admin':'Staff'}</div>
+        <div style="display:flex;align-items:center;gap:12px;min-width:0">
+          <div style="position:relative;flex-shrink:0" onclick="!UPLOADING_PROFILE_PHOTO && document.getElementById('profilePhotoInput').click()">
+            <div style="width:48px;height:48px;border-radius:50%;background:${CURRENT_USER.photoURL?`url('${esc(CURRENT_USER.photoURL)}') center/cover`:'linear-gradient(135deg,var(--teal),var(--blue))'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:17px;font-family:'Space Grotesk',sans-serif;cursor:pointer;opacity:${UPLOADING_PROFILE_PHOTO?'.5':'1'}">${CURRENT_USER.photoURL?'':esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
+            <div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink-soft)">${ic('camera')}</div>
+            <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="handleProfilePhotoInput(this)">
+          </div>
+          <div style="min-width:0">
+            <div style="font-weight:600">${esc(CURRENT_USER.name)}</div>
+            <div class="tiny muted">@${esc(CURRENT_USER.username)} · ${CURRENT_USER.role==='admin'?'Admin':'Staff'}</div>
+          </div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="logout()">Log out</button>
       </div>
