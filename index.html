@@ -275,19 +275,21 @@
   @keyframes fiCornerGlow{
     0%,100%{stroke:rgba(255,255,255,.65);} 50%{stroke:#3DDC97;}
   }
-  /* Touch ID: ridges light up in a wave from the fingertip outward while scanning,
-     like the sensor reading each ridge line — same beat as fiScan above. */
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth{animation:fiRidgePulse 1.1s ease-in-out infinite;}
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth:nth-child(7){animation-delay:0s;}
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth:nth-child(3),
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth:nth-child(6){animation-delay:.09s;}
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth:nth-child(2),
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth:nth-child(5){animation-delay:.18s;}
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth:nth-child(1),
-  .faceid-frame.scanning .fi-fingerprint .fi-mouth:nth-child(4){animation-delay:.27s;}
+  /* Touch ID: filled concentric ring bands. They fade in on entrance, then in the
+     scanning state light up in a wave from the innermost ring outward, like the
+     sensor reading each ridge — same beat as fiScan above. */
+  .fi-fill-ring{opacity:0;animation:fiFillFadeIn .35s ease forwards;}
+  .fi-fill-ring:nth-child(1){animation-delay:.56s;}
+  .fi-fill-ring:nth-child(2){animation-delay:.48s;}
+  .fi-fill-ring:nth-child(3){animation-delay:.4s;}
+  @keyframes fiFillFadeIn{to{opacity:1;}}
+  .faceid-frame.scanning .fi-fingerprint .fi-fill-ring{animation:fiRidgePulse 1.1s ease-in-out infinite;}
+  .faceid-frame.scanning .fi-fingerprint .fi-fill-ring:nth-child(3){animation-delay:0s;}
+  .faceid-frame.scanning .fi-fingerprint .fi-fill-ring:nth-child(2){animation-delay:.18s;}
+  .faceid-frame.scanning .fi-fingerprint .fi-fill-ring:nth-child(1){animation-delay:.36s;}
   @keyframes fiRidgePulse{
-    0%,60%,100%{stroke:#fff;stroke-dashoffset:0;opacity:.55;filter:drop-shadow(0 0 0 rgba(61,220,151,0));}
-    20%{stroke:#3DDC97;stroke-dashoffset:0;opacity:1;filter:drop-shadow(0 0 4px rgba(61,220,151,.85));}
+    0%,60%,100%{opacity:.55;}
+    20%{opacity:1;}
   }
   .faceid-frame::after{
     content:'';position:absolute;inset:-8px;border-radius:28px;
@@ -1843,17 +1845,14 @@ function renderLogin(){
               <stop offset="100%" stop-color="#3B82F6"/>
             </linearGradient>
             <filter id="tidGlow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="2.2" result="blur"/>
+              <feGaussianBlur stdDeviation="1.4" result="blur"/>
               <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
             </filter>
           </defs>
-          <g class="fi-face fi-fingerprint" filter="url(#tidGlow)">
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,20 C33,20 21,33 21,50 C21,62 27,72 36,79"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,20 C67,20 79,33 79,50 C79,62 73,72 64,79"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,29 C39,29 30,38 30,50 C30,59 34,66 40,71"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,29 C61,29 70,38 70,50 C70,59 66,66 60,71"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,38 C45,38 40,43 40,50 C40,55 43,60 47,63"/>
-            <path class="fi-mouth" pathLength="1" stroke-width="6.5" style="stroke:url(#tidGrad)" d="M50,38 C55,38 60,43 60,50 C60,55 57,60 53,63"/>
+          <g class="fi-face fi-fingerprint" fill="url(#tidGrad)" fill-rule="evenodd" filter="url(#tidGlow)">
+            <path class="fi-fill-ring" d="M50,15 A35,35 0 0 0 15,50 A35,35 0 0 0 26,75.5 L31,71 A28,28 0 0 1 22,50 A28,28 0 0 1 50,22 A28,28 0 0 1 78,50 A28,28 0 0 1 69,71 L74,75.5 A35,35 0 0 0 85,50 A35,35 0 0 0 50,15 Z"/>
+            <path class="fi-fill-ring" d="M50,27 A23,23 0 0 0 27,50 A23,23 0 0 0 35,67 L40,62.5 A16,16 0 0 1 34,50 A16,16 0 0 1 50,34 A16,16 0 0 1 66,50 A16,16 0 0 1 60,62.5 L65,67 A23,23 0 0 0 73,50 A23,23 0 0 0 50,27 Z"/>
+            <path class="fi-fill-ring" d="M50,40 A10,10 0 0 0 40,50 C40,55.5 43,59 46,61 L50,57 C47.5,55.5 46,53 46,50 A4,4 0 0 1 50,46 A4,4 0 0 1 54,50 C54,53 52.5,55.5 50,57 L54,61 C57,59 60,55.5 60,50 A10,10 0 0 0 50,40 Z"/>
           </g>` : `
           <g class="fi-face">
             <circle class="fi-eye" cx="38" cy="45" r="3.4"/>
