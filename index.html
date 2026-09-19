@@ -965,12 +965,14 @@ async function loadAll(){
     render();
     return;
   }
+  if(S.users && S.users.length) markTeamSeen();
   if(FIREBASE_ENABLED && (!S.users || S.users.length===0) &&
-     (S.invoices.length || S.quotes.length || S.purchases.length || S.inventory.length || S.projects.length)){
-    // The 'users' read came back empty but other business data did not — a genuinely
-    // fresh ledger has EVERYTHING empty, so this is an anomalous/partial read (not a
-    // fresh install). Never show "Set up Ledger" here: creating an admin account would
-    // collide with the real team's data. Show the retry screen instead.
+     (hasSeenTeam() || S.invoices.length || S.quotes.length || S.purchases.length || S.inventory.length || S.projects.length)){
+    // The 'users' read came back empty, but either this device has used a real team
+    // before or other business data did come through — and a genuinely fresh ledger has
+    // EVERYTHING empty. So this is an anomalous read, not a first run. Stop here rather
+    // than letting anything run against an empty in-memory team (a persist() from this
+    // state is what would actually overwrite the real data).
     STORAGE_MODE='error';
     render();
     return;
@@ -1003,6 +1005,7 @@ function attachFirestoreListeners(){
           return;
         }
         S[k]=parsed;
+        if(k==='users' && parsed && parsed.length) markTeamSeen();
         if(!FORM_VIEWS.includes(VIEW.name) && CURRENT_USER){ render(); flashSync(); }
       }
     }, err=>console.error('firestore listener error',k,err));
@@ -1038,6 +1041,14 @@ function flashSync(){
 let storageWarned=false;
 async function persist(key){
   const payload = JSON.stringify(S[key]);
+  if(key==='users' && (!S.users || S.users.length===0) && hasSeenTeam()){
+    // Refuse to write an empty team over a real one. Nothing in the app legitimately
+    // saves a zero-user list from a device that has seen a team (you cannot remove the
+    // account you are signed in as), so reaching here means in-memory state is wrong —
+    // and this write is the step that would turn that into actual data loss.
+    console.error('refusing to persist an empty users list over an existing team');
+    return;
+  }
   if(FIREBASE_ENABLED){
     try{ await fbDB.collection('ledger').doc(key).set({json:payload, updatedAt: Date.now()}); return; }
     catch(e){ console.error('firestore save failed',key,e); toast('Save failed — check connection'); return; }
@@ -1833,6 +1844,7 @@ async function doSetupAdmin(){
   const passHash = await sha256(username+':'+pin);
   const user={id:uid(), name, username, passHash, role:'admin'};
   S.users.push(user);
+  markTeamSeen();
   await persist('users');
   CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,photoURL:user.photoURL||null};
   syncPushTopic();
@@ -1843,6 +1855,13 @@ async function doSetupAdmin(){
 }
 function rememberedUserId(){ try{ return localStorage.getItem('rememberedUserId'); }catch(e){ return null; } }
 function setRememberedUserId(id){ try{ if(id) localStorage.setItem('rememberedUserId', id); else localStorage.removeItem('rememberedUserId'); }catch(e){} }
+/* Once a device has seen a real team, "Set up Ledger" is never the right screen for it
+   again. Whatever empties S.users — a flaky read, a racing snapshot, some path not yet
+   found — offering to create a first admin there is how a real team's data gets
+   overwritten. This flag is a device-local backstop that does not depend on knowing
+   which path went wrong: it just remembers that a team exists. */
+function markTeamSeen(){ try{ localStorage.setItem('ledgerHasTeam','1'); }catch(e){} }
+function hasSeenTeam(){ try{ return localStorage.getItem('ledgerHasTeam')==='1' || !!localStorage.getItem('rememberedUserId'); }catch(e){ return false; } }
 function renderLogin(){
   const rid = rememberedUserId();
   const rememberedUser = rid ? S.users.find(u=>u.id===rid) : null;
@@ -2386,6 +2405,7 @@ function renderConnectionError(){
     <div style="font-family:'Space Grotesk';font-weight:700;font-size:18px">Can't connect right now</div>
     <div class="small muted" style="max-width:320px">Couldn't reach the database. This is usually a slow or blocked connection — it does NOT mean your data is gone. Check your internet connection and try again.</div>
     <button class="btn btn-primary" onclick="location.reload()">${ic('check')} Retry</button>
+    <div class="tiny muted" style="opacity:.6;margin-top:4px">${esc(STORAGE_MODE)} · users ${S.users?S.users.length:0} · inv ${S.invoices.length} · items ${S.inventory.length} · prj ${S.projects.length}</div>
   </div>`;
 }
 function render(){
@@ -2394,7 +2414,12 @@ function render(){
   const app = document.getElementById('app');
   const sidebar = document.getElementById('desktopSidebar');
   if(STORAGE_MODE==='error'){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
-  if(!S.users || S.users.length===0){ app.className=''; app.innerHTML = noStorageBanner() + renderSetup(); sidebar.innerHTML=''; return; }
+  if(!S.users || S.users.length===0){
+    // A device that has already used a real team must never be shown the first-run
+    // signup screen, no matter what emptied the list — show the retry screen instead.
+    if(hasSeenTeam()){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
+    app.className=''; app.innerHTML = noStorageBanner() + renderSetup(); sidebar.innerHTML=''; return;
+  }
   if(!CURRENT_USER){ app.className=''; app.innerHTML = noStorageBanner() + renderLogin(); sidebar.innerHTML=''; return; }
   // client accounts get their own read-only portal — never the staff/admin app shell,
   // regardless of what VIEW happens to be set to (e.g. from a stale #project= hash link)
