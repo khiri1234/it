@@ -1726,7 +1726,7 @@ async function doSetupAdmin(){
   const user={id:uid(), name, username, passHash, role:'admin'};
   S.users.push(user);
   await persist('users');
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role};
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,photoURL:user.photoURL||null};
   syncPushTopic();
   AUTH_ERR='';
   logActivity(`Created the admin account and set up Ledger`);
@@ -1779,7 +1779,7 @@ async function doLogin(){
   const passHash = await sha256(username+':'+pin);
   const user = S.users.find(u=>u.username===username && u.passHash===passHash);
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null};
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null};
   syncPushTopic();
   AUTH_ERR='';
   setRememberedUserId(user.id);
@@ -1978,6 +1978,7 @@ async function uploadProfilePhoto(file){
     await Promise.race([uploadTask, uploadTimeoutPromise(45000)]);
     const url = await ref.getDownloadURL();
     user.photoURL = url;
+    CURRENT_USER.photoURL = url; // CURRENT_USER is a separate copy, not a reference into S.users
     await persist('users');
     toast('Profile photo updated');
   }catch(e){
@@ -2093,7 +2094,7 @@ function __faceIDUnlock(){
   if(!user) return false;
   const badge = document.getElementById('faceidBadge');
   const finish = ()=>{
-    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null};
+    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null};
     syncPushTopic();
     AUTH_ERR='';
     if(!applyHashRoute()) render();
