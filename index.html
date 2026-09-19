@@ -712,6 +712,25 @@ function setDarkMode(on){
   render();
 }
 function toggleDarkMode(){ setDarkMode(!DARK_MODE); }
+/* ---------- BIOMETRIC SIGN-IN AVAILABILITY ----------
+   Face ID is only available inside the native iOS wrapper (via its
+   WKScriptMessageHandler bridge — see the FACE ID section below). On a
+   plain desktop/laptop browser there's no such bridge, so we offer Touch
+   ID (or Windows Hello, same API) through WebAuthn's platform authenticator
+   instead. Detection is async, so this flips true after load and re-renders
+   the login screen if it's still showing. */
+let PLATFORM_AUTH_AVAILABLE = false;
+if(window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable){
+  PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(v=>{
+    PLATFORM_AUTH_AVAILABLE = !!v;
+    render();
+  }).catch(()=>{});
+}
+function biometricKind(){
+  if(isWrappedApp()) return 'face';
+  if(PLATFORM_AUTH_AVAILABLE) return 'touch';
+  return null;
+}
 /* ---------- DESKTOP SIDEBAR collapse state ---------- */
 let DS_COLLAPSED = false;
 try{ DS_COLLAPSED = localStorage.getItem('sidebarCollapsed')==='1'; }catch(e){}
@@ -1738,31 +1757,41 @@ function setRememberedUserId(id){ try{ if(id) localStorage.setItem('rememberedUs
 function renderLogin(){
   const rid = rememberedUserId();
   const rememberedUser = rid ? S.users.find(u=>u.id===rid) : null;
+  const kind = biometricKind(); // 'face' (native app) | 'touch' (desktop WebAuthn) | null
+  const showBiometric = rememberedUser && (kind==='face' || (kind==='touch' && rememberedUser.webauthnCredentialId));
+  const biometricLabel = kind==='touch' ? 'Touch ID' : 'Face ID';
   return `
   <div class="content auth-content" style="padding-top:110px">
     <div style="text-align:center;margin-bottom:22px">
       <div class="display" style="font-size:22px;font-weight:700">${esc(S.settings.companyName||'Ledger')}</div>
       <div class="tiny muted">Sign in to continue</div>
     </div>
-    ${rememberedUser?`
-    <div class="faceid-wrap" id="faceidWrap" onclick="requestFaceIDLogin()">
+    ${showBiometric?`
+    <div class="faceid-wrap" id="faceidWrap" onclick="requestBiometricLogin()">
       <div class="faceid-frame idle" id="faceidBadge">
         <svg class="faceid-svg" viewBox="0 0 100 100" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
           <path class="fi-corner fi-tl" pathLength="1" d="M18,34 L18,20 Q18,18 20,18 L34,18"/>
           <path class="fi-corner fi-tr" pathLength="1" d="M66,18 L80,18 Q82,18 82,20 L82,34"/>
           <path class="fi-corner fi-bl" pathLength="1" d="M18,66 L18,80 Q18,82 20,82 L34,82"/>
           <path class="fi-corner fi-br" pathLength="1" d="M82,66 L82,80 Q82,82 80,82 L66,82"/>
+          ${kind==='touch' ? `
+          <g class="fi-face">
+            <path class="fi-mouth" pathLength="1" d="M32,30 Q50,20 68,30"/>
+            <path class="fi-mouth" pathLength="1" d="M26,42 Q50,26 74,42"/>
+            <path class="fi-mouth" pathLength="1" d="M24,56 Q50,34 76,56"/>
+            <path class="fi-mouth" pathLength="1" d="M28,70 Q50,44 72,70"/>
+          </g>` : `
           <g class="fi-face">
             <circle class="fi-eye" cx="38" cy="45" r="3.4"/>
             <circle class="fi-eye" cx="62" cy="45" r="3.4"/>
             <path class="fi-mouth" pathLength="1" stroke-width="4.5" d="M36,60 Q50,68 64,60"/>
-          </g>
+          </g>`}
           <path class="fi-check" pathLength="1" stroke-width="7" d="M30,52 L44,66 L72,36"/>
           <line class="fi-scanline" x1="15" y1="30" x2="85" y2="30" stroke-width="3"/>
         </svg>
       </div>
       <div class="faceid-label">Welcome back, ${esc(rememberedUser.name)}</div>
-      <div class="faceid-sub" id="faceidSub">Tap to unlock with Face ID</div>
+      <div class="faceid-sub" id="faceidSub">Tap to unlock with ${biometricLabel}</div>
     </div>
     <div class="faceid-divider">or sign in with username &amp; PIN</div>`:''}
     <div class="card">
@@ -2082,11 +2111,15 @@ function renderProjectDocsSection(p, canManage){
     <button class="btn btn-ghost btn-block" ${uploading?'disabled':''} onclick="document.getElementById('projectDocInput').click()">${ic('download')} ${uploading?'Uploading…':'Upload document / certificate'}</button>`:''}`;
 }
 
-/* ---------- FACE ID (native app shell only — no-ops in a plain browser) ----------
-   The native iOS wrapper calls window.__faceIDUnlock() after Face ID succeeds,
-   or window.__faceIDFailed() if it fails/is cancelled. requestFaceIDLogin() asks
-   the native shell (via a WKScriptMessageHandler) to trigger the Face ID prompt,
-   and drives the scan/success/error animation on the badge while it waits. */
+/* ---------- FACE ID / TOUCH ID ----------
+   In the native iOS wrapper, the shell calls window.__faceIDUnlock() after Face
+   ID succeeds, or window.__faceIDFailed() if it fails/is cancelled — triggered
+   by requestBiometricLogin() asking the native shell (via a WKScriptMessageHandler)
+   to show the Face ID prompt. On a desktop browser there's no such bridge, so
+   requestBiometricLogin() instead runs a WebAuthn platform-authenticator (Touch
+   ID / Windows Hello) assertion against the credential enrolled via
+   enableTouchID() (More page). Either path drives the same scan/success/error
+   animation on the badge and finishes through __faceIDUnlock(). */
 function __faceIDUnlock(){
   const rid = rememberedUserId();
   if(!rid) return false;
@@ -2120,18 +2153,79 @@ function __faceIDFailed(message){
   if(sub){ sub.textContent = message || 'Face ID failed — tap to try again'; sub.classList.add('error'); }
 }
 window.__faceIDFailed = __faceIDFailed;
-function requestFaceIDLogin(){
+function requestBiometricLogin(){
   const badge = document.getElementById('faceidBadge');
   const sub = document.getElementById('faceidSub');
   if(badge){ badge.classList.remove('idle','failed'); badge.classList.add('scanning'); }
   if(sub){ sub.textContent='Scanning…'; sub.classList.remove('error'); }
+  if(isWrappedApp()){
+    try{
+      if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.faceID){
+        window.webkit.messageHandlers.faceID.postMessage('unlock');
+      } else {
+        setTimeout(()=>__faceIDFailed('Face ID isn’t available in this browser — use the iOS app.'), 500);
+      }
+    }catch(e){ __faceIDFailed('Face ID isn’t available here.'); }
+    return;
+  }
+  requestTouchIDLogin();
+}
+// base64 <-> ArrayBuffer, for storing/replaying a WebAuthn credential id as plain text.
+function bufToB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64ToBuf(b64){ const bin=atob(b64); const bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); return bytes.buffer; }
+async function requestTouchIDLogin(){
+  const rid = rememberedUserId();
+  const user = rid ? S.users.find(u=>u.id===rid) : null;
+  if(!user || !user.webauthnCredentialId){ __faceIDFailed('Touch ID isn’t set up — sign in with your PIN.'); return; }
   try{
-    if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.faceID){
-      window.webkit.messageHandlers.faceID.postMessage('unlock');
-    } else {
-      setTimeout(()=>__faceIDFailed('Face ID isn’t available in this browser — use the iOS app.'), 500);
-    }
-  }catch(e){ __faceIDFailed('Face ID isn’t available here.'); }
+    await navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: b64ToBuf(user.webauthnCredentialId), type:'public-key' }],
+        userVerification: 'required',
+        timeout: 60000,
+      }
+    });
+    __faceIDUnlock();
+  }catch(e){
+    console.error('Touch ID unlock failed', e);
+    __faceIDFailed('Touch ID failed — tap to try again');
+  }
+}
+// Enrolls this device's Touch ID / Windows Hello as a sign-in method for the
+// current user (More page). Only the credential id is stored — WebAuthn keeps
+// the actual private key inside the platform authenticator, never exposed to us.
+async function enableTouchID(){
+  if(!PLATFORM_AUTH_AVAILABLE){ toast('Touch ID isn’t available on this device or browser'); return; }
+  const user = S.users.find(u=>u.id===CURRENT_USER.id);
+  if(!user) return;
+  try{
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: S.settings.companyName || 'Ledger' },
+        user: { id: new TextEncoder().encode(user.id), name: user.username, displayName: user.name },
+        pubKeyCredParams: [{ type:'public-key', alg:-7 }, { type:'public-key', alg:-257 }],
+        authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required' },
+        timeout: 60000,
+      }
+    });
+    user.webauthnCredentialId = bufToB64(cred.rawId);
+    await persist('users');
+    toast('Touch ID enabled');
+    render();
+  }catch(e){
+    console.error('Touch ID enrollment failed', e);
+    toast('Could not set up Touch ID — try again');
+  }
+}
+function disableTouchID(){
+  const user = S.users.find(u=>u.id===CURRENT_USER.id);
+  if(!user) return;
+  delete user.webauthnCredentialId;
+  persist('users');
+  toast('Touch ID turned off');
+  render();
 }
 
 /* ---------- PUSH NOTIFICATIONS (native app shell only — no-ops in a plain browser) ----------
@@ -5089,6 +5183,18 @@ function renderMore(){
         <button class="btn btn-ghost btn-sm" onclick="logout()">Log out</button>
       </div>
     </div>
+    ${biometricKind()==='touch' ? (()=>{
+      const hasTouchID = !!(S.users.find(u=>u.id===CURRENT_USER.id)||{}).webauthnCredentialId;
+      return `<div class="card">
+      <div class="toggle-row" style="border-bottom:none;padding:0">
+        <div>
+          <div class="small" style="font-weight:600">Touch ID sign-in</div>
+          <div class="tiny muted">${hasTouchID?'Enabled on this device':'Sign in faster without typing your PIN'}</div>
+        </div>
+        ${hasTouchID?`<button class="btn btn-ghost btn-sm" onclick="disableTouchID()">Turn off</button>`:`<button class="btn btn-primary btn-sm" onclick="enableTouchID()">Set up</button>`}
+      </div>
+    </div>`;
+    })() : ''}
     <div class="card" style="padding:0;overflow:hidden">
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('chat')">
         <div class="small" style="font-weight:600">Team chat</div>${ic('chev')}
