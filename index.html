@@ -709,7 +709,9 @@ function setDarkMode(on){
   DARK_MODE = !!on;
   document.documentElement.setAttribute('data-theme', DARK_MODE?'dark':'light');
   try{ localStorage.setItem('theme', DARK_MODE?'dark':'light'); }catch(e){}
+  render();
 }
+function toggleDarkMode(){ setDarkMode(!DARK_MODE); }
 /* ---------- DESKTOP SIDEBAR collapse state ---------- */
 let DS_COLLAPSED = false;
 try{ DS_COLLAPSED = localStorage.getItem('sidebarCollapsed')==='1'; }catch(e){}
@@ -745,6 +747,8 @@ const ICO = {
   file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>',
   eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
   camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>',
+  sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
 };
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
@@ -5028,7 +5032,7 @@ function renderReports(){
 /* ---------- MORE / SETTINGS ---------- */
 function renderMore(){
   return `
-  ${topbar('More','Settings & tools')}
+  ${topbar('More','Settings & tools', false, `<button class="icon-btn" onclick="toggleDarkMode()" title="${DARK_MODE?'Switch to light mode':'Switch to dark mode'}">${ic(DARK_MODE?'sun':'moon')}</button>`)}
   <div class="content">
     <div class="card">
       <div class="row-between">
@@ -5037,12 +5041,6 @@ function renderMore(){
           <div class="tiny muted">@${esc(CURRENT_USER.username)} · ${CURRENT_USER.role==='admin'?'Admin':'Staff'}</div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="logout()">Log out</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="toggle-row" style="border-bottom:none;padding:0">
-        <div class="small" style="font-weight:600">Dark mode</div>
-        <label class="switch"><input type="checkbox" ${DARK_MODE?'checked':''} onchange="setDarkMode(this.checked)"><span class="slider"></span></label>
       </div>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
