@@ -807,14 +807,14 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos','supplierChats','supplierChatReads'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ', rfqPrefix:'RFQ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1, rfqNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[] };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{} };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
@@ -827,6 +827,10 @@ let CLIENT_CHAT_DRAFT='';
 let CLIENT_CHAT_INPUT_WAS_FOCUSED=false;
 let CLIENT_CHAT_REPLY_DRAFT='';
 let CLIENT_CHAT_REPLY_WAS_FOCUSED=false;
+let SUPPLIER_CHAT_DRAFT='';
+let SUPPLIER_CHAT_INPUT_WAS_FOCUSED=false;
+let SUPPLIER_CHAT_REPLY_DRAFT='';
+let SUPPLIER_CHAT_REPLY_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
 let CURRENT_USER=null; // {id,name,username,role} — session only, not persisted
 let AUTH_ERR='';
@@ -2528,11 +2532,20 @@ function render(){
   // submit their prices, nothing else of the app is reachable
   if(CURRENT_USER.role==='supplier'){
     app.className='client-portal';
+    SUPPLIER_CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='supplierChatInput';
     app.innerHTML = VIEW.name==='supplier-rfq' ? renderSupplierRfqForm(VIEW.params.id)
       : VIEW.name==='supplier-purchase-view' ? renderSupplierPurchaseView(VIEW.params.id)
       : renderSupplierPortal();
     sidebar.innerHTML=renderPortalSidebar();
     sidebar.classList.toggle('collapsed', DS_COLLAPSED);
+    const supScroller = document.getElementById('supplierChatScroll');
+    if(supScroller) supScroller.scrollIntoView({block:'end'});
+    const supInput = document.getElementById('supplierChatInput');
+    if(supInput && SUPPLIER_CHAT_INPUT_WAS_FOCUSED){
+      supInput.focus();
+      const len = supInput.value.length;
+      supInput.setSelectionRange(len,len);
+    }
     return;
   }
   app.className='';
@@ -2568,6 +2581,8 @@ function render(){
     case 'chat': body = renderChat(); break;
     case 'client-chats': body = renderClientChatList(); break;
     case 'client-chat': body = renderClientChatThread(VIEW.params.customer); break;
+    case 'supplier-chats': body = renderSupplierChatList(); break;
+    case 'supplier-chat': body = renderSupplierChatThread(VIEW.params.supplier); break;
     case 'rfq-form': body = renderRfqForm(VIEW.params.id); break;
     case 'rfq-view': body = renderRfqView(VIEW.params.id); break;
     case 'todos': body = renderTodos(); break;
@@ -2575,6 +2590,7 @@ function render(){
   }
   CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='chatInput';
   CLIENT_CHAT_REPLY_WAS_FOCUSED = document.activeElement && document.activeElement.id==='clientChatReplyInput';
+  SUPPLIER_CHAT_REPLY_WAS_FOCUSED = document.activeElement && document.activeElement.id==='supplierChatReplyInput';
   app.innerHTML = noStorageBanner() + body + renderTabbar();
   sidebar.className = 'desktop-sidebar' + (DS_COLLAPSED?' collapsed':'');
   sidebar.innerHTML = renderSidebar();
@@ -2624,6 +2640,7 @@ const TAB_SECTIONS={
   'reports':'more',
   'chat':'more',
   'client-chats':'more','client-chat':'more',
+  'supplier-chats':'more','supplier-chat':'more',
   'todos':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
@@ -2703,6 +2720,7 @@ function portalNavItems(){
     ['p-rfqs','reports','Requests for quotation'],
     ['p-pos','cart','Purchase orders'],
     ['p-documents','file','Documents'],
+    ['p-messages','chat','Messages'],
   ];
 }
 function portalGoTo(sectionId){
@@ -2758,6 +2776,7 @@ function commandPaletteItems(){
     {label:'Projects', icon:'box', action:()=>switchTab('projects')},
     {label:'Team chat', icon:'chat', action:()=>openChatFromSidebar()},
     {label:'Client messages', icon:'chat', action:()=>{switchTab('more');goPush('client-chats');}},
+    {label:'Supplier messages', icon:'chat', action:()=>{switchTab('more');goPush('supplier-chats');}},
     {label:'To-Do list', icon:'todo', action:()=>{switchTab('more');goPush('todos');}},
     {label:'Reports', icon:'reports', action:()=>openReportsFromSidebar()},
     {label:'More & settings', icon:'more', action:()=>switchTab('more')},
@@ -4640,6 +4659,9 @@ function renderSupplierPortal(){
   const rfqs = [...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const myQuotes = (S.supplierQuotes||[]).filter(q=>q.supplierName===supplierName);
   const myPurchases = S.purchases.filter(p=>p.supplier===supplierName).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const supplierChatMsgs = (S.supplierChats && S.supplierChats[supplierName]) || [];
+  markSupplierChatRead(supplierName,'supplier');
+  const supplierChatSeenLabel = supplierThreadSeenLabel(supplierName, supplierChatMsgs, 'supplier');
   return `
   ${topbar(S.settings.companyName||'Ledger', `Supplier portal — ${supplierName}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
@@ -4679,7 +4701,41 @@ function renderSupplierPortal(){
       }).join('')}
 
     ${renderSupplierDocsSection(myPurchases)}
+
+    <div class="section-title" id="p-messages">Messages</div>
+    <div class="card">
+      ${supplierChatMsgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">Send us a message and we'll reply here.</div>` :
+        `<div id="supplierChatScroll">${supplierChatMsgs.map((m,idx)=>{
+          const mine = m.from==='supplier';
+          const showSeen = mine && idx===supplierChatMsgs.length-1 && supplierChatSeenLabel;
+          return `<div class="chat-msg ${mine?'mine':''}">
+            ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+            <div class="chat-bubble-wrap">
+              ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
+              <div class="chat-bubble">${esc(m.text)}</div>
+              <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(supplierChatSeenLabel):''}</div>
+            </div>
+          </div>`;
+        }).join('')}</div>`}
+      <div class="chat-composer">
+        <input id="supplierChatInput" placeholder="Message us…" value="${esc(SUPPLIER_CHAT_DRAFT)}" oninput="SUPPLIER_CHAT_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendSupplierChatMessage();}">
+        <button class="chat-send" onclick="sendSupplierChatMessage()">${ic('check')}</button>
+      </div>
+    </div>
   </div>`;
+}
+function sendSupplierChatMessage(){
+  const input = document.getElementById('supplierChatInput');
+  const text = (input?input.value:SUPPLIER_CHAT_DRAFT).trim();
+  if(!text) return;
+  const supplierName = CURRENT_USER.supplierName;
+  if(!S.supplierChats) S.supplierChats={};
+  if(!S.supplierChats[supplierName]) S.supplierChats[supplierName]=[];
+  S.supplierChats[supplierName].push({id:uid(), ts:Date.now(), from:'supplier', authorName:CURRENT_USER.name, text});
+  if(S.supplierChats[supplierName].length>500) S.supplierChats[supplierName]=S.supplierChats[supplierName].slice(-500);
+  SUPPLIER_CHAT_DRAFT='';
+  persist('supplierChats');
+  render();
 }
 function renderSupplierPurchaseView(id){
   const supplierName = CURRENT_USER.supplierName;
@@ -5574,6 +5630,9 @@ function renderMore(){
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('client-chats')">
         <div class="small" style="font-weight:600">Client messages</div>${ic('chev')}
       </div>
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('supplier-chats')">
+        <div class="small" style="font-weight:600">Supplier messages</div>${ic('chev')}
+      </div>
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('todos')">
         <div class="small" style="font-weight:600">To-Do list</div>
         <div style="display:flex;align-items:center;gap:8px">
@@ -5862,6 +5921,85 @@ function sendClientChatReply(customer){
   persist('clientChats');
   render();
 }
+/* ---------- SUPPLIER MESSAGES (staff/admin side) — same private-thread pattern as
+   client messages above, one thread per supplier, keyed in S.supplierChats. ---------- */
+function renderSupplierChatList(){
+  const suppliers = new Set();
+  S.users.filter(u=>u.role==='supplier' && u.supplierName).forEach(u=>suppliers.add(u.supplierName));
+  Object.keys(S.supplierChats||{}).forEach(c=>{ if((S.supplierChats[c]||[]).length) suppliers.add(c); });
+  const rows = [...suppliers].map(c=>{
+    const msgs=(S.supplierChats&&S.supplierChats[c])||[];
+    return {supplier:c, last: msgs.length?msgs[msgs.length-1]:null};
+  }).sort((a,b)=>(b.last?b.last.ts:0)-(a.last?a.last.ts:0));
+  return `
+  ${topbar('Supplier messages','One private thread per supplier', true)}
+  <div class="content">
+    ${rows.length===0? emptyState('chat','No supplier accounts yet','Add a supplier from Team & logins to start messaging them.') :
+      rows.map(r=>`<div class="card row-between" onclick="goPush('supplier-chat',{supplier:'${onclickStr(r.supplier)}'})">
+        <div style="min-width:0;flex:1">
+          <div class="small" style="font-weight:600">${esc(r.supplier)}</div>
+          <div class="tiny muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${r.last?esc(r.last.text):'No messages yet'}</div>
+        </div>
+        ${r.last?`<div class="tiny mono muted" style="flex-shrink:0;margin-left:8px">${fmtLogTime(r.last.ts)}</div>`:''}
+      </div>`).join('')}
+  </div>`;
+}
+function renderSupplierChatThread(supplier){
+  const msgs = (S.supplierChats && S.supplierChats[supplier]) || [];
+  markSupplierChatRead(supplier,'staff');
+  const seenLabel = supplierThreadSeenLabel(supplier, msgs, 'staff');
+  return `
+  ${topbar(supplier,'Private conversation', true)}
+  <div class="content">
+    ${msgs.length===0? emptyState('chat','No messages yet','Send the first message below.') :
+      `<div id="chatScroll">${msgs.map((m,idx)=>{
+        const mine = m.from==='staff';
+        const showSeen = mine && idx===msgs.length-1 && seenLabel;
+        return `<div class="chat-msg ${mine?'mine':''}">
+          ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+          <div class="chat-bubble-wrap">
+            ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
+            <div class="chat-bubble">${esc(m.text)}</div>
+            <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(seenLabel):''}</div>
+          </div>
+        </div>`;
+      }).join('')}</div>`}
+    <div class="chat-composer">
+      <input id="supplierChatReplyInput" placeholder="Reply to ${esc(supplier)}…" value="${esc(SUPPLIER_CHAT_REPLY_DRAFT)}" oninput="SUPPLIER_CHAT_REPLY_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendSupplierChatReply('${onclickStr(supplier)}');}">
+      <button class="chat-send" onclick="sendSupplierChatReply('${onclickStr(supplier)}')">${ic('check')}</button>
+    </div>
+  </div>`;
+}
+function markSupplierChatRead(supplier, side){
+  const msgs = (S.supplierChats && S.supplierChats[supplier]) || [];
+  if(msgs.length===0) return;
+  const lastTs = msgs[msgs.length-1].ts;
+  if(!S.supplierChatReads) S.supplierChatReads={};
+  if(!S.supplierChatReads[supplier]) S.supplierChatReads[supplier]={};
+  if((S.supplierChatReads[supplier][side]||0) >= lastTs) return;
+  S.supplierChatReads[supplier][side]=lastTs;
+  persist('supplierChatReads');
+}
+function supplierThreadSeenLabel(supplier, msgs, viewerSide){
+  if(msgs.length===0) return '';
+  const last = msgs[msgs.length-1];
+  if(last.from!==viewerSide) return '';
+  const reads = (S.supplierChatReads && S.supplierChatReads[supplier]) || {};
+  const otherSide = viewerSide==='staff'?'supplier':'staff';
+  return (reads[otherSide]||0) >= last.ts ? 'Seen' : '';
+}
+function sendSupplierChatReply(supplier){
+  const input = document.getElementById('supplierChatReplyInput');
+  const text = (input?input.value:SUPPLIER_CHAT_REPLY_DRAFT).trim();
+  if(!text) return;
+  if(!S.supplierChats) S.supplierChats={};
+  if(!S.supplierChats[supplier]) S.supplierChats[supplier]=[];
+  S.supplierChats[supplier].push({id:uid(), ts:Date.now(), from:'staff', authorName:CURRENT_USER.name, text});
+  if(S.supplierChats[supplier].length>500) S.supplierChats[supplier]=S.supplierChats[supplier].slice(-500);
+  SUPPLIER_CHAT_REPLY_DRAFT='';
+  persist('supplierChats');
+  render();
+}
 let TEAM_EDIT_ID = null;
 function editTeamMember(id){ TEAM_EDIT_ID=id; render(); }
 function cancelTeamEdit(){ TEAM_EDIT_ID=null; render(); }
@@ -6000,7 +6138,7 @@ function renderSettingsForm(){
     <button class="btn btn-primary btn-block" onclick="saveSettings()">${ic('check')} Save settings</button>
     <div class="card" style="margin-top:14px">
       <label>Danger zone</label>
-      <div class="tiny muted" style="margin-bottom:10px">Permanently deletes every Team chat message and every client conversation, for all customers. Use this to wipe out test messages before going live — it can't be undone.</div>
+      <div class="tiny muted" style="margin-bottom:10px">Permanently deletes every Team chat message and every client or supplier conversation. Use this to wipe out test messages before going live — it can't be undone.</div>
       <button class="btn btn-danger btn-block" onclick="clearAllChats()">${ic('trash')} Clear all chat messages</button>
     </div>
   </div>`;
@@ -6012,11 +6150,15 @@ function clearAllChats(){
     S.clientChats={};
     S.chatReads={};
     S.clientChatReads={};
+    S.supplierChats={};
+    S.supplierChatReads={};
     await persist('chat');
     await persist('clientChats');
     await persist('chatReads');
     await persist('clientChatReads');
-    logActivity('Cleared all Team chat and client message history');
+    await persist('supplierChats');
+    await persist('supplierChatReads');
+    logActivity('Cleared all Team chat, client, and supplier message history');
     toast('All chat messages cleared');
     goBack();
   });
@@ -6141,6 +6283,16 @@ function afterRender(){
     if(scroller) scroller.scrollIntoView({block:'end'});
     const input = document.getElementById('clientChatReplyInput');
     if(input && CLIENT_CHAT_REPLY_WAS_FOCUSED){
+      input.focus();
+      const len = input.value.length;
+      input.setSelectionRange(len,len);
+    }
+  }
+  if(VIEW.name==='supplier-chat'){
+    const scroller = document.getElementById('chatScroll');
+    if(scroller) scroller.scrollIntoView({block:'end'});
+    const input = document.getElementById('supplierChatReplyInput');
+    if(input && SUPPLIER_CHAT_REPLY_WAS_FOCUSED){
       input.focus();
       const len = input.value.length;
       input.setSelectionRange(len,len);

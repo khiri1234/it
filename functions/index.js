@@ -52,6 +52,29 @@ exports.notifyOnClientMessage = onDocumentWritten("ledger/clientChats", async (e
   }
 });
 
+// Supplier <-> staff chat: same pattern as the client thread above, keyed by supplier name.
+exports.notifyOnSupplierMessage = onDocumentWritten("ledger/supplierChats", async (event) => {
+  const beforeChats = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || {};
+  const afterChats = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterChats) return;
+
+  for (const supplier of Object.keys(afterChats)) {
+    const beforeMsgs = beforeChats[supplier] || [];
+    const afterMsgs = afterChats[supplier] || [];
+    if (afterMsgs.length <= beforeMsgs.length) continue;
+
+    const newMsgs = afterMsgs.slice(beforeMsgs.length);
+    for (const msg of newMsgs) {
+      const body = String(msg.text || "").slice(0, 150) || "(no message)";
+      if (msg.from === "supplier") {
+        await sendPush("staff", `New message from ${supplier}`, body);
+      } else if (msg.from === "staff") {
+        await sendPush(`supplier_${slugifyTopic(supplier)}`, `New message from ${msg.authorName || "the team"}`, body);
+      }
+    }
+  }
+});
+
 // Team chat: notify all staff whenever anyone posts.
 exports.notifyOnTeamChatMessage = onDocumentWritten("ledger/chat", async (event) => {
   const beforeMsgs = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
