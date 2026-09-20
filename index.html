@@ -2041,9 +2041,10 @@ function renderClientPortal(){
             <div class="small">${fmtMoney(pay.amount)}</div>
             <div class="tiny mono muted">${fmtDate(pay.date)}</div>
           </div>`).join('')}` : ''}
-        </div>
-        ${renderProjectDocsSection(p, false)}`;
+        </div>`;
       }).join('')}
+
+    ${renderClientDocsSection(projects)}
 
     <div class="section-title" id="p-docs">Invoices &amp; quotes</div>
     ${docs.length===0? `<div class="card"><div class="tiny muted">Nothing issued to you yet.</div></div>` :
@@ -2246,6 +2247,31 @@ function removeProjectDoc(projectId, docId){
     toast('Removed');
     render();
   });
+}
+/* Every file across the client's projects in one place, newest first. The client
+   portal renders one of these instead of a per-project block under each project —
+   which also stops #projectDocsSection appearing several times in the same page. */
+function renderClientDocsSection(projects){
+  const files = [];
+  projects.forEach(p=>(p.docs||[]).forEach(d=>files.push({...d, projectName:p.name, projectNumber:p.number})));
+  files.sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
+  return `
+    <div class="section-title" id="p-documents">Documents</div>
+    ${files.length===0? `<div class="card"><div class="tiny muted">No documents shared with you yet.</div></div>` :
+      files.map(d=>{
+        const isPdf=(d.type||'')==='application/pdf';
+        return `<div class="card" style="margin-bottom:8px">
+          <div style="min-width:0;flex:1;display:flex;align-items:center;gap:10px">
+            <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
+            <div style="min-width:0">
+              <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
+              <div class="tiny muted">${esc(d.projectNumber||'')}${d.projectName?` · ${esc(d.projectName)}`:''}</div>
+              <div class="tiny muted">${fmtFileSize(d.size)}${d.uploadedAt?` · ${fmtDate(new Date(d.uploadedAt).toISOString().slice(0,10))}`:''}</div>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="viewProjectDoc('${onclickStr(d.url)}','${onclickStr(d.name)}','${onclickStr(d.type||'')}')">${ic('download')} View / download${isPdf?' PDF':''}</button>
+        </div>`;
+      }).join('')}`;
 }
 function renderProjectDocsSection(p, canManage){
   const docs = p.docs||[];
@@ -2656,6 +2682,7 @@ const PORTAL_SUBVIEWS = ['supplier-rfq','supplier-purchase-view'];
 function portalNavItems(){
   if(CURRENT_USER.role==='client') return [
     ['p-projects','box','Projects'],
+    ['p-documents','file','Documents'],
     ['p-docs','sales','Invoices & quotes'],
     ['p-messages','chat','Messages'],
   ];
