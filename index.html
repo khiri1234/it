@@ -889,7 +889,31 @@ const FIREBASE_CONFIG = {
 */
 let FIREBASE_ENABLED=false, fbDB=null, fbAuth=null, fbStorage=null;
 
-let STORAGE_MODE='builtin'; // 'firebase' | 'builtin' | 'none' | 'error'
+let STORAGE_MODE='loading'; // 'loading' | 'firebase' | 'builtin' | 'none' | 'error'
+/* The Firebase SDK comes from four <script src> tags. On a phone with a slow link they
+   can still be in flight when this runs, and treating that as "Firebase is broken" is
+   what turned a slow launch into a dead-end screen. Wait for them instead. */
+function firebaseSdkReady(){ return typeof firebase!=='undefined' && !!firebase.initializeApp; }
+async function waitForFirebaseSdk(maxMs=20000){
+  const started=Date.now();
+  while(!firebaseSdkReady()){
+    if(Date.now()-started>maxMs) return false;
+    await new Promise(r=>setTimeout(r,150));
+  }
+  return true;
+}
+/* A launch that can't reach the database retries on its own, with backoff, instead of
+   stranding the app behind a button nobody is there to press. */
+let LOAD_RETRY_TIMER=null, LOAD_RETRIES=0;
+function failLoad(reason){
+  console.error('load failed:', reason);
+  STORAGE_MODE='error';
+  render();
+  if(LOAD_RETRY_TIMER) clearTimeout(LOAD_RETRY_TIMER);
+  const delay = Math.min(2000 * Math.pow(2, LOAD_RETRIES), 15000);
+  LOAD_RETRIES++;
+  LOAD_RETRY_TIMER = setTimeout(()=>{ loadAll(); }, delay);
+}
 function initFirebaseAuth(){
   return new Promise((resolve)=>{
     let settled=false;
@@ -906,9 +930,12 @@ function initFirebaseAuth(){
   });
 }
 async function loadAll(){
+  if(LOAD_RETRY_TIMER){ clearTimeout(LOAD_RETRY_TIMER); LOAD_RETRY_TIMER=null; }
   if(FIREBASE_CONFIG){
+    if(STORAGE_MODE!=='firebase') STORAGE_MODE='loading';
     try{
-      firebase.initializeApp(FIREBASE_CONFIG);
+      if(!firebaseSdkReady() && !(await waitForFirebaseSdk())) return failLoad('Firebase SDK never loaded');
+      if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       fbDB = firebase.firestore();
       fbAuth = firebase.auth();
       const ok = await initFirebaseAuth();
@@ -917,17 +944,13 @@ async function loadAll(){
         try{ fbStorage = firebase.storage(); }catch(e){ console.error('firebase storage init failed (attachments will be disabled)',e); }
       } else {
         // Firebase IS configured but unreachable right now — never fall through to a
-        // "no data" state that could look like a fresh setup. Show a clear retry screen instead.
-        STORAGE_MODE='error';
-        render();
-        return;
+        // "no data" state that could look like a fresh setup.
+        return failLoad('anonymous sign-in did not complete');
       }
     }catch(e){
-      console.error('Firebase init failed',e);
-      STORAGE_MODE='error';
-      render();
-      return;
+      return failLoad(e);
     }
+    if(!FIREBASE_ENABLED) return failLoad('Firebase configured but not enabled');
   }
 
   let usersLoadFailed = false;
@@ -945,6 +968,12 @@ async function loadAll(){
         if(snap.exists && snap.data().json) S[k]=JSON.parse(snap.data().json);
       }catch(e){ console.error('firestore read failed',k,e); if(k==='users') usersLoadFailed=true; }
     }));
+  } else if(FIREBASE_CONFIG){
+    // Unreachable by design: with Firebase configured, the block above either enables it
+    // or returns through failLoad(). Falling through to the built-in store here is what
+    // produced a "builtin · users 0" launch — an empty local bridge standing in for a
+    // team that actually lives in Firestore. Never let that happen silently.
+    return failLoad('Firebase configured but load fell through to built-in storage');
   } else if(typeof window.storage === 'undefined' || !window.storage){
     // No Claude storage bridge available (e.g. opened as a plain downloaded file, or outside claude.ai)
     STORAGE_MODE='none';
@@ -959,11 +988,8 @@ async function loadAll(){
   if(usersLoadFailed){
     // Couldn't confirm whether a team already exists (e.g. a flaky connection dropped
     // just this one read) — never fall through to "Set up Ledger" on a failed read, since
-    // creating a new admin account there would overwrite the real team's data. Show the
-    // same retry screen used for an outright connection failure instead.
-    STORAGE_MODE='error';
-    render();
-    return;
+    // creating a new admin account there would overwrite the real team's data.
+    return failLoad('users read failed');
   }
   if(S.users && S.users.length) markTeamSeen();
   if(FIREBASE_ENABLED && (!S.users || S.users.length===0) &&
@@ -973,15 +999,14 @@ async function loadAll(){
     // EVERYTHING empty. So this is an anomalous read, not a first run. Stop here rather
     // than letting anything run against an empty in-memory team (a persist() from this
     // state is what would actually overwrite the real data).
-    STORAGE_MODE='error';
-    render();
-    return;
+    return failLoad('users came back empty but this is not a fresh ledger');
   }
+  LOAD_RETRIES = 0;
   if(!S.settings || !S.settings.companyName) S.settings = {...DEFAULT_SETTINGS, ...(S.settings||{})};
   render();
 
   if(FIREBASE_ENABLED){ attachFirestoreListeners(); }
-  else if(STORAGE_MODE!=='none'){ startSync(); }
+  else if(STORAGE_MODE!=='none' && STORAGE_MODE!=='loading'){ startSync(); }
 }
 const FORM_VIEWS=['invoice-form','quote-form','item-form','purchase-form','settings-form','team-form','bulk-payment','project-form','inventory-import','rfq-form'];
 
@@ -1019,7 +1044,12 @@ function startSync(){
   syncTimer = setInterval(syncPull, 6000);
 }
 async function syncPull(){
-  if(STORAGE_MODE==='none' || syncing || FORM_VIEWS.includes(VIEW.name)) return;
+  // Legacy polling path for the built-in store only. With Firebase configured, the
+  // realtime listeners own the data — letting this run (it fires on every focus and
+  // visibilitychange, including while sign-in is still pending at launch) would let an
+  // empty local bridge write over a team that lives in Firestore.
+  if(FIREBASE_CONFIG || STORAGE_MODE==='none' || STORAGE_MODE==='loading' || STORAGE_MODE==='error') return;
+  if(syncing || FORM_VIEWS.includes(VIEW.name)) return;
   syncing = true;
   const onAuthScreen = !CURRENT_USER; // setup or login — never yank the form out from under typing
   try{
@@ -2399,13 +2429,19 @@ function noStorageBanner(){
     ${ic('alert')} Nothing will be saved — open this from the Claude conversation, or set up Firebase for standalone hosting.
   </div>`;
 }
+function renderLoading(){
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px;padding:24px;text-align:center">
+    <div class="spinner" style="width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite"></div>
+    <div class="small muted">Loading your ledger…</div>
+  </div>`;
+}
 function renderConnectionError(){
   return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px;padding:24px;text-align:center">
     <span style="color:var(--red);width:40px;height:40px">${ic('alert')}</span>
     <div style="font-family:'Space Grotesk';font-weight:700;font-size:18px">Can't connect right now</div>
-    <div class="small muted" style="max-width:320px">Couldn't reach the database. This is usually a slow or blocked connection — it does NOT mean your data is gone. Check your internet connection and try again.</div>
-    <button class="btn btn-primary" onclick="location.reload()">${ic('check')} Retry</button>
-    <div class="tiny muted" style="opacity:.6;margin-top:4px">${esc(STORAGE_MODE)} · users ${S.users?S.users.length:0} · inv ${S.invoices.length} · items ${S.inventory.length} · prj ${S.projects.length}</div>
+    <div class="small muted" style="max-width:320px">Couldn't reach the database. This is usually a slow or blocked connection — it does NOT mean your data is gone. Retrying automatically…</div>
+    <button class="btn btn-primary" onclick="loadAll()">${ic('check')} Retry now</button>
+    <div class="tiny muted" style="opacity:.6;margin-top:4px">${esc(STORAGE_MODE)} · users ${S.users?S.users.length:0} · inv ${S.invoices.length} · items ${S.inventory.length} · prj ${S.projects.length} · try ${LOAD_RETRIES}</div>
   </div>`;
 }
 function render(){
@@ -2413,6 +2449,7 @@ function render(){
   document.body.classList.toggle('role-readonly', isReadOnly());
   const app = document.getElementById('app');
   const sidebar = document.getElementById('desktopSidebar');
+  if(STORAGE_MODE==='loading'){ app.className=''; app.innerHTML = renderLoading(); sidebar.innerHTML=''; return; }
   if(STORAGE_MODE==='error'){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
   if(!S.users || S.users.length===0){
     // A device that has already used a real team must never be shown the first-run
