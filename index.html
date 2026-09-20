@@ -575,10 +575,13 @@
     .desktop-sidebar.collapsed:not(:empty) ~ #app{margin-left:82px;}
     .desktop-sidebar:not(:empty) ~ #app .tabbar{display:none !important;}
     .desktop-sidebar:not(:empty) ~ #app .fab{right:32px;bottom:32px;}
-    /* client portal has no sidebar at all — still needs to escape the 520px mobile
-       #app cap, just with a narrower centered reading column than the admin/staff app */
+    /* the client/supplier portals escape the 520px mobile #app cap with a narrower
+       centered reading column than the admin/staff app; when their own sidebar is
+       present the column clears it, same as the staff shell */
     #app.client-portal{max-width:none;margin:0;padding-bottom:0;min-height:100vh;background:var(--bg);}
     #app.client-portal .content{max-width:760px;padding-top:28px;padding-bottom:40px;}
+    .desktop-sidebar:not(:empty) ~ #app.client-portal{margin-left:248px;transition:margin-left .22s cubic-bezier(.4,0,.2,1);}
+    .desktop-sidebar.collapsed:not(:empty) ~ #app.client-portal{margin-left:82px;}
     /* login / first-run setup / connection-error — no sidebar, not a portal —
        become a single floating glass card centered over the mesh */
     .desktop-sidebar:empty ~ #app:not(.client-portal){
@@ -654,6 +657,8 @@
     .desktop-sidebar{--ds-w:264px;}
     .desktop-sidebar:not(:empty) ~ #app{margin-left:264px;}
     .desktop-sidebar.collapsed:not(:empty) ~ #app{margin-left:82px;}
+    .desktop-sidebar:not(:empty) ~ #app.client-portal{margin-left:264px;}
+    .desktop-sidebar.collapsed:not(:empty) ~ #app.client-portal{margin-left:82px;}
   }
 
   /* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
@@ -2000,7 +2005,7 @@ function renderClientPortal(){
   ${topbar(S.settings.companyName||'Ledger', `Client portal — ${customer}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
   <div class="content">
-    <div class="section-title">Projects</div>
+    <div class="section-title" id="p-projects">Projects</div>
     ${projects.length===0? `<div class="card"><div class="tiny muted">No projects yet.</div></div>` :
       projects.map(p=>{
         const val=projectValue(p), adv=projectAdvances(p), bal=projectBalance(p);
@@ -2040,7 +2045,7 @@ function renderClientPortal(){
         ${renderProjectDocsSection(p, false)}`;
       }).join('')}
 
-    <div class="section-title">Invoices &amp; quotes</div>
+    <div class="section-title" id="p-docs">Invoices &amp; quotes</div>
     ${docs.length===0? `<div class="card"><div class="tiny muted">Nothing issued to you yet.</div></div>` :
       docs.map(d=>{
         const total=docTotal(d), bal=remaining(d);
@@ -2069,7 +2074,7 @@ function renderClientPortal(){
         </div>`;
       }).join('')}
 
-    <div class="section-title">Messages</div>
+    <div class="section-title" id="p-messages">Messages</div>
     <div class="card">
       ${clientChatMsgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">Send us a message and we'll reply here.</div>` :
         `<div id="clientChatScroll">${clientChatMsgs.map((m,idx)=>{
@@ -2468,7 +2473,8 @@ function render(){
     app.className='client-portal';
     CLIENT_CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='clientChatInput';
     app.innerHTML = renderClientPortal();
-    sidebar.innerHTML='';
+    sidebar.innerHTML=renderPortalSidebar();
+    sidebar.classList.toggle('collapsed', DS_COLLAPSED);
     const scroller = document.getElementById('clientChatScroll');
     if(scroller) scroller.scrollIntoView({block:'end'});
     const input = document.getElementById('clientChatInput');
@@ -2486,7 +2492,8 @@ function render(){
     app.innerHTML = VIEW.name==='supplier-rfq' ? renderSupplierRfqForm(VIEW.params.id)
       : VIEW.name==='supplier-purchase-view' ? renderSupplierPurchaseView(VIEW.params.id)
       : renderSupplierPortal();
-    sidebar.innerHTML='';
+    sidebar.innerHTML=renderPortalSidebar();
+    sidebar.classList.toggle('collapsed', DS_COLLAPSED);
     return;
   }
   app.className='';
@@ -2635,6 +2642,66 @@ function renderSidebar(){
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`;
     }).join('')}
+  </div>
+  <div class="ds-foot">
+    <button class="ds-logout" onclick="logout()" title="Log out">${ic('logout')}<span>Log out</span></button>
+  </div>`;
+}
+/* Desktop sidebar for the client and supplier portals. Both portals are a single
+   scrolling page, so the nav scrolls to a section rather than switching views — except
+   from a supplier sub-view (an RFQ form or a PO), which has to return to the portal
+   first. PORTAL_SECTION just remembers the last one clicked, for the active highlight. */
+let PORTAL_SECTION = '';
+const PORTAL_SUBVIEWS = ['supplier-rfq','supplier-purchase-view'];
+function portalNavItems(){
+  if(CURRENT_USER.role==='client') return [
+    ['p-projects','box','Projects'],
+    ['p-docs','sales','Invoices & quotes'],
+    ['p-messages','chat','Messages'],
+  ];
+  return [
+    ['p-rfqs','reports','Requests for quotation'],
+    ['p-pos','cart','Purchase orders'],
+  ];
+}
+function portalGoTo(sectionId){
+  const onSub = PORTAL_SUBVIEWS.includes(VIEW.name);
+  PORTAL_SECTION = sectionId;
+  if(onSub) go('dashboard'); else render();
+  setTimeout(()=>{
+    const el = document.getElementById(sectionId);
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 40);
+}
+function renderPortalSidebar(){
+  if(!CURRENT_USER) return '';
+  const isClient = CURRENT_USER.role==='client';
+  const who = isClient ? (CURRENT_USER.clientCustomer||'—') : (CURRENT_USER.supplierName||'—');
+  // inside an RFQ form or a PO, no section is the one you're looking at
+  const activeId = PORTAL_SUBVIEWS.includes(VIEW.name) ? '' : PORTAL_SECTION;
+  return `
+  <button class="ds-toggle" onclick="toggleSidebarCollapse()" title="${DS_COLLAPSED?'Expand':'Collapse'} sidebar">${ic('chev')}</button>
+  <div class="ds-head">
+    <span class="ds-logo"><img src="${HOME_LOGO_DATA_URI}" alt="Home"></span>
+    <div style="min-width:0">
+      <div class="ds-company">${esc(S.settings.companyName||'Ledger')}</div>
+      <div class="ds-sub">${isClient?'Client portal':'Supplier portal'}</div>
+    </div>
+  </div>
+  <div class="ds-user-card">
+    <div class="ds-avatar-wrap">
+      <div class="ds-avatar" style="${CURRENT_USER.photoURL?`background:url('${esc(CURRENT_USER.photoURL)}') center/cover`:''}">${CURRENT_USER.photoURL?'':esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
+      <span class="ds-status-dot"></span>
+    </div>
+    <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
+    <div class="ds-urole">${esc(who)}</div>
+  </div>
+  <div class="ds-section-label">Menu</div>
+  <div class="ds-nav">
+    ${portalNavItems().map(([id,icon,label])=>`
+      <button class="ds-navbtn ${activeId===id?'active':''}" onclick="portalGoTo('${id}')" title="${esc(label)}">
+        <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
+      </button>`).join('')}
   </div>
   <div class="ds-foot">
     <button class="ds-logout" onclick="logout()" title="Log out">${ic('logout')}<span>Log out</span></button>
@@ -4536,7 +4603,7 @@ function renderSupplierPortal(){
   ${topbar(S.settings.companyName||'Ledger', `Supplier portal — ${supplierName}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
   <div class="content">
-    <div class="section-title">Requests for quotation</div>
+    <div class="section-title" id="p-rfqs">Requests for quotation</div>
     ${rfqs.length===0? `<div class="card"><div class="tiny muted">No requests yet.</div></div>` :
       rfqs.map(r=>{
         const submitted = !!myQuotes.find(q=>q.rfqId===r.id);
@@ -4551,7 +4618,7 @@ function renderSupplierPortal(){
           </div>
         </div>`;
       }).join('')}
-    <div class="section-title dash-section">Purchase orders</div>
+    <div class="section-title dash-section" id="p-pos">Purchase orders</div>
     ${myPurchases.length===0? `<div class="card"><div class="tiny muted">No purchase orders yet.</div></div>` :
       myPurchases.map(p=>{
         const attCount = (p.attachments||[]).length;
