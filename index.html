@@ -1915,8 +1915,8 @@ function renderLogin(){
           ${kind==='touch' ? `
           <defs>
             <linearGradient id="tidGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#7DD3FC"/>
-              <stop offset="100%" stop-color="#2563EB"/>
+              <stop offset="0%" stop-color="#FF7BA0"/>
+              <stop offset="100%" stop-color="#D62E5C"/>
             </linearGradient>
             <filter id="tidGlow" x="-60%" y="-60%" width="220%" height="220%">
               <feGaussianBlur stdDeviation="1.4" result="blur"/>
@@ -1925,23 +1925,27 @@ function renderLogin(){
           </defs>
           <g class="fi-face fi-fingerprint">
             <circle class="fi-scan-ring" cx="50" cy="50" r="40" stroke="url(#tidGrad)"/>
-            <g class="fi-print-base" fill="none" stroke="rgba(255,255,255,.88)" stroke-width="5.5" stroke-linecap="round">
-              <path d="M50,19 C32,19 19,32 19,50 C19,63 26,74 36,81"/>
-              <path d="M50,19 C68,19 81,32 81,50 C81,63 74,74 64,81"/>
-              <path d="M50,28 C39,28 30,37 30,50 C30,60 35,67 42,72"/>
-              <path d="M50,28 C61,28 70,37 70,50 C70,60 65,67 58,72"/>
-              <path d="M50,38 C44,38 39,43 39,50 C39,56 43,61 48,64"/>
-              <path d="M50,38 C56,38 61,43 61,50 C61,56 57,61 52,64"/>
-              <path d="M50,46 L50,60"/>
+            <g class="fi-print-base" fill="none" stroke="#DD4D72" stroke-width="5.5" stroke-linecap="round" transform="translate(50,50) scale(.82) translate(-50,-50)">
+              <path pathLength="100" stroke-dasharray="56 9 35 100" stroke-dashoffset="7" d="M50,10 C28,10 12,28 12,50 C12,66 17,79 26,88"/>
+              <path pathLength="100" stroke-dasharray="72 9 19 100" stroke-dashoffset="-16" d="M50,10 C72,10 88,28 88,50 C88,66 83,79 74,88"/>
+              <path pathLength="100" stroke-dasharray="62 9 29 100" stroke-dashoffset="-28" d="M50,20 C33,20 20,35 20,52 C20,65 24,75 32,83"/>
+              <path pathLength="100" stroke-dasharray="50 9 41 100" stroke-dashoffset="11" d="M50,20 C67,20 80,35 80,52 C80,65 76,75 68,83"/>
+              <path pathLength="100" stroke-dasharray="66 9 25 100" stroke-dashoffset="-7" d="M50,30 C39,30 29,41 29,53 C29,63 32,71 38,78"/>
+              <path pathLength="100" stroke-dasharray="55 9 36 100" stroke-dashoffset="19" d="M50,30 C61,30 71,41 71,53 C71,63 68,71 62,78"/>
+              <path pathLength="100" stroke-dasharray="68 9 23 100" stroke-dashoffset="-3" d="M50,40 C43,40 38,47 38,54 C38,62 41,68 45,73"/>
+              <path pathLength="100" stroke-dasharray="58 9 33 100" stroke-dashoffset="15" d="M50,40 C57,40 62,47 62,54 C62,62 59,68 55,73"/>
+              <path d="M50,50 C46,50 44,53 44,57 C44,63 46,67 50,70"/>
             </g>
-            <g class="fi-print-glow" fill="none" stroke="url(#tidGrad)" stroke-width="5.5" stroke-linecap="round" filter="url(#tidGlow)">
-              <path d="M50,19 C32,19 19,32 19,50 C19,63 26,74 36,81"/>
-              <path d="M50,19 C68,19 81,32 81,50 C81,63 74,74 64,81"/>
-              <path d="M50,28 C39,28 30,37 30,50 C30,60 35,67 42,72"/>
-              <path d="M50,28 C61,28 70,37 70,50 C70,60 65,67 58,72"/>
-              <path d="M50,38 C44,38 39,43 39,50 C39,56 43,61 48,64"/>
-              <path d="M50,38 C56,38 61,43 61,50 C61,56 57,61 52,64"/>
-              <path d="M50,46 L50,60"/>
+            <g class="fi-print-glow" fill="none" stroke="url(#tidGrad)" stroke-width="5.5" stroke-linecap="round" filter="url(#tidGlow)" transform="translate(50,50) scale(.82) translate(-50,-50)">
+              <path pathLength="100" stroke-dasharray="56 9 35 100" stroke-dashoffset="7" d="M50,10 C28,10 12,28 12,50 C12,66 17,79 26,88"/>
+              <path pathLength="100" stroke-dasharray="72 9 19 100" stroke-dashoffset="-16" d="M50,10 C72,10 88,28 88,50 C88,66 83,79 74,88"/>
+              <path pathLength="100" stroke-dasharray="62 9 29 100" stroke-dashoffset="-28" d="M50,20 C33,20 20,35 20,52 C20,65 24,75 32,83"/>
+              <path pathLength="100" stroke-dasharray="50 9 41 100" stroke-dashoffset="11" d="M50,20 C67,20 80,35 80,52 C80,65 76,75 68,83"/>
+              <path pathLength="100" stroke-dasharray="66 9 25 100" stroke-dashoffset="-7" d="M50,30 C39,30 29,41 29,53 C29,63 32,71 38,78"/>
+              <path pathLength="100" stroke-dasharray="55 9 36 100" stroke-dashoffset="19" d="M50,30 C61,30 71,41 71,53 C71,63 68,71 62,78"/>
+              <path pathLength="100" stroke-dasharray="68 9 23 100" stroke-dashoffset="-3" d="M50,40 C43,40 38,47 38,54 C38,62 41,68 45,73"/>
+              <path pathLength="100" stroke-dasharray="58 9 33 100" stroke-dashoffset="15" d="M50,40 C57,40 62,47 62,54 C62,62 59,68 55,73"/>
+              <path d="M50,50 C46,50 44,53 44,57 C44,63 46,67 50,70"/>
             </g>
           </g>` : `
           <g class="fi-face">
