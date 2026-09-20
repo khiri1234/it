@@ -2935,6 +2935,26 @@ function renderDashboard(){
     </div>
 
     <div class="section-title dash-section" style="display:flex;justify-content:space-between;align-items:center">
+      <span>To-Do${openTodos.length?` (${openTodos.length})`:''}</span>
+      <span class="small" style="font-weight:600;color:var(--teal);cursor:pointer" onclick="goPush('todos')">See all</span>
+    </div>
+    ${openTodos.length===0? `<div class="card dash-section"><div class="tiny muted">Nothing on your to-do list.</div></div>` :
+      `<div class="card dash-section" style="padding:0 14px">${openTodos.map(t=>{
+        const assignee = todoStaff.find(u=>u.id===t.assigneeId);
+        const overdue = todoIsOverdue(t);
+        return `<div class="row-between" style="padding:10px 0;border-bottom:1px solid var(--line);gap:10px;align-items:flex-start">
+          <button onclick="event.stopPropagation();toggleTodo('${t.id}')" style="flex-shrink:0;margin-top:1px;width:20px;height:20px;border-radius:50%;border:2px solid var(--line);background:transparent;cursor:pointer;padding:0"></button>
+          <div style="flex:1;min-width:0" onclick="goPush('todos')">
+            <div class="small" style="font-weight:600">${esc(t.text)}</div>
+            ${(assignee||t.dueDate)?`<div class="tiny muted" style="margin-top:2px;display:flex;flex-wrap:wrap;gap:6px">
+              ${assignee?`<span>${esc(assignee.name)}</span>`:''}
+              ${t.dueDate?`<span style="${overdue?'color:var(--red);font-weight:600':''}">${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`:''}
+            </div>`:''}
+          </div>
+        </div>`;
+      }).join('')}</div>`}
+
+    <div class="section-title dash-section" style="display:flex;justify-content:space-between;align-items:center">
       <span>Projects${liveProjects.length?` (${liveProjects.length})`:''}</span>
       <span class="small" style="font-weight:600;color:var(--teal);cursor:pointer" onclick="switchTab('projects')">See all</span>
     </div>
@@ -3003,26 +3023,6 @@ function renderDashboard(){
         </div>`;
       }).join('')}
     </div>
-
-    <div class="section-title dash-section" style="display:flex;justify-content:space-between;align-items:center">
-      <span>To-Do${openTodos.length?` (${openTodos.length})`:''}</span>
-      <span class="small" style="font-weight:600;color:var(--teal);cursor:pointer" onclick="goPush('todos')">See all</span>
-    </div>
-    ${openTodos.length===0? `<div class="card dash-section"><div class="tiny muted">Nothing on your to-do list.</div></div>` :
-      `<div class="card dash-section" style="padding:0 14px">${openTodos.map(t=>{
-        const assignee = todoStaff.find(u=>u.id===t.assigneeId);
-        const overdue = todoIsOverdue(t);
-        return `<div class="row-between" style="padding:10px 0;border-bottom:1px solid var(--line);gap:10px;align-items:flex-start">
-          <button onclick="event.stopPropagation();toggleTodo('${t.id}')" style="flex-shrink:0;margin-top:1px;width:20px;height:20px;border-radius:50%;border:2px solid var(--line);background:transparent;cursor:pointer;padding:0"></button>
-          <div style="flex:1;min-width:0" onclick="goPush('todos')">
-            <div class="small" style="font-weight:600">${esc(t.text)}</div>
-            ${(assignee||t.dueDate)?`<div class="tiny muted" style="margin-top:2px;display:flex;flex-wrap:wrap;gap:6px">
-              ${assignee?`<span>${esc(assignee.name)}</span>`:''}
-              ${t.dueDate?`<span style="${overdue?'color:var(--red);font-weight:600':''}">${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`:''}
-            </div>`:''}
-          </div>
-        </div>`;
-      }).join('')}</div>`}
 
     <div class="section-title dash-section">Recent activity</div>
     ${recent.length===0? emptyState('sales','Nothing yet','Create your first invoice or quote to see it here.') :
