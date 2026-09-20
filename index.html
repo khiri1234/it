@@ -2248,13 +2248,12 @@ function removeProjectDoc(projectId, docId){
     render();
   });
 }
-/* Every file across the client's projects in one place, newest first. The client
-   portal renders one of these instead of a per-project block under each project —
-   which also stops #projectDocsSection appearing several times in the same page. */
-function renderClientDocsSection(projects){
-  const files = [];
-  projects.forEach(p=>(p.docs||[]).forEach(d=>files.push({...d, projectName:p.name, projectNumber:p.number})));
-  files.sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
+/* One Documents section for the client and supplier portals: every file they can see,
+   newest first, each captioned with what it belongs to. `files` carries a `context`
+   caption per file, and `viewFn` names the viewer for that file's source — project
+   documents and purchase attachments are stored and opened differently. */
+function renderPortalDocsSection(files, viewFn){
+  files = files.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
   return `
     <div class="section-title" id="p-documents">Documents</div>
     ${files.length===0? `<div class="card"><div class="tiny muted">No documents shared with you yet.</div></div>` :
@@ -2265,13 +2264,27 @@ function renderClientDocsSection(projects){
             <span style="flex-shrink:0;color:var(--ink-soft)">${ic('file')}</span>
             <div style="min-width:0">
               <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
-              <div class="tiny muted">${esc(d.projectNumber||'')}${d.projectName?` · ${esc(d.projectName)}`:''}</div>
+              ${d.context?`<div class="tiny muted">${esc(d.context)}</div>`:''}
               <div class="tiny muted">${fmtFileSize(d.size)}${d.uploadedAt?` · ${fmtDate(new Date(d.uploadedAt).toISOString().slice(0,10))}`:''}</div>
             </div>
           </div>
-          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="viewProjectDoc('${onclickStr(d.url)}','${onclickStr(d.name)}','${onclickStr(d.type||'')}')">${ic('download')} View / download${isPdf?' PDF':''}</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="${viewFn}('${onclickStr(d.url)}','${onclickStr(d.name)}','${onclickStr(d.type||'')}')">${ic('download')} View / download${isPdf?' PDF':''}</button>
         </div>`;
       }).join('')}`;
+}
+/* The client portal renders one of these instead of a per-project block under each
+   project — which also stops #projectDocsSection appearing several times in a page. */
+function renderClientDocsSection(projects){
+  const files = [];
+  projects.forEach(p=>(p.docs||[]).forEach(d=>files.push({...d, context:[p.number,p.name].filter(Boolean).join(' · ')})));
+  return renderPortalDocsSection(files, 'viewProjectDoc');
+}
+/* Supplier-side equivalent: the invoices/receipts attached to their purchase orders,
+   which otherwise are only reachable by opening each order in turn. */
+function renderSupplierDocsSection(purchases){
+  const files = [];
+  purchases.forEach(p=>(p.attachments||[]).forEach(a=>files.push({...a, context:[p.number, p.date?fmtDate(p.date):''].filter(Boolean).join(' · ')})));
+  return renderPortalDocsSection(files, 'viewPurchaseAttachment');
 }
 function renderProjectDocsSection(p, canManage){
   const docs = p.docs||[];
@@ -2689,6 +2702,7 @@ function portalNavItems(){
   return [
     ['p-rfqs','reports','Requests for quotation'],
     ['p-pos','cart','Purchase orders'],
+    ['p-documents','file','Documents'],
   ];
 }
 function portalGoTo(sectionId){
@@ -4663,6 +4677,8 @@ function renderSupplierPortal(){
           ${attCount?`<div class="tiny muted" style="margin-top:6px">${ic('file')} ${attCount} file${attCount===1?'':'s'} attached</div>`:''}
         </div>`;
       }).join('')}
+
+    ${renderSupplierDocsSection(myPurchases)}
   </div>`;
 }
 function renderSupplierPurchaseView(id){
