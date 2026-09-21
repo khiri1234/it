@@ -679,7 +679,7 @@
   @media (min-width:1360px){
     .portal-msg-panel{
       display:flex;flex-direction:column;overflow:hidden;
-      position:fixed;top:112px;right:24px;bottom:auto;width:252px;height:min(480px,calc(100vh - 136px));
+      position:fixed;top:240px;right:24px;bottom:auto;width:252px;height:min(480px,calc(100vh - 264px));
       background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
       border:1px solid var(--glass-border);border-radius:18px;box-shadow:0 16px 40px rgba(8,14,26,.16);
       z-index:40;
@@ -688,11 +688,16 @@
     /* Plain #app (no .client-portal qualifier) so this covers the staff/admin shell's
        right-hand Messages panel too, not just the client/supplier portal's. */
     .portal-msg-panel:not(:empty) ~ #app{margin-right:300px;}
-    /* The topbar's own box stops short at that same 300px gutter — widen it the rest of
-       the way to the real screen edge (the panel floats lower, clear of the header's
-       row, so this never sits underneath it) so the datetime/theme/logout controls
-       redistribute out to the true edge instead of stopping in the middle of the bar. */
-    .portal-msg-panel:not(:empty) ~ #app .topbar{margin-right:-300px;}
+    /* Both the plain .topbar (every non-dashboard page) and the Dashboard's own taller
+       .dash-hero banner stop short at that same 300px gutter — widen each the rest of
+       the way to the real screen edge (the panel floats lower, clear of both, so this
+       never sits underneath them) so their controls (datetime/theme/logout, or the
+       hero's dark-mode/more buttons) redistribute out to the true edge instead of
+       stopping in the middle of the bar. The panel's own top offset above is set to
+       clear the taller .dash-hero + its overlapping stat cards, the tallest header of
+       the two, so it never overlaps either. */
+    .portal-msg-panel:not(:empty) ~ #app .topbar,
+    .portal-msg-panel:not(:empty) ~ #app .dash-hero{margin-right:-300px;}
     .portal-msg-head{
       display:flex;align-items:center;gap:10px;padding:16px 16px 14px;flex-shrink:0;
       background:linear-gradient(135deg,var(--navy),#0F2A4D);color:#fff;
