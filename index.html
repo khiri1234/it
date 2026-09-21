@@ -679,23 +679,26 @@
   @media (min-width:1360px){
     .portal-msg-panel{
       display:flex;flex-direction:column;overflow:hidden;
-      position:fixed;top:230px;right:24px;bottom:auto;width:252px;height:min(480px,calc(100vh - 254px));
+      position:fixed;top:100px;right:24px;bottom:auto;width:252px;height:min(480px,calc(100vh - 124px));
       background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
       border:1px solid var(--glass-border);border-radius:18px;box-shadow:0 16px 40px rgba(8,14,26,.16);
       z-index:40;
+      transition:top .15s,height .15s;
     }
+    /* The staff Dashboard's own .dash-hero banner (with its overlapping stat cards) is
+       much taller than the plain .topbar every other page — client/supplier portal and
+       staff — uses. render() adds this class only when the staff Dashboard is showing,
+       so the panel only drops down that far when it actually needs to clear the hero. */
+    .portal-msg-panel.tall-header{top:226px;height:min(480px,calc(100vh - 250px));}
     .portal-msg-panel:empty{display:none;}
     /* Plain #app (no .client-portal qualifier) so this covers the staff/admin shell's
        right-hand Messages panel too, not just the client/supplier portal's. */
     .portal-msg-panel:not(:empty) ~ #app{margin-right:300px;}
     /* Both the plain .topbar (every non-dashboard page) and the Dashboard's own taller
        .dash-hero banner stop short at that same 300px gutter — widen each the rest of
-       the way to the real screen edge (the panel floats lower, clear of both, so this
-       never sits underneath them) so their controls (datetime/theme/logout, or the
+       the way to the real screen edge so their controls (datetime/theme/logout, or the
        hero's dark-mode/more buttons) redistribute out to the true edge instead of
-       stopping in the middle of the bar. The panel's own top offset above is set to
-       clear the taller .dash-hero + its overlapping stat cards, the tallest header of
-       the two, so it never overlaps either. */
+       stopping in the middle of the bar. */
     .portal-msg-panel:not(:empty) ~ #app .topbar,
     .portal-msg-panel:not(:empty) ~ #app .dash-hero{margin-right:-300px;}
     .portal-msg-head{
@@ -2810,6 +2813,10 @@ function render(){
   const app = document.getElementById('app');
   const sidebar = document.getElementById('desktopSidebar');
   const msgPanel = document.getElementById('portalMsgPanel');
+  // Only the staff shell's Dashboard has a header tall enough to need the panel pushed
+  // further down (see the .tall-header rule below) — reset by default so every other
+  // context (client/supplier portal, every other staff page) uses the tighter default.
+  msgPanel.classList.remove('tall-header');
   if(STORAGE_MODE==='loading'){ app.className=''; app.innerHTML = renderLoading(); sidebar.innerHTML=''; msgPanel.innerHTML=''; return; }
   if(STORAGE_MODE==='error'){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; msgPanel.innerHTML=''; return; }
   if(!S.users || S.users.length===0){
@@ -2862,13 +2869,18 @@ function render(){
   app.className='';
   STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='staffPanelChatInput';
   STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='staffPanelThreadInput';
-  msgPanel.innerHTML = isStaffMsgPanelEligible() ? renderStaffMsgPanel() : '';
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
   // purchasing-only accounts are confined to the Stock section (purchases/RFQs/inventory)
   if(isPurchasingOnly() && (TAB_SECTIONS[VIEW.name]||'dashboard')!=='stock'){ VIEW={name:'stock',params:{}}; }
   // read-only accounts can browse everything but never reach a create/edit form
   if(isReadOnly() && FORM_VIEWS.includes(VIEW.name)){ VIEW={name:TAB_SECTIONS[VIEW.name]||'dashboard',params:{}}; }
+  const staffPanelEligible = isStaffMsgPanelEligible();
+  msgPanel.innerHTML = staffPanelEligible ? renderStaffMsgPanel() : '';
+  // The Dashboard's hero banner (with its overlapping stat cards) is much taller than
+  // the plain .topbar every other staff page uses — only it needs the panel pushed
+  // further down to clear it (see .tall-header in the CSS).
+  msgPanel.classList.toggle('tall-header', staffPanelEligible && VIEW.name==='dashboard');
   let body='';
   switch(VIEW.name){
     case 'dashboard': body = renderDashboard(); break;
