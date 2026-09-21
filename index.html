@@ -686,13 +686,11 @@
     }
     .portal-msg-panel:empty{display:none;}
     .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:300px;}
-    /* The topbar's own box stops short at that same 300px gutter — extend its navy
-       background the rest of the way to the real screen edge (an ::after rather than
-       widening the box itself, so the logout button and other topbar content stay put)
-       so the floating panel above reads as sitting on top of one full-width header. */
-    .portal-msg-panel:not(:empty) ~ #app.client-portal .topbar::after{
-      content:'';position:absolute;top:0;right:-300px;bottom:0;width:300px;background:var(--navy);
-    }
+    /* The topbar's own box stops short at that same 300px gutter — widen it the rest of
+       the way to the real screen edge (the panel floats lower, clear of the header's
+       row, so this never sits underneath it) so the datetime/theme/logout controls
+       redistribute out to the true edge instead of stopping in the middle of the bar. */
+    .portal-msg-panel:not(:empty) ~ #app.client-portal .topbar{margin-right:-300px;}
     .portal-msg-head{
       display:flex;align-items:center;gap:10px;padding:16px 16px 14px;flex-shrink:0;
       background:linear-gradient(135deg,var(--navy),#0F2A4D);color:#fff;
