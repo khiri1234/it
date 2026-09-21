@@ -319,6 +319,9 @@
   .faceid-sub{font-size:12px;color:var(--ink-soft);transition:color .2s;}
   .faceid-sub.error{color:var(--red);font-weight:600;}
   .faceid-divider{font-size:11px;color:var(--ink-soft);text-align:center;margin-bottom:14px;}
+  .app-store-link{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;font-size:12.5px;font-weight:600;color:var(--ink-soft);text-decoration:none;}
+  .app-store-link svg{width:14px;height:14px;}
+  .app-store-link:hover{color:var(--teal);}
   body.role-readonly .fab{display:none;}
   .fab{
     position:fixed;bottom:calc(78px + 1cm);right:max(16px,calc(50vw - 260px + 16px));
@@ -1999,6 +2002,10 @@ function renderLogin(){
       <div id="li_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px">${esc(AUTH_ERR)}</div>
     </div>
     <button class="btn btn-primary btn-block" onclick="doLogin()">${ic('check')} Sign in</button>
+    ${!isWrappedApp()?`
+    <a class="app-store-link" href="https://apps.apple.com/app/id6809113781" target="_blank" rel="noopener">
+      ${ic('download')} Get the iPhone app on the App Store
+    </a>`:''}
   </div>`;
 }
 async function doLogin(){
