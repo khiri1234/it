@@ -678,14 +678,14 @@
   .portal-msg-panel{display:none;}
   @media (min-width:1360px){
     .portal-msg-panel{
-      display:flex;flex-direction:column;
-      position:fixed;top:0;right:0;bottom:0;width:252px;
+      display:flex;flex-direction:column;overflow:hidden;
+      position:fixed;top:24px;right:24px;bottom:auto;width:252px;height:min(480px,calc(100vh - 48px));
       background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
-      border-left:1px solid var(--glass-border);box-shadow:-6px 0 28px rgba(8,14,26,.08);
+      border:1px solid var(--glass-border);border-radius:18px;box-shadow:0 16px 40px rgba(8,14,26,.16);
       z-index:40;
     }
     .portal-msg-panel:empty{display:none;}
-    .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:252px;}
+    .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:300px;}
     .portal-msg-head{
       display:flex;align-items:center;gap:10px;padding:16px 16px 14px;flex-shrink:0;
       background:linear-gradient(135deg,var(--navy),#0F2A4D);color:#fff;
