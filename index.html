@@ -672,22 +672,51 @@
      Mirrors the left .desktop-sidebar pattern: an :empty panel collapses to nothing, and the
      portal content column makes room via a margin-right sibling rule only when it's populated.
      Below the 1360px breakpoint (or off the client/supplier portals) render() never fills this
-     element, so it stays empty and invisible — Messages then renders inline instead. */
+     element, so it stays empty and invisible — Messages then renders inline instead. Bubble/
+     avatar/composer sizing here is scoped to .portal-msg-panel so the shared .chat-* classes
+     used by team chat and the admin reply views elsewhere are untouched. */
   .portal-msg-panel{display:none;}
   @media (min-width:1360px){
     .portal-msg-panel{
       display:flex;flex-direction:column;
-      position:fixed;top:0;right:0;bottom:0;width:300px;
+      position:fixed;top:0;right:0;bottom:0;width:252px;
       background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
       border-left:1px solid var(--glass-border);box-shadow:-6px 0 28px rgba(8,14,26,.08);
       z-index:40;
     }
     .portal-msg-panel:empty{display:none;}
-    .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:300px;}
-    .portal-msg-head{padding:22px 20px 14px;border-bottom:1px solid var(--line);flex-shrink:0;}
-    .portal-msg-title{font-weight:700;font-size:15px;}
-    .portal-msg-list{flex:1;overflow-y:auto;padding:14px 16px;}
-    .portal-msg-panel .chat-composer{flex-shrink:0;padding:12px 16px;border-top:1px solid var(--line);}
+    .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:252px;}
+    .portal-msg-head{
+      display:flex;align-items:center;gap:10px;padding:16px 16px 14px;flex-shrink:0;
+      background:linear-gradient(135deg,var(--navy),#0F2A4D);color:#fff;
+    }
+    .portal-msg-avatar{
+      width:34px;height:34px;border-radius:11px;flex-shrink:0;
+      background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;
+      display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
+      font-family:'Space Grotesk',sans-serif;box-shadow:0 3px 8px rgba(0,0,0,.25);
+    }
+    .portal-msg-head-text{min-width:0;}
+    .portal-msg-title{font-weight:700;font-size:13.5px;line-height:1.25;}
+    .portal-msg-sub{font-size:10.5px;color:rgba(255,255,255,.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
+    .portal-msg-list{flex:1;overflow-y:auto;padding:12px 12px;}
+    .portal-msg-panel .chat-msg{margin-bottom:10px;}
+    .portal-msg-panel .chat-avatar{width:22px;height:22px;font-size:9.5px;}
+    .portal-msg-panel .chat-bubble-wrap{max-width:84%;}
+    .portal-msg-panel .chat-sender{font-size:9.5px;}
+    .portal-msg-panel .chat-bubble{padding:7px 10px;font-size:12.5px;border-radius:12px;}
+    .portal-msg-panel .chat-msg.mine .chat-bubble{border-bottom-right-radius:3px;}
+    .portal-msg-panel .chat-msg:not(.mine) .chat-bubble{border-bottom-left-radius:3px;}
+    .portal-msg-panel .chat-time{font-size:8.5px;}
+    .portal-msg-panel .chat-composer{
+      flex-shrink:0;gap:6px;margin-top:0;padding:10px 12px;
+      border-top:1px solid var(--line);background:var(--surface);
+    }
+    .portal-msg-panel .chat-composer input{
+      background:var(--bg);border-radius:20px;padding:8px 14px;font-size:12.5px;height:auto;
+    }
+    .portal-msg-panel .chat-composer .chat-send{width:34px;height:34px;}
+    .portal-msg-panel .chat-composer .chat-send svg{width:15px;height:15px;}
   }
 
   /* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
@@ -2069,7 +2098,10 @@ function renderPortalMessagesPanel(){
     const msgs = (S.clientChats && S.clientChats[customer]) || [];
     markClientChatRead(customer,'client');
     const seenLabel = clientThreadSeenLabel(customer, msgs, 'client');
-    return `<div class="portal-msg-head"><div class="portal-msg-title">Messages</div><div class="tiny muted">${esc(customer)}</div></div>
+    return `<div class="portal-msg-head">
+        <div class="portal-msg-avatar">${esc((customer||'?').trim().slice(0,1).toUpperCase())}</div>
+        <div class="portal-msg-head-text"><div class="portal-msg-title">Messages</div><div class="portal-msg-sub">${esc(customer)}</div></div>
+      </div>
       ${renderChatCard(msgs, seenLabel, 'client', {scroll:'clientChatScroll', input:'clientChatInput'}, CLIENT_CHAT_DRAFT, 'sendClientChatMessage', 'CLIENT_CHAT_DRAFT', 'panel')}`;
   }
   if(CURRENT_USER.role==='supplier'){
@@ -2077,7 +2109,10 @@ function renderPortalMessagesPanel(){
     const msgs = (S.supplierChats && S.supplierChats[supplierName]) || [];
     markSupplierChatRead(supplierName,'supplier');
     const seenLabel = supplierThreadSeenLabel(supplierName, msgs, 'supplier');
-    return `<div class="portal-msg-head"><div class="portal-msg-title">Messages</div><div class="tiny muted">${esc(supplierName)}</div></div>
+    return `<div class="portal-msg-head">
+        <div class="portal-msg-avatar">${esc((supplierName||'?').trim().slice(0,1).toUpperCase())}</div>
+        <div class="portal-msg-head-text"><div class="portal-msg-title">Messages</div><div class="portal-msg-sub">${esc(supplierName)}</div></div>
+      </div>
       ${renderChatCard(msgs, seenLabel, 'supplier', {scroll:'supplierChatScroll', input:'supplierChatInput'}, SUPPLIER_CHAT_DRAFT, 'sendSupplierChatMessage', 'SUPPLIER_CHAT_DRAFT', 'panel')}`;
   }
   return '';
