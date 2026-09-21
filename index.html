@@ -661,6 +661,28 @@
     .desktop-sidebar.collapsed:not(:empty) ~ #app.client-portal{margin-left:82px;}
   }
 
+  /* ---------- PORTAL MESSAGES — right-hand column (client/supplier, wide desktop only) ----------
+     Mirrors the left .desktop-sidebar pattern: an :empty panel collapses to nothing, and the
+     portal content column makes room via a margin-right sibling rule only when it's populated.
+     Below the 1360px breakpoint (or off the client/supplier portals) render() never fills this
+     element, so it stays empty and invisible — Messages then renders inline instead. */
+  .portal-msg-panel{display:none;}
+  @media (min-width:1360px){
+    .portal-msg-panel{
+      display:flex;flex-direction:column;
+      position:fixed;top:0;right:0;bottom:0;width:300px;
+      background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
+      border-left:1px solid var(--glass-border);box-shadow:-6px 0 28px rgba(8,14,26,.08);
+      z-index:40;
+    }
+    .portal-msg-panel:empty{display:none;}
+    .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:300px;}
+    .portal-msg-head{padding:22px 20px 14px;border-bottom:1px solid var(--line);flex-shrink:0;}
+    .portal-msg-title{font-weight:700;font-size:15px;}
+    .portal-msg-list{flex:1;overflow-y:auto;padding:14px 16px;}
+    .portal-msg-panel .chat-composer{flex-shrink:0;padding:12px 16px;border-top:1px solid var(--line);}
+  }
+
   /* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
   #pdfPrintRoot{ display:none; }
   .pdf-page{
@@ -707,6 +729,7 @@
 </head>
 <body>
 <div id="desktopSidebar" class="desktop-sidebar"></div>
+<div id="portalMsgPanel" class="portal-msg-panel"></div>
 <div id="app"><div class="boot-screen">
   <div class="boot-ring-wrap">
     <div class="boot-ring"></div>
@@ -1995,6 +2018,56 @@ async function doLogin(){
 }
 function logout(){ CURRENT_USER=null; syncPushTopic(); setRememberedUserId(null); go('dashboard'); }
 
+/* On a wide enough desktop, the client/supplier portal shows its Messages thread as a
+   persistent right-hand column instead of a section at the bottom of the page — reused
+   here as the single source of truth so the inline (mobile/tablet) and panel (desktop)
+   layouts never both exist in the DOM at once (that would mean two elements sharing the
+   same id, like the clientChatScroll/clientChatInput ids each layout needs). Exactly one
+   is rendered, chosen by isWideEnoughForMsgPanel() at render time. */
+function isWideEnoughForMsgPanel(){
+  try{ return window.innerWidth>=1360; }catch(e){ return false; }
+}
+function renderChatCard(msgs, seenLabel, viewerFrom, ids, draft, sendFnName, draftVarName, layout){
+  const list = msgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">Send us a message and we'll reply here.</div>` :
+    `<div id="${ids.scroll}">${msgs.map((m,idx)=>{
+      const mine = m.from===viewerFrom;
+      const showSeen = mine && idx===msgs.length-1 && seenLabel;
+      return `<div class="chat-msg ${mine?'mine':''}">
+        ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+        <div class="chat-bubble-wrap">
+          ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
+          <div class="chat-bubble">${esc(m.text)}</div>
+          <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(seenLabel):''}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  const composer = `<div class="chat-composer">
+    <input id="${ids.input}" placeholder="Message us…" value="${esc(draft)}" oninput="${draftVarName}=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();${sendFnName}();}">
+    <button class="chat-send" onclick="${sendFnName}()">${ic('check')}</button>
+  </div>`;
+  if(layout==='panel') return `<div class="portal-msg-list">${list}</div>${composer}`;
+  return `<div class="card">${list}${composer}</div>`;
+}
+function renderPortalMessagesPanel(){
+  if(!CURRENT_USER || !isWideEnoughForMsgPanel()) return '';
+  if(CURRENT_USER.role==='client'){
+    const customer = CURRENT_USER.clientCustomer;
+    const msgs = (S.clientChats && S.clientChats[customer]) || [];
+    markClientChatRead(customer,'client');
+    const seenLabel = clientThreadSeenLabel(customer, msgs, 'client');
+    return `<div class="portal-msg-head"><div class="portal-msg-title">Messages</div><div class="tiny muted">${esc(customer)}</div></div>
+      ${renderChatCard(msgs, seenLabel, 'client', {scroll:'clientChatScroll', input:'clientChatInput'}, CLIENT_CHAT_DRAFT, 'sendClientChatMessage', 'CLIENT_CHAT_DRAFT', 'panel')}`;
+  }
+  if(CURRENT_USER.role==='supplier'){
+    const supplierName = CURRENT_USER.supplierName;
+    const msgs = (S.supplierChats && S.supplierChats[supplierName]) || [];
+    markSupplierChatRead(supplierName,'supplier');
+    const seenLabel = supplierThreadSeenLabel(supplierName, msgs, 'supplier');
+    return `<div class="portal-msg-head"><div class="portal-msg-title">Messages</div><div class="tiny muted">${esc(supplierName)}</div></div>
+      ${renderChatCard(msgs, seenLabel, 'supplier', {scroll:'supplierChatScroll', input:'supplierChatInput'}, SUPPLIER_CHAT_DRAFT, 'sendSupplierChatMessage', 'SUPPLIER_CHAT_DRAFT', 'panel')}`;
+  }
+  return '';
+}
 /* ---------- CLIENT PORTAL (read-only — one customer's own projects/invoices/quotes,
    no cost prices, no profit margins, no edit controls of any kind) ---------- */
 function renderClientPortal(){
@@ -2079,26 +2152,10 @@ function renderClientPortal(){
         </div>`;
       }).join('')}
 
+    ${isWideEnoughForMsgPanel() ? '' : `
     <div class="section-title" id="p-messages">Messages</div>
-    <div class="card">
-      ${clientChatMsgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">Send us a message and we'll reply here.</div>` :
-        `<div id="clientChatScroll">${clientChatMsgs.map((m,idx)=>{
-          const mine = m.from==='client';
-          const showSeen = mine && idx===clientChatMsgs.length-1 && clientChatSeenLabel;
-          return `<div class="chat-msg ${mine?'mine':''}">
-            ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
-            <div class="chat-bubble-wrap">
-              ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
-              <div class="chat-bubble">${esc(m.text)}</div>
-              <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(clientChatSeenLabel):''}</div>
-            </div>
-          </div>`;
-        }).join('')}</div>`}
-      <div class="chat-composer">
-        <input id="clientChatInput" placeholder="Message us…" value="${esc(CLIENT_CHAT_DRAFT)}" oninput="CLIENT_CHAT_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendClientChatMessage();}">
-        <button class="chat-send" onclick="sendClientChatMessage()">${ic('check')}</button>
-      </div>
-    </div>
+    ${renderChatCard(clientChatMsgs, clientChatSeenLabel, 'client', {scroll:'clientChatScroll', input:'clientChatInput'}, CLIENT_CHAT_DRAFT, 'sendClientChatMessage', 'CLIENT_CHAT_DRAFT', 'inline')}
+    `}
   </div>`;
 }
 function sendClientChatMessage(){
@@ -2501,15 +2558,16 @@ function render(){
   document.body.classList.toggle('role-readonly', isReadOnly());
   const app = document.getElementById('app');
   const sidebar = document.getElementById('desktopSidebar');
-  if(STORAGE_MODE==='loading'){ app.className=''; app.innerHTML = renderLoading(); sidebar.innerHTML=''; return; }
-  if(STORAGE_MODE==='error'){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
+  const msgPanel = document.getElementById('portalMsgPanel');
+  if(STORAGE_MODE==='loading'){ app.className=''; app.innerHTML = renderLoading(); sidebar.innerHTML=''; msgPanel.innerHTML=''; return; }
+  if(STORAGE_MODE==='error'){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; msgPanel.innerHTML=''; return; }
   if(!S.users || S.users.length===0){
     // A device that has already used a real team must never be shown the first-run
     // signup screen, no matter what emptied the list — show the retry screen instead.
-    if(hasSeenTeam()){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; return; }
-    app.className=''; app.innerHTML = noStorageBanner() + renderSetup(); sidebar.innerHTML=''; return;
+    if(hasSeenTeam()){ app.className=''; app.innerHTML = renderConnectionError(); sidebar.innerHTML=''; msgPanel.innerHTML=''; return; }
+    app.className=''; app.innerHTML = noStorageBanner() + renderSetup(); sidebar.innerHTML=''; msgPanel.innerHTML=''; return;
   }
-  if(!CURRENT_USER){ app.className=''; app.innerHTML = noStorageBanner() + renderLogin(); sidebar.innerHTML=''; return; }
+  if(!CURRENT_USER){ app.className=''; app.innerHTML = noStorageBanner() + renderLogin(); sidebar.innerHTML=''; msgPanel.innerHTML=''; return; }
   // client accounts get their own read-only portal — never the staff/admin app shell,
   // regardless of what VIEW happens to be set to (e.g. from a stale #project= hash link)
   if(CURRENT_USER.role==='client'){
@@ -2518,6 +2576,7 @@ function render(){
     app.innerHTML = renderClientPortal();
     sidebar.innerHTML=renderPortalSidebar();
     sidebar.classList.toggle('collapsed', DS_COLLAPSED);
+    msgPanel.innerHTML = renderPortalMessagesPanel();
     const scroller = document.getElementById('clientChatScroll');
     if(scroller) scroller.scrollIntoView({block:'end'});
     const input = document.getElementById('clientChatInput');
@@ -2538,6 +2597,7 @@ function render(){
       : renderSupplierPortal();
     sidebar.innerHTML=renderPortalSidebar();
     sidebar.classList.toggle('collapsed', DS_COLLAPSED);
+    msgPanel.innerHTML = renderPortalMessagesPanel();
     const supScroller = document.getElementById('supplierChatScroll');
     if(supScroller) supScroller.scrollIntoView({block:'end'});
     const supInput = document.getElementById('supplierChatInput');
@@ -2549,6 +2609,7 @@ function render(){
     return;
   }
   app.className='';
+  msgPanel.innerHTML='';
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
   // purchasing-only accounts are confined to the Stock section (purchases/RFQs/inventory)
@@ -2728,6 +2789,13 @@ function portalGoTo(sectionId){
   PORTAL_SECTION = sectionId;
   if(onSub) go('dashboard'); else render();
   setTimeout(()=>{
+    // Messages lives in the always-visible right-hand panel on a wide desktop, not as a
+    // scrollable section — there's nothing to scroll to, so focus its composer instead.
+    if(sectionId==='p-messages' && isWideEnoughForMsgPanel()){
+      const input = document.querySelector('.portal-msg-panel input');
+      if(input) input.focus();
+      return;
+    }
     const el = document.getElementById(sectionId);
     if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
   }, 40);
@@ -4702,26 +4770,10 @@ function renderSupplierPortal(){
 
     ${renderSupplierDocsSection(myPurchases)}
 
+    ${isWideEnoughForMsgPanel() ? '' : `
     <div class="section-title" id="p-messages">Messages</div>
-    <div class="card">
-      ${supplierChatMsgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">Send us a message and we'll reply here.</div>` :
-        `<div id="supplierChatScroll">${supplierChatMsgs.map((m,idx)=>{
-          const mine = m.from==='supplier';
-          const showSeen = mine && idx===supplierChatMsgs.length-1 && supplierChatSeenLabel;
-          return `<div class="chat-msg ${mine?'mine':''}">
-            ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
-            <div class="chat-bubble-wrap">
-              ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
-              <div class="chat-bubble">${esc(m.text)}</div>
-              <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(supplierChatSeenLabel):''}</div>
-            </div>
-          </div>`;
-        }).join('')}</div>`}
-      <div class="chat-composer">
-        <input id="supplierChatInput" placeholder="Message us…" value="${esc(SUPPLIER_CHAT_DRAFT)}" oninput="SUPPLIER_CHAT_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendSupplierChatMessage();}">
-        <button class="chat-send" onclick="sendSupplierChatMessage()">${ic('check')}</button>
-      </div>
-    </div>
+    ${renderChatCard(supplierChatMsgs, supplierChatSeenLabel, 'supplier', {scroll:'supplierChatScroll', input:'supplierChatInput'}, SUPPLIER_CHAT_DRAFT, 'sendSupplierChatMessage', 'SUPPLIER_CHAT_DRAFT', 'inline')}
+    `}
   </div>`;
 }
 function sendSupplierChatMessage(){
@@ -6302,6 +6354,22 @@ function afterRender(){
 
 loadAll();
 window.addEventListener('focus', ()=>{ syncPull(); });
+// Crossing the 1360px breakpoint toggles Messages between the inline section and the
+// right-hand panel (see isWideEnoughForMsgPanel/renderPortalMessagesPanel) — re-render
+// so a client/supplier portal open during a resize (e.g. rotating a tablet, or resizing
+// a browser window) picks up the new layout instead of waiting for its next action.
+let MSG_PANEL_WAS_WIDE = isWideEnoughForMsgPanel();
+let MSG_PANEL_RESIZE_TIMER = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(MSG_PANEL_RESIZE_TIMER);
+  MSG_PANEL_RESIZE_TIMER = setTimeout(()=>{
+    const nowWide = isWideEnoughForMsgPanel();
+    if(nowWide!==MSG_PANEL_WAS_WIDE){
+      MSG_PANEL_WAS_WIDE = nowWide;
+      if(CURRENT_USER && (CURRENT_USER.role==='client' || CURRENT_USER.role==='supplier')) render();
+    }
+  }, 150);
+});
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncPull(); });
 // Select existing value when a number field is focused (click, tab, or tap) so typing
 // replaces "0" instead of appending to it — applies to every number input, including
