@@ -685,12 +685,14 @@
       z-index:40;
     }
     .portal-msg-panel:empty{display:none;}
-    .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:300px;}
+    /* Plain #app (no .client-portal qualifier) so this covers the staff/admin shell's
+       right-hand Messages panel too, not just the client/supplier portal's. */
+    .portal-msg-panel:not(:empty) ~ #app{margin-right:300px;}
     /* The topbar's own box stops short at that same 300px gutter — widen it the rest of
        the way to the real screen edge (the panel floats lower, clear of the header's
        row, so this never sits underneath it) so the datetime/theme/logout controls
        redistribute out to the true edge instead of stopping in the middle of the bar. */
-    .portal-msg-panel:not(:empty) ~ #app.client-portal .topbar{margin-right:-300px;}
+    .portal-msg-panel:not(:empty) ~ #app .topbar{margin-right:-300px;}
     .portal-msg-head{
       display:flex;align-items:center;gap:10px;padding:16px 16px 14px;flex-shrink:0;
       background:linear-gradient(135deg,var(--navy),#0F2A4D);color:#fff;
@@ -722,6 +724,35 @@
     }
     .portal-msg-panel .chat-composer .chat-send{width:34px;height:34px;}
     .portal-msg-panel .chat-composer .chat-send svg{width:15px;height:15px;}
+
+    /* Staff/admin panel only — the 3-way Team/Clients/Suppliers tab strip, the
+       client/supplier list rows, and the thread's back-header row. */
+    .staff-msg-tabs{display:flex;flex-shrink:0;border-bottom:1px solid var(--line);background:var(--surface);}
+    .staff-msg-tab{
+      flex:1;border:none;background:none;padding:9px 4px;font-size:11.5px;font-weight:600;
+      color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;
+      font-family:'IBM Plex Sans',sans-serif;transition:color .15s,border-color .15s;
+    }
+    .staff-msg-tab:hover{color:var(--ink);}
+    .staff-msg-tab.active{color:var(--teal);border-bottom-color:var(--teal);}
+    .staff-msg-list{padding:6px 0;}
+    .staff-msg-row{padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s;}
+    .staff-msg-row:hover{background:rgba(0,0,0,.035);}
+    :root[data-theme="dark"] .staff-msg-row:hover{background:rgba(255,255,255,.06);}
+    .staff-msg-row:last-child{border-bottom:none;}
+    .staff-msg-row-name{font-size:12.5px;font-weight:600;}
+    .staff-msg-row-preview{font-size:11px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
+    .staff-msg-thread-head{
+      display:flex;align-items:center;gap:8px;padding:10px 12px;flex-shrink:0;
+      border-bottom:1px solid var(--line);background:var(--surface);
+    }
+    .staff-msg-back{
+      width:26px;height:26px;border-radius:8px;border:none;background:rgba(0,0,0,.05);
+      color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;
+    }
+    :root[data-theme="dark"] .staff-msg-back{background:rgba(255,255,255,.08);}
+    .staff-msg-back svg{width:14px;height:14px;}
+    .staff-msg-thread-name{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   }
 
   /* ---------- PROFESSIONAL DOCUMENT (print & PDF export) ---------- */
@@ -895,6 +926,15 @@ let SUPPLIER_CHAT_DRAFT='';
 let SUPPLIER_CHAT_INPUT_WAS_FOCUSED=false;
 let SUPPLIER_CHAT_REPLY_DRAFT='';
 let SUPPLIER_CHAT_REPLY_WAS_FOCUSED=false;
+// Admin/staff right-hand Messages panel: one persistent column with 3 tabs (Team /
+// Clients / Suppliers), visible alongside every staff page, not just a dedicated Chat
+// view — so its own composer ids must never collide with the full-page chat views',
+// which can be on screen at the same time (e.g. viewing the Chat page while the panel
+// is also showing the Team tab).
+let STAFF_MSG_TAB='team'; // 'team' | 'clients' | 'suppliers'
+let STAFF_MSG_THREAD=null; // {type:'client'|'supplier', name} while viewing one thread; null = list
+let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
+let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
 let CURRENT_USER=null; // {id,name,username,role} — session only, not persisted
 let AUTH_ERR='';
@@ -2122,6 +2162,158 @@ function renderPortalMessagesPanel(){
   }
   return '';
 }
+
+/* ---------- STAFF/ADMIN MESSAGES PANEL — same right-hand column pattern as the
+   client/supplier portal above, but with 3 tabs (Team / Clients / Suppliers) since
+   staff have three separate threads to keep an eye on. Purchasing-only accounts (which
+   don't get chat access at all) and client/supplier accounts (which get the portal
+   panel above instead) are excluded. */
+function isStaffMsgPanelEligible(){
+  return !!CURRENT_USER && !isPurchasingOnly() && ['admin','staff','readonly'].includes(CURRENT_USER.role);
+}
+function setStaffMsgTab(tab){
+  if(STAFF_MSG_TAB===tab) return;
+  STAFF_MSG_TAB=tab;
+  STAFF_MSG_THREAD=null;
+  render();
+}
+function openStaffMsgThread(type, name){
+  STAFF_MSG_THREAD={type,name};
+  render();
+}
+function backStaffMsgThread(){
+  STAFF_MSG_THREAD=null;
+  render();
+}
+// Mirrors sendChatMessage(), but reads from the panel's own input — the full-page Chat
+// view can be open at the same time with its own #chatInput, and the two must never be
+// confused (the panel's box may hold newer text than a stale main-content box, or vice
+// versa).
+function sendStaffPanelTeamMessage(){
+  const input = document.getElementById('staffPanelChatInput');
+  const text = (input?input.value:CHAT_DRAFT).trim();
+  if(!text) return;
+  if(!S.chat) S.chat=[];
+  S.chat.push({id:uid(), ts:Date.now(), userId:CURRENT_USER.id, userName:CURRENT_USER.name, text});
+  if(S.chat.length>500) S.chat=S.chat.slice(S.chat.length-500);
+  CHAT_DRAFT='';
+  persist('chat');
+  render();
+}
+// Mirrors sendClientChatReply()/sendSupplierChatReply(), same reasoning as above —
+// reads from the panel's own #staffPanelThreadInput, never the full-page reply box.
+function sendStaffPanelThreadReply(){
+  if(!STAFF_MSG_THREAD) return;
+  const {type,name} = STAFF_MSG_THREAD;
+  const isClient = type==='client';
+  const input = document.getElementById('staffPanelThreadInput');
+  const fallbackDraft = isClient ? CLIENT_CHAT_REPLY_DRAFT : SUPPLIER_CHAT_REPLY_DRAFT;
+  const text = (input?input.value:fallbackDraft).trim();
+  if(!text) return;
+  const bucket = isClient ? 'clientChats' : 'supplierChats';
+  if(!S[bucket]) S[bucket]={};
+  if(!S[bucket][name]) S[bucket][name]=[];
+  S[bucket][name].push({id:uid(), ts:Date.now(), from:'staff', authorName:CURRENT_USER.name, text});
+  if(S[bucket][name].length>500) S[bucket][name]=S[bucket][name].slice(-500);
+  if(isClient) CLIENT_CHAT_REPLY_DRAFT=''; else SUPPLIER_CHAT_REPLY_DRAFT='';
+  persist(bucket);
+  render();
+}
+function renderStaffMsgPanel(){
+  if(!isWideEnoughForMsgPanel()) return '';
+  const tabs=[['team','Team'],['clients','Clients'],['suppliers','Suppliers']];
+  const tabsHtml = `<div class="staff-msg-tabs">${tabs.map(([id,label])=>
+    `<button class="staff-msg-tab ${STAFF_MSG_TAB===id?'active':''}" onclick="setStaffMsgTab('${id}')">${esc(label)}</button>`
+  ).join('')}</div>`;
+  let bodyHtml;
+  if(STAFF_MSG_TAB==='team'){
+    bodyHtml = renderStaffPanelTeamBody();
+  } else if(STAFF_MSG_TAB==='clients'){
+    bodyHtml = (STAFF_MSG_THREAD && STAFF_MSG_THREAD.type==='client')
+      ? renderStaffPanelThreadBody('client', STAFF_MSG_THREAD.name)
+      : renderStaffPanelListBody('client');
+  } else {
+    bodyHtml = (STAFF_MSG_THREAD && STAFF_MSG_THREAD.type==='supplier')
+      ? renderStaffPanelThreadBody('supplier', STAFF_MSG_THREAD.name)
+      : renderStaffPanelListBody('supplier');
+  }
+  return `<div class="portal-msg-head"><div class="portal-msg-title">Messages</div></div>${tabsHtml}${bodyHtml}`;
+}
+function renderStaffPanelTeamBody(){
+  const msgs = S.chat||[];
+  markTeamChatRead();
+  const seenLabel = teamChatSeenLabel(msgs);
+  const list = msgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">No messages yet — say hello to the team.</div>` :
+    `<div id="staffPanelChatScroll">${msgs.map((m,idx)=>{
+      const mine = CURRENT_USER && m.userId===CURRENT_USER.id;
+      const showSeen = mine && idx===msgs.length-1 && seenLabel;
+      return `<div class="chat-msg ${mine?'mine':''}">
+        ${!mine?`<div class="chat-avatar">${esc((m.userName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+        <div class="chat-bubble-wrap">
+          ${!mine?`<div class="chat-sender">${esc(m.userName)}</div>`:''}
+          <div class="chat-bubble">${esc(m.text)}</div>
+          <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(seenLabel):''}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  return `<div class="portal-msg-list">${list}</div>
+    <div class="chat-composer">
+      <input id="staffPanelChatInput" placeholder="Message the team…" value="${esc(CHAT_DRAFT)}" oninput="CHAT_DRAFT=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendStaffPanelTeamMessage();}">
+      <button class="chat-send" onclick="sendStaffPanelTeamMessage()">${ic('check')}</button>
+    </div>`;
+}
+function renderStaffPanelListBody(type){
+  const isClient = type==='client';
+  const bucket = isClient ? S.clientChats : S.supplierChats;
+  const names = new Set();
+  if(isClient) S.users.filter(u=>u.role==='client' && u.clientCustomer).forEach(u=>names.add(u.clientCustomer));
+  else S.users.filter(u=>u.role==='supplier' && u.supplierName).forEach(u=>names.add(u.supplierName));
+  Object.keys(bucket||{}).forEach(c=>{ if((bucket[c]||[]).length) names.add(c); });
+  const rows = [...names].map(name=>{
+    const msgs=(bucket && bucket[name])||[];
+    return {name, last: msgs.length?msgs[msgs.length-1]:null};
+  }).sort((a,b)=>(b.last?b.last.ts:0)-(a.last?a.last.ts:0));
+  if(rows.length===0){
+    return `<div class="portal-msg-list"><div class="tiny muted" style="padding:4px 0 8px">No ${isClient?'client':'supplier'} accounts yet.</div></div>`;
+  }
+  return `<div class="portal-msg-list staff-msg-list">${rows.map(r=>`
+    <div class="staff-msg-row" onclick="openStaffMsgThread('${type}','${onclickStr(r.name)}')">
+      <div class="staff-msg-row-name">${esc(r.name)}</div>
+      <div class="staff-msg-row-preview">${r.last?esc(r.last.text):'No messages yet'}</div>
+    </div>`).join('')}</div>`;
+}
+function renderStaffPanelThreadBody(type, name){
+  const isClient = type==='client';
+  const bucket = isClient ? S.clientChats : S.supplierChats;
+  const msgs = (bucket && bucket[name]) || [];
+  if(isClient) markClientChatRead(name,'staff'); else markSupplierChatRead(name,'staff');
+  const seenLabel = isClient ? clientThreadSeenLabel(name, msgs, 'staff') : supplierThreadSeenLabel(name, msgs, 'staff');
+  const draft = isClient ? CLIENT_CHAT_REPLY_DRAFT : SUPPLIER_CHAT_REPLY_DRAFT;
+  const draftVarName = isClient ? 'CLIENT_CHAT_REPLY_DRAFT' : 'SUPPLIER_CHAT_REPLY_DRAFT';
+  const list = msgs.length===0? `<div class="tiny muted" style="padding:4px 0 8px">No messages yet — send the first one below.</div>` :
+    `<div id="staffPanelThreadScroll">${msgs.map((m,idx)=>{
+      const mine = m.from==='staff';
+      const showSeen = mine && idx===msgs.length-1 && seenLabel;
+      return `<div class="chat-msg ${mine?'mine':''}">
+        ${!mine?`<div class="chat-avatar">${esc((m.authorName||'?').trim().slice(0,1).toUpperCase())}</div>`:''}
+        <div class="chat-bubble-wrap">
+          ${!mine?`<div class="chat-sender">${esc(m.authorName)}</div>`:''}
+          <div class="chat-bubble">${esc(m.text)}</div>
+          <div class="chat-time">${fmtLogTime(m.ts)}${showSeen?' · '+esc(seenLabel):''}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  return `<div class="staff-msg-thread-head">
+      <button class="staff-msg-back" onclick="backStaffMsgThread()">${ICO.back}</button>
+      <div class="staff-msg-thread-name">${esc(name)}</div>
+    </div>
+    <div class="portal-msg-list">${list}</div>
+    <div class="chat-composer">
+      <input id="staffPanelThreadInput" placeholder="Reply to ${esc(name)}…" value="${esc(draft)}" oninput="${draftVarName}=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();sendStaffPanelThreadReply();}">
+      <button class="chat-send" onclick="sendStaffPanelThreadReply()">${ic('check')}</button>
+    </div>`;
+}
+
 /* ---------- CLIENT PORTAL (read-only — one customer's own projects/invoices/quotes,
    no cost prices, no profit margins, no edit controls of any kind) ---------- */
 function renderClientPortal(){
@@ -2663,7 +2855,9 @@ function render(){
     return;
   }
   app.className='';
-  msgPanel.innerHTML='';
+  STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='staffPanelChatInput';
+  STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='staffPanelThreadInput';
+  msgPanel.innerHTML = isStaffMsgPanelEligible() ? renderStaffMsgPanel() : '';
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
   // purchasing-only accounts are confined to the Stock section (purchases/RFQs/inventory)
@@ -6404,6 +6598,20 @@ function afterRender(){
       input.setSelectionRange(len,len);
     }
   }
+  if(isStaffMsgPanelEligible()){
+    const panelChatInput = document.getElementById('staffPanelChatInput');
+    if(panelChatInput && STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED){
+      panelChatInput.focus();
+      const len = panelChatInput.value.length;
+      panelChatInput.setSelectionRange(len,len);
+    }
+    const panelThreadInput = document.getElementById('staffPanelThreadInput');
+    if(panelThreadInput && STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED){
+      panelThreadInput.focus();
+      const len = panelThreadInput.value.length;
+      panelThreadInput.setSelectionRange(len,len);
+    }
+  }
 }
 
 loadAll();
@@ -6420,7 +6628,7 @@ window.addEventListener('resize', ()=>{
     const nowWide = isWideEnoughForMsgPanel();
     if(nowWide!==MSG_PANEL_WAS_WIDE){
       MSG_PANEL_WAS_WIDE = nowWide;
-      if(CURRENT_USER && (CURRENT_USER.role==='client' || CURRENT_USER.role==='supplier')) render();
+      if(CURRENT_USER) render();
     }
   }, 150);
 });
