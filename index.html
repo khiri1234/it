@@ -679,13 +679,20 @@
   @media (min-width:1360px){
     .portal-msg-panel{
       display:flex;flex-direction:column;overflow:hidden;
-      position:fixed;top:24px;right:24px;bottom:auto;width:252px;height:min(480px,calc(100vh - 48px));
+      position:fixed;top:88px;right:24px;bottom:auto;width:252px;height:min(480px,calc(100vh - 112px));
       background:var(--glass-bg-strong);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
       border:1px solid var(--glass-border);border-radius:18px;box-shadow:0 16px 40px rgba(8,14,26,.16);
       z-index:40;
     }
     .portal-msg-panel:empty{display:none;}
     .portal-msg-panel:not(:empty) ~ #app.client-portal{margin-right:300px;}
+    /* The topbar's own box stops short at that same 300px gutter — extend its navy
+       background the rest of the way to the real screen edge (an ::after rather than
+       widening the box itself, so the logout button and other topbar content stay put)
+       so the floating panel above reads as sitting on top of one full-width header. */
+    .portal-msg-panel:not(:empty) ~ #app.client-portal .topbar::after{
+      content:'';position:absolute;top:0;right:-300px;bottom:0;width:300px;background:var(--navy);
+    }
     .portal-msg-head{
       display:flex;align-items:center;gap:10px;padding:16px 16px 14px;flex-shrink:0;
       background:linear-gradient(135deg,var(--navy),#0F2A4D);color:#fff;
