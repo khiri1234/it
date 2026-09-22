@@ -947,7 +947,7 @@ let SUPPLIER_CHAT_REPLY_WAS_FOCUSED=false;
 let STAFF_MSG_TAB='team'; // 'team' | 'clients' | 'suppliers'
 let STAFF_MSG_THREAD=null; // {type:'client'|'supplier', name} while viewing one thread; null = list
 let IPHONE_ORDER_QTY={}; // itemId -> qty, while a client is building an iPhone Store order
-let IPHONE_ORDER_DETAILS={}; // itemId -> {storage, color}, alongside IPHONE_ORDER_QTY
+let IPHONE_ORDER_DETAILS={}; // itemId -> {storage, color, country, activation}, alongside IPHONE_ORDER_QTY
 let IPHONE_ORDER_NOTE='';
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
@@ -2613,25 +2613,29 @@ function iphoneStoreItems(){
 }
 const IPHONE_STORAGE_OPTIONS = ['64GB','128GB','256GB','512GB','1TB'];
 const IPHONE_COUNTRY_OPTIONS = ['UAE','USA','KSA','Hong Kong','Japan','China','Europe','Other'];
+const IPHONE_ACTIVATION_OPTIONS = ['Active','Non-Active'];
+const IPHONE_ORDER_STATUS_BADGE = {new:'pending', priced:'sent', confirmed:'accepted', declined:'overdue', fulfilled:'completed', cancelled:'overdue'};
 function iphoneOrderItemLabel(it){
-  return `${it.name}${it.storage?' '+it.storage:''}${it.color?' ('+it.color+')':''}${it.country?' · '+it.country:''} ×${it.qty}`;
+  return `${it.name}${it.storage?' '+it.storage:''}${it.color?' ('+it.color+')':''}${it.country?' · '+it.country:''}${it.activation?' · '+it.activation:''} ×${it.qty}`;
+}
+function iphoneOrderTotal(o){
+  return (o.items||[]).reduce((a,it)=>a+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0);
 }
 function renderIphoneStoreSection(customer){
   const items = iphoneStoreItems();
   const myOrders = (S.iphoneOrders||[]).filter(o=>o.customer===customer).slice().sort((a,b)=>b.ts-a.ts);
-  const orderStatusBadge = {new:'pending', confirmed:'active', fulfilled:'completed', cancelled:'overdue'};
   return `
   <div class="card" style="margin-bottom:14px">
     ${items.length===0? `<div class="tiny muted">No iPhone models available to order right now.</div>` : `
     ${items.map(i=>{
       const qty = IPHONE_ORDER_QTY[i.id]||0;
-      const detail = IPHONE_ORDER_DETAILS[i.id] || {storage:'', color:'', country:''};
+      const detail = IPHONE_ORDER_DETAILS[i.id] || {storage:'', color:'', country:'', activation:''};
       return `
       <div style="padding:10px 0;border-bottom:1px solid var(--line)">
         <div class="row-between">
           <div style="min-width:0">
             <div class="small" style="font-weight:600">${esc(i.name)}</div>
-            <div class="tiny muted">${i.sellPrice>0?fmtMoney(i.sellPrice):'Price on request'} · ${i.stock>0?'In stock':'Out of stock — can still order'}</div>
+            <div class="tiny muted">${i.stock>0?'In stock':'Out of stock — can still order'}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
             <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 11px" onclick="stepIphoneOrderQty('${i.id}',-1)">−</button>
@@ -2655,6 +2659,15 @@ function renderIphoneStoreSection(customer){
               ${IPHONE_COUNTRY_OPTIONS.map(o=>`<option value="${o}" ${detail.country===o?'selected':''}>${o}</option>`).join('')}
             </select>
           </div>
+        </div>
+        <div class="item-grid" style="margin-top:8px">
+          <div>
+            <label class="tiny muted">Activation (optional)</label>
+            <select onchange="setIphoneOrderDetail('${i.id}','activation',this.value)">
+              <option value="">Not specified</option>
+              ${IPHONE_ACTIVATION_OPTIONS.map(o=>`<option value="${o}" ${detail.activation===o?'selected':''}>${o}</option>`).join('')}
+            </select>
+          </div>
           <div>
             <label class="tiny muted">Color (optional)</label>
             <input value="${esc(detail.color)}" placeholder="e.g. Space Black" oninput="setIphoneOrderDetail('${i.id}','color',this.value)">
@@ -2665,19 +2678,36 @@ function renderIphoneStoreSection(customer){
     <label style="margin-top:10px">Notes (optional)</label>
     <textarea id="iphoneOrderNote" rows="2" placeholder="Anything else we should know..." oninput="IPHONE_ORDER_NOTE=this.value">${esc(IPHONE_ORDER_NOTE)}</textarea>
     <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="submitIphoneOrder()">${ic('check')} Submit order</button>
+    <div class="tiny muted" style="margin-top:8px">No price is shown yet — we'll review your request and send you a price to accept or decline.</div>
     `}
   </div>
   ${myOrders.length? `
   <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px">Your orders</div>
-  ${myOrders.map(o=>`
+  ${myOrders.map(o=>{
+    const total = iphoneOrderTotal(o);
+    return `
     <div class="card" style="margin-bottom:8px">
       <div class="row-between">
         <div class="small" style="font-weight:600">${esc(o.items.map(iphoneOrderItemLabel).join(', '))}</div>
-        <span class="badge ${orderStatusBadge[o.status]||'pending'}">${esc(o.status)}</span>
+        <span class="badge ${IPHONE_ORDER_STATUS_BADGE[o.status]||'pending'}">${o.status.charAt(0).toUpperCase()+o.status.slice(1)}</span>
       </div>
       <div class="tiny mono muted">${fmtDate(new Date(o.ts).toISOString().slice(0,10))}</div>
       ${o.notes?`<div class="tiny muted" style="margin-top:4px">${esc(o.notes)}</div>`:''}
-    </div>`).join('')}
+      ${o.status==='new'? `<div class="tiny muted" style="margin-top:8px">Awaiting a price from us.</div>` : ''}
+      ${['priced','confirmed','declined'].includes(o.status)? `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+        ${o.items.map(it=>`<div class="row-between tiny" style="padding:2px 0"><div class="muted">${esc(it.name)}${it.storage?' '+esc(it.storage):''} ×${it.qty}</div><div class="mono">${fmtMoney((Number(it.unitPrice)||0)*it.qty)}</div></div>`).join('')}
+        <div class="row-between" style="margin-top:4px"><div class="small" style="font-weight:600">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div></div>
+      </div>` : ''}
+      ${o.status==='priced'? `
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary" style="flex:1" onclick="respondIphoneOrderPrice('${o.id}','confirmed')">${ic('check')} Accept</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="respondIphoneOrderPrice('${o.id}','declined')">Decline</button>
+      </div>` : ''}
+      ${o.status==='confirmed'? `<div class="tiny" style="margin-top:8px;color:var(--green)">Confirmed — we'll be in touch to arrange payment &amp; delivery.</div>` : ''}
+      ${o.status==='declined'? `<div class="tiny muted" style="margin-top:8px">You declined this quote.</div>` : ''}
+    </div>`;
+  }).join('')}
   ` : ''}`;
 }
 function stepIphoneOrderQty(itemId, delta){
@@ -2687,7 +2717,7 @@ function stepIphoneOrderQty(itemId, delta){
   render();
 }
 function setIphoneOrderDetail(itemId, field, value){
-  if(!IPHONE_ORDER_DETAILS[itemId]) IPHONE_ORDER_DETAILS[itemId]={storage:'', color:'', country:''};
+  if(!IPHONE_ORDER_DETAILS[itemId]) IPHONE_ORDER_DETAILS[itemId]={storage:'', color:'', country:'', activation:''};
   IPHONE_ORDER_DETAILS[itemId][field]=value;
 }
 function submitIphoneOrder(){
@@ -2707,20 +2737,33 @@ function submitIphoneOrder(){
   }
   const items = entries.map(([itemId,qty])=>{
     const it = S.inventory.find(i=>i.id===itemId);
-    const detail = IPHONE_ORDER_DETAILS[itemId]||{storage:'',color:'',country:''};
-    return {itemId, name: it?it.name:'Item', sellPrice: it?(Number(it.sellPrice)||0):0, qty, storage: detail.storage, country: detail.country, color: (detail.color||'').trim()};
+    const detail = IPHONE_ORDER_DETAILS[itemId]||{storage:'',color:'',country:'',activation:''};
+    return {
+      itemId, name: it?it.name:'Item', qty,
+      storage: detail.storage, country: detail.country, activation: detail.activation||'',
+      color: (detail.color||'').trim(),
+      suggestedPrice: it?(Number(it.sellPrice)||0):0, unitPrice: null
+    };
   });
   if(!S.iphoneOrders) S.iphoneOrders=[];
   S.iphoneOrders.push({
     id: uid(), ts: Date.now(),
     customer: CURRENT_USER.clientCustomer, userId: CURRENT_USER.id, userName: CURRENT_USER.name,
-    items, notes: (IPHONE_ORDER_NOTE||'').trim(), status:'new'
+    items, notes: (IPHONE_ORDER_NOTE||'').trim(), status:'new', pricedAt:null
   });
   persist('iphoneOrders');
   IPHONE_ORDER_QTY={};
   IPHONE_ORDER_DETAILS={};
   IPHONE_ORDER_NOTE='';
   toast('Order submitted — we\'ll be in touch');
+  render();
+}
+function respondIphoneOrderPrice(orderId, decision){
+  const o = (S.iphoneOrders||[]).find(x=>x.id===orderId && x.customer===CURRENT_USER.clientCustomer);
+  if(!o || o.status!=='priced') return;
+  o.status = decision;
+  persist('iphoneOrders');
+  toast(decision==='confirmed' ? 'Order confirmed — we\'ll be in touch' : 'Order declined');
   render();
 }
 /* The client portal renders one of these instead of a per-project block under each
@@ -6165,28 +6208,57 @@ function renderActivityLog(){
 /* ---------- IPHONE STORE ORDERS (staff side — gated to isIphoneStoreAdmin() in render()) ---------- */
 function renderIphoneOrders(){
   const orders = (S.iphoneOrders||[]).slice().sort((a,b)=>b.ts-a.ts);
-  const statusBadge = {new:'pending', confirmed:'active', fulfilled:'completed', cancelled:'overdue'};
-  const statusFlow = ['new','confirmed','fulfilled','cancelled'];
+  const statusFlow = ['new','priced','confirmed','declined','fulfilled','cancelled'];
   return `
   ${topbar('iPhone Store orders','Only visible to you', true)}
   <div class="content">
     ${orders.length===0? emptyState('cart','No orders yet','Orders clients place through the iPhone Store will show up here.') :
-      orders.map(o=>`
+      orders.map(o=>{
+        const total = iphoneOrderTotal(o);
+        return `
       <div class="card" style="margin-bottom:10px">
         <div class="row-between">
           <div style="min-width:0">
             <div class="small" style="font-weight:600">${esc(o.customer||o.userName||'Client')}</div>
             <div class="tiny mono muted">${fmtDate(new Date(o.ts).toISOString().slice(0,10))}</div>
           </div>
-          <span class="badge ${statusBadge[o.status]||'pending'}">${esc(o.status)}</span>
+          <span class="badge ${IPHONE_ORDER_STATUS_BADGE[o.status]||'pending'}">${o.status.charAt(0).toUpperCase()+o.status.slice(1)}</span>
         </div>
-        <div class="small" style="margin-top:8px;line-height:1.5">${o.items.map(it=>`${esc(it.name)}${it.storage?' '+esc(it.storage):''}${it.color?' ('+esc(it.color)+')':''}${it.country?' · '+esc(it.country):''} ×${it.qty}${it.sellPrice>0?` — ${fmtMoney(it.sellPrice*it.qty)}`:''}`).join('<br>')}</div>
+        <div style="margin-top:8px">
+          ${o.items.map(it=>`
+          <div class="row-between" style="padding:4px 0;gap:10px">
+            <div class="small" style="min-width:0">${esc(it.name)}${it.storage?' '+esc(it.storage):''}${it.color?' ('+esc(it.color)+')':''}${it.country?' · '+esc(it.country):''}${it.activation?' · '+esc(it.activation):''} ×${it.qty}</div>
+            ${o.status==='new'?
+              `<input type="number" min="0" step="0.01" id="iphonePrice_${o.id}_${it.itemId}" value="${it.suggestedPrice>0?it.suggestedPrice:''}" placeholder="Price" style="width:100px;flex-shrink:0">`
+              : `<div class="mono small" style="flex-shrink:0">${fmtMoney((Number(it.unitPrice)||0)*it.qty)}</div>`}
+          </div>`).join('')}
+        </div>
+        ${o.status!=='new'? `<div class="row-between" style="margin-top:4px;padding-top:6px;border-top:1px solid var(--line)"><div class="small" style="font-weight:600">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div></div>` : ''}
         ${o.notes?`<div class="tiny muted" style="margin-top:6px">${esc(o.notes)}</div>`:''}
+        ${o.status==='new'? `<button class="btn btn-primary btn-block" style="margin-top:10px" onclick="sendIphoneOrderPrice('${o.id}')">${ic('check')} Send price to client</button>` : ''}
         <select style="margin-top:10px" onchange="setIphoneOrderStatus('${o.id}',this.value)">
           ${statusFlow.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
         </select>
-      </div>`).join('')}
+      </div>`;
+      }).join('')}
   </div>`;
+}
+function sendIphoneOrderPrice(orderId){
+  const o = (S.iphoneOrders||[]).find(x=>x.id===orderId);
+  if(!o) return;
+  const prices = [];
+  for(const it of o.items){
+    const input = document.getElementById(`iphonePrice_${orderId}_${it.itemId}`);
+    const val = Number(input && input.value);
+    if(!val || val<=0){ toast(`Enter a price for ${it.name}`); return; }
+    prices.push(val);
+  }
+  o.items.forEach((it,idx)=>{ it.unitPrice = prices[idx]; });
+  o.status='priced';
+  o.pricedAt=Date.now();
+  persist('iphoneOrders');
+  toast('Price sent to client');
+  render();
 }
 function setIphoneOrderStatus(id, status){
   const o = (S.iphoneOrders||[]).find(x=>x.id===id);
