@@ -2633,9 +2633,10 @@ function renderPortalDocsSection(files, viewFn){
 function iphoneStoreItems(){
   return S.inventory.filter(i=>/iphone\s*18/i.test(i.name||''));
 }
-const IPHONE_STORAGE_OPTIONS = ['64GB','128GB','256GB','512GB','1TB'];
+const IPHONE_STORAGE_OPTIONS = ['256GB','512GB','1TB','2TB'];
 const IPHONE_COUNTRY_OPTIONS = ['UAE','USA','KSA','Hong Kong','Japan','China','Europe','Other'];
 const IPHONE_ACTIVATION_OPTIONS = ['Active','Non-Active'];
+const IPHONE_COLOR_OPTIONS = ['Burgundy','Glacier','Black','Silver'];
 const IPHONE_ORDER_STATUS_BADGE = {new:'pending', priced:'sent', confirmed:'accepted', declined:'overdue', fulfilled:'completed', cancelled:'overdue'};
 function iphoneOrderItemLabel(it){
   return `${it.name}${it.storage?' '+it.storage:''}${it.color?' ('+it.color+')':''}${it.country?' · '+it.country:''}${it.activation?' · '+it.activation:''} ×${it.qty}`;
@@ -2692,7 +2693,10 @@ function renderIphoneStoreSection(customer){
           </div>
           <div>
             <label class="tiny muted">Color (optional)</label>
-            <input value="${esc(detail.color)}" placeholder="e.g. Space Black" oninput="setIphoneOrderDetail('${i.id}','color',this.value)">
+            <select onchange="setIphoneOrderDetail('${i.id}','color',this.value)">
+              <option value="">Not specified</option>
+              ${IPHONE_COLOR_OPTIONS.map(o=>`<option value="${o}" ${detail.color===o?'selected':''}>${o}</option>`).join('')}
+            </select>
           </div>
         </div>` : ''}
       </div>`;
