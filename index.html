@@ -949,6 +949,7 @@ let STAFF_MSG_THREAD=null; // {type:'client'|'supplier', name} while viewing one
 let IPHONE_ORDER_QTY={}; // itemId -> qty, while a client is building an iPhone Store order
 let IPHONE_ORDER_DETAILS={}; // itemId -> {storage, color, country, activation}, alongside IPHONE_ORDER_QTY
 let IPHONE_ORDER_NOTE='';
+let IPHONE_ORDER_EDIT_ID=null; // set while a client is correcting one of their own still-'new' orders
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
@@ -2649,6 +2650,7 @@ function renderIphoneStoreSection(customer){
   const myOrders = (S.iphoneOrders||[]).filter(o=>o.customer===customer).slice().sort((a,b)=>b.ts-a.ts);
   return `
   <div class="card" style="margin-bottom:14px">
+    ${IPHONE_ORDER_EDIT_ID? `<div class="row-between" style="margin-bottom:8px"><div class="tiny" style="font-weight:600;color:var(--teal)">Editing your order</div><span class="small" style="color:var(--teal);cursor:pointer" onclick="cancelIphoneOrderEdit()">Cancel</span></div>` : ''}
     ${items.length===0? `<div class="tiny muted">No iPhone models available to order right now.</div>` : `
     ${items.map(i=>{
       const qty = IPHONE_ORDER_QTY[i.id]||0;
@@ -2703,8 +2705,8 @@ function renderIphoneStoreSection(customer){
     }).join('')}
     <label style="margin-top:10px">Notes (optional)</label>
     <textarea id="iphoneOrderNote" rows="2" placeholder="Anything else we should know..." oninput="IPHONE_ORDER_NOTE=this.value">${esc(IPHONE_ORDER_NOTE)}</textarea>
-    <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="submitIphoneOrder()">${ic('check')} Submit order</button>
-    <div class="tiny muted" style="margin-top:8px">No price is shown yet — we'll review your request and send you a price to accept or decline.</div>
+    <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="submitIphoneOrder()">${ic('check')} ${IPHONE_ORDER_EDIT_ID?'Save changes':'Submit order'}</button>
+    ${IPHONE_ORDER_EDIT_ID? '' : `<div class="tiny muted" style="margin-top:8px">No price is shown yet — we'll review your request and send you a price to accept or decline.</div>`}
     `}
   </div>
   ${myOrders.length? `
@@ -2719,7 +2721,8 @@ function renderIphoneStoreSection(customer){
       </div>
       <div class="tiny mono muted">${fmtDate(new Date(o.ts).toISOString().slice(0,10))}</div>
       ${o.notes?`<div class="tiny muted" style="margin-top:4px">${esc(o.notes)}</div>`:''}
-      ${o.status==='new'? `<div class="tiny muted" style="margin-top:8px">Awaiting a price from us.</div>` : ''}
+      ${o.status==='new'? `<div class="tiny muted" style="margin-top:8px">Awaiting a price from us.</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="editIphoneOrder('${o.id}')">${ic('edit')} Edit order</button>` : ''}
       ${['priced','confirmed','declined'].includes(o.status)? `
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
         ${o.items.map(it=>`<div class="row-between tiny" style="padding:2px 0"><div class="muted">${esc(it.name)}${it.storage?' '+esc(it.storage):''} ×${it.qty}</div><div class="mono">${fmtMoney((Number(it.unitPrice)||0)*it.qty)}</div></div>`).join('')}
@@ -2746,6 +2749,28 @@ function setIphoneOrderDetail(itemId, field, value){
   if(!IPHONE_ORDER_DETAILS[itemId]) IPHONE_ORDER_DETAILS[itemId]={storage:'', color:'', country:'', activation:''};
   IPHONE_ORDER_DETAILS[itemId][field]=value;
 }
+function editIphoneOrder(orderId){
+  const o = (S.iphoneOrders||[]).find(x=>x.id===orderId && x.customer===CURRENT_USER.clientCustomer);
+  if(!o || o.status!=='new'){ toast('This order can no longer be edited'); return; }
+  IPHONE_ORDER_QTY={};
+  IPHONE_ORDER_DETAILS={};
+  o.items.forEach(it=>{
+    IPHONE_ORDER_QTY[it.itemId]=it.qty;
+    IPHONE_ORDER_DETAILS[it.itemId]={storage:it.storage||'', color:it.color||'', country:it.country||'', activation:it.activation||''};
+  });
+  IPHONE_ORDER_NOTE=o.notes||'';
+  IPHONE_ORDER_EDIT_ID=orderId;
+  render();
+  const el=document.getElementById('p-iphones');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function cancelIphoneOrderEdit(){
+  IPHONE_ORDER_QTY={};
+  IPHONE_ORDER_DETAILS={};
+  IPHONE_ORDER_NOTE='';
+  IPHONE_ORDER_EDIT_ID=null;
+  render();
+}
 function submitIphoneOrder(){
   const entries = Object.entries(IPHONE_ORDER_QTY).filter(([,qty])=>qty>0);
   if(entries.length===0){ toast('Pick at least one model and quantity'); return; }
@@ -2771,17 +2796,31 @@ function submitIphoneOrder(){
       suggestedPrice: it?(Number(it.sellPrice)||0):0, unitPrice: null
     };
   });
-  if(!S.iphoneOrders) S.iphoneOrders=[];
-  S.iphoneOrders.push({
-    id: uid(), ts: Date.now(),
-    customer: CURRENT_USER.clientCustomer, userId: CURRENT_USER.id, userName: CURRENT_USER.name,
-    items, notes: (IPHONE_ORDER_NOTE||'').trim(), status:'new', pricedAt:null
-  });
-  persist('iphoneOrders');
+  if(IPHONE_ORDER_EDIT_ID){
+    const o = (S.iphoneOrders||[]).find(x=>x.id===IPHONE_ORDER_EDIT_ID && x.customer===CURRENT_USER.clientCustomer);
+    if(!o || o.status!=='new'){
+      toast('This order can no longer be edited');
+    } else {
+      o.items=items;
+      o.notes=(IPHONE_ORDER_NOTE||'').trim();
+      o.ts=Date.now();
+      persist('iphoneOrders');
+      toast('Order updated');
+    }
+    IPHONE_ORDER_EDIT_ID=null;
+  } else {
+    if(!S.iphoneOrders) S.iphoneOrders=[];
+    S.iphoneOrders.push({
+      id: uid(), ts: Date.now(),
+      customer: CURRENT_USER.clientCustomer, userId: CURRENT_USER.id, userName: CURRENT_USER.name,
+      items, notes: (IPHONE_ORDER_NOTE||'').trim(), status:'new', pricedAt:null
+    });
+    persist('iphoneOrders');
+    toast('Order submitted — we\'ll be in touch');
+  }
   IPHONE_ORDER_QTY={};
   IPHONE_ORDER_DETAILS={};
   IPHONE_ORDER_NOTE='';
-  toast('Order submitted — we\'ll be in touch');
   render();
 }
 function respondIphoneOrderPrice(orderId, decision){
