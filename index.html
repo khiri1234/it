@@ -915,14 +915,14 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos','supplierChats','supplierChatReads'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos','supplierChats','supplierChatReads','iphoneOrders'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ', rfqPrefix:'RFQ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1, rfqNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{} };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{}, iphoneOrders:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
@@ -946,6 +946,8 @@ let SUPPLIER_CHAT_REPLY_WAS_FOCUSED=false;
 // is also showing the Team tab).
 let STAFF_MSG_TAB='team'; // 'team' | 'clients' | 'suppliers'
 let STAFF_MSG_THREAD=null; // {type:'client'|'supplier', name} while viewing one thread; null = list
+let IPHONE_ORDER_QTY={}; // itemId -> qty, while a client is building an iPhone Store order
+let IPHONE_ORDER_NOTE='';
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
@@ -959,6 +961,15 @@ async function sha256(str){
 function isAdmin(){ return CURRENT_USER && CURRENT_USER.role==='admin'; }
 function isReadOnly(){ return CURRENT_USER && CURRENT_USER.role==='readonly'; }
 function isPurchasingOnly(){ return CURRENT_USER && CURRENT_USER.role==='purchasing'; }
+// iPhone Store orders are visible only to whichever single account this is true for —
+// an explicit flag on the user record, defaulting (until an admin sets it explicitly)
+// to whoever's username is "hatef" so it works out of the box without extra setup.
+function iphoneStoreAdminFlag(u){
+  if(!u) return false;
+  if(typeof u.iphoneStoreAdmin==='boolean') return u.iphoneStoreAdmin;
+  return !!(u.username && u.username.toLowerCase()==='hatef');
+}
+function isIphoneStoreAdmin(){ return iphoneStoreAdminFlag(CURRENT_USER); }
 function denyIfReadOnly(){
   if(isReadOnly()){ toast('View only — ask an admin to make changes'); return true; }
   return false;
@@ -2108,7 +2119,7 @@ async function doLogin(){
   const passHash = await sha256(username+':'+pin);
   const user = S.users.find(u=>u.username===username && u.passHash===passHash);
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null};
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
   syncPushTopic();
   AUTH_ERR='';
   setRememberedUserId(user.id);
@@ -2380,6 +2391,9 @@ function renderClientPortal(){
         </div>`;
       }).join('')}
 
+    <div class="section-title" id="p-iphones">iPhone Store</div>
+    ${renderIphoneStoreSection(customer)}
+
     ${renderClientDocsSection(projects)}
 
     <div class="section-title" id="p-docs">Invoices &amp; quotes</div>
@@ -2592,6 +2606,74 @@ function renderPortalDocsSection(files, viewFn){
         </div>`;
       }).join('')}`;
 }
+/* ---------- IPHONE STORE (client portal, orders visible only to isIphoneStoreAdmin()) ---------- */
+function iphoneStoreItems(){
+  return S.inventory.filter(i=>/iphone/i.test(i.name||''));
+}
+function renderIphoneStoreSection(customer){
+  const items = iphoneStoreItems();
+  const myOrders = (S.iphoneOrders||[]).filter(o=>o.customer===customer).slice().sort((a,b)=>b.ts-a.ts);
+  const orderStatusBadge = {new:'pending', confirmed:'active', fulfilled:'completed', cancelled:'overdue'};
+  return `
+  <div class="card" style="margin-bottom:14px">
+    ${items.length===0? `<div class="tiny muted">No iPhone models available to order right now.</div>` : `
+    ${items.map(i=>{
+      const qty = IPHONE_ORDER_QTY[i.id]||0;
+      return `
+      <div class="row-between" style="padding:10px 0;border-bottom:1px solid var(--line)">
+        <div style="min-width:0">
+          <div class="small" style="font-weight:600">${esc(i.name)}</div>
+          <div class="tiny muted">${i.sellPrice>0?fmtMoney(i.sellPrice):'Price on request'} · ${i.stock>0?'In stock':'Out of stock — can still order'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 11px" onclick="stepIphoneOrderQty('${i.id}',-1)">−</button>
+          <div class="mono" style="min-width:16px;text-align:center">${qty}</div>
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 11px" onclick="stepIphoneOrderQty('${i.id}',1)">+</button>
+        </div>
+      </div>`;
+    }).join('')}
+    <label style="margin-top:10px">Notes (optional)</label>
+    <textarea id="iphoneOrderNote" rows="2" placeholder="Color, storage size, anything else..." oninput="IPHONE_ORDER_NOTE=this.value">${esc(IPHONE_ORDER_NOTE)}</textarea>
+    <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="submitIphoneOrder()">${ic('check')} Submit order</button>
+    `}
+  </div>
+  ${myOrders.length? `
+  <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px">Your orders</div>
+  ${myOrders.map(o=>`
+    <div class="card" style="margin-bottom:8px">
+      <div class="row-between">
+        <div class="small" style="font-weight:600">${esc(o.items.map(it=>`${it.name} ×${it.qty}`).join(', '))}</div>
+        <span class="badge ${orderStatusBadge[o.status]||'pending'}">${esc(o.status)}</span>
+      </div>
+      <div class="tiny mono muted">${fmtDate(new Date(o.ts).toISOString().slice(0,10))}</div>
+      ${o.notes?`<div class="tiny muted" style="margin-top:4px">${esc(o.notes)}</div>`:''}
+    </div>`).join('')}
+  ` : ''}`;
+}
+function stepIphoneOrderQty(itemId, delta){
+  const next = Math.max(0, (IPHONE_ORDER_QTY[itemId]||0)+delta);
+  if(next===0) delete IPHONE_ORDER_QTY[itemId]; else IPHONE_ORDER_QTY[itemId]=next;
+  render();
+}
+function submitIphoneOrder(){
+  const entries = Object.entries(IPHONE_ORDER_QTY).filter(([,qty])=>qty>0);
+  if(entries.length===0){ toast('Pick at least one model and quantity'); return; }
+  const items = entries.map(([itemId,qty])=>{
+    const it = S.inventory.find(i=>i.id===itemId);
+    return {itemId, name: it?it.name:'Item', sellPrice: it?(Number(it.sellPrice)||0):0, qty};
+  });
+  if(!S.iphoneOrders) S.iphoneOrders=[];
+  S.iphoneOrders.push({
+    id: uid(), ts: Date.now(),
+    customer: CURRENT_USER.clientCustomer, userId: CURRENT_USER.id, userName: CURRENT_USER.name,
+    items, notes: (IPHONE_ORDER_NOTE||'').trim(), status:'new'
+  });
+  persist('iphoneOrders');
+  IPHONE_ORDER_QTY={};
+  IPHONE_ORDER_NOTE='';
+  toast('Order submitted — we\'ll be in touch');
+  render();
+}
 /* The client portal renders one of these instead of a per-project block under each
    project — which also stops #projectDocsSection appearing several times in a page. */
 function renderClientDocsSection(projects){
@@ -2658,7 +2740,7 @@ function __faceIDUnlock(){
   if(!user) return false;
   const badge = document.getElementById('faceidBadge');
   const finish = ()=>{
-    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null};
+    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
     syncPushTopic();
     AUTH_ERR='';
     if(!applyHashRoute()) render();
@@ -2770,7 +2852,11 @@ function slugifyTopic(s){
 }
 function pushTopicsForUser(u){
   if(!u) return [];
-  if(['admin','staff','purchasing','readonly'].includes(u.role)) return ['staff'];
+  if(['admin','staff','purchasing','readonly'].includes(u.role)){
+    const topics=['staff'];
+    if(iphoneStoreAdminFlag(u)) topics.push('iphone_orders');
+    return topics;
+  }
   if(u.role==='client' && u.clientCustomer) return ['client_'+slugifyTopic(u.clientCustomer)];
   if(u.role==='supplier' && u.supplierName) return ['suppliers', 'supplier_'+slugifyTopic(u.supplierName)];
   return [];
@@ -2876,6 +2962,8 @@ function render(){
   STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='staffPanelThreadInput';
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
+  // iPhone Store orders are visible only to whoever iphoneStoreAdminFlag() singles out
+  if(!isIphoneStoreAdmin() && VIEW.name==='iphone-orders'){ VIEW={name:'more',params:{}}; }
   // purchasing-only accounts are confined to the Stock section (purchases/RFQs/inventory)
   if(isPurchasingOnly() && (TAB_SECTIONS[VIEW.name]||'dashboard')!=='stock'){ VIEW={name:'stock',params:{}}; }
   // read-only accounts can browse everything but never reach a create/edit form
@@ -2917,6 +3005,7 @@ function render(){
     case 'rfq-form': body = renderRfqForm(VIEW.params.id); break;
     case 'rfq-view': body = renderRfqView(VIEW.params.id); break;
     case 'todos': body = renderTodos(); break;
+    case 'iphone-orders': body = renderIphoneOrders(); break;
     default: body = renderDashboard();
   }
   CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='chatInput';
@@ -2973,6 +3062,7 @@ const TAB_SECTIONS={
   'client-chats':'more','client-chat':'more',
   'supplier-chats':'more','supplier-chat':'more',
   'todos':'more',
+  'iphone-orders':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){
@@ -3043,6 +3133,7 @@ const PORTAL_SUBVIEWS = ['supplier-rfq','supplier-purchase-view'];
 function portalNavItems(){
   if(CURRENT_USER.role==='client') return [
     ['p-projects','box','Projects'],
+    ['p-iphones','cart','iPhone Store'],
     ['p-documents','file','Documents'],
     ['p-docs','sales','Invoices & quotes'],
     ['p-messages','chat','Messages'],
@@ -5962,6 +6053,13 @@ function renderMore(){
           ${ic('chev')}
         </div>
       </div>
+      ${isIphoneStoreAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('iphone-orders')">
+        <div class="small" style="font-weight:600">iPhone Store orders</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${(S.iphoneOrders||[]).filter(o=>o.status==='new').length>0?`<span class="badge pending">${(S.iphoneOrders||[]).filter(o=>o.status==='new').length} new</span>`:''}
+          ${ic('chev')}
+        </div>
+      </div>`:''}
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('reports')">
         <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
       </div>
@@ -6013,6 +6111,40 @@ function renderActivityLog(){
           </div>`).join('')}
       </div>`}
   </div>`;
+}
+
+/* ---------- IPHONE STORE ORDERS (staff side — gated to isIphoneStoreAdmin() in render()) ---------- */
+function renderIphoneOrders(){
+  const orders = (S.iphoneOrders||[]).slice().sort((a,b)=>b.ts-a.ts);
+  const statusBadge = {new:'pending', confirmed:'active', fulfilled:'completed', cancelled:'overdue'};
+  const statusFlow = ['new','confirmed','fulfilled','cancelled'];
+  return `
+  ${topbar('iPhone Store orders','Only visible to you', true)}
+  <div class="content">
+    ${orders.length===0? emptyState('cart','No orders yet','Orders clients place through the iPhone Store will show up here.') :
+      orders.map(o=>`
+      <div class="card" style="margin-bottom:10px">
+        <div class="row-between">
+          <div style="min-width:0">
+            <div class="small" style="font-weight:600">${esc(o.customer||o.userName||'Client')}</div>
+            <div class="tiny mono muted">${fmtDate(new Date(o.ts).toISOString().slice(0,10))}</div>
+          </div>
+          <span class="badge ${statusBadge[o.status]||'pending'}">${esc(o.status)}</span>
+        </div>
+        <div class="small" style="margin-top:8px;line-height:1.5">${o.items.map(it=>`${esc(it.name)} ×${it.qty}${it.sellPrice>0?` — ${fmtMoney(it.sellPrice*it.qty)}`:''}`).join('<br>')}</div>
+        ${o.notes?`<div class="tiny muted" style="margin-top:6px">${esc(o.notes)}</div>`:''}
+        <select style="margin-top:10px" onchange="setIphoneOrderStatus('${o.id}',this.value)">
+          ${statusFlow.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
+        </select>
+      </div>`).join('')}
+  </div>`;
+}
+function setIphoneOrderStatus(id, status){
+  const o = (S.iphoneOrders||[]).find(x=>x.id===id);
+  if(!o) return;
+  o.status = status;
+  persist('iphoneOrders');
+  toast('Order updated');
 }
 
 /* ---------- TO-DO LIST ---------- */
@@ -6328,6 +6460,7 @@ function cancelTeamEdit(){ TEAM_EDIT_ID=null; render(); }
 function toggleTeamRoleWraps(role){
   const c=document.getElementById('t_client_wrap'); if(c) c.style.display = role==='client'?'block':'none';
   const s=document.getElementById('t_supplier_wrap'); if(s) s.style.display = role==='supplier'?'block':'none';
+  const p=document.getElementById('t_iphone_wrap'); if(p) p.style.display = (role==='client'||role==='supplier')?'none':'block';
 }
 function renderTeamForm(){
   const staff = S.users.filter(u=>u.id!==CURRENT_USER.id);
@@ -6363,6 +6496,15 @@ function renderTeamForm(){
         <div class="tiny muted" style="margin-top:2px">Every price they submit is tagged with this exact supplier name, so you can tell suppliers apart.</div>
         ${supplierDatalist()}
       </div>
+      <div id="t_iphone_wrap" style="display:${(role==='client'||role==='supplier')?'none':'block'}">
+        <div class="toggle-row">
+          <div>
+            <div class="small" style="font-weight:600">iPhone Store access</div>
+            <div class="tiny muted">Only this person can see and manage orders placed through the client-facing iPhone Store.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="t_iphone_admin" ${editing?(iphoneStoreAdminFlag(editing)?'checked':''):''}><span class="slider"></span></label>
+        </div>
+      </div>
       <div id="t_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px"></div>
       <div style="display:flex;gap:8px;margin-top:6px">
         ${editing?`<button class="btn btn-ghost" onclick="cancelTeamEdit()">Cancel</button>`:''}
@@ -6387,6 +6529,7 @@ async function saveTeamMember(){
   const role=document.getElementById('t_role').value;
   const clientCustomer=document.getElementById('t_customer').value.trim();
   const supplierName=document.getElementById('t_supplier').value.trim();
+  const iphoneStoreAdmin=document.getElementById('t_iphone_admin').checked;
   const err=document.getElementById('t_err');
   const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
   if(!name||!username||(!editing&&pin.length<4)||(pin&&pin.length<4)){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
@@ -6398,6 +6541,7 @@ async function saveTeamMember(){
     editing.name=name; editing.username=username; editing.role=role;
     if(role==='client') editing.clientCustomer=clientCustomer; else delete editing.clientCustomer;
     if(role==='supplier') editing.supplierName=supplierName; else delete editing.supplierName;
+    if(role==='client'||role==='supplier') delete editing.iphoneStoreAdmin; else editing.iphoneStoreAdmin=iphoneStoreAdmin;
     if(pin) editing.passHash=await sha256(username+':'+pin);
     await persist('users');
     logActivity(`Updated team member "${name}" (${label})`);
@@ -6408,6 +6552,7 @@ async function saveTeamMember(){
     const user={id:uid(), name, username, passHash, role};
     if(role==='client') user.clientCustomer=clientCustomer;
     if(role==='supplier') user.supplierName=supplierName;
+    if(role!=='client' && role!=='supplier') user.iphoneStoreAdmin=iphoneStoreAdmin;
     S.users.push(user);
     await persist('users');
     logActivity(`Added team member "${name}" (${label})`);
