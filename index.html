@@ -689,7 +689,12 @@
        much taller than the plain .topbar every other page — client/supplier portal and
        staff — uses. render() adds this class only when the staff Dashboard is showing,
        so the panel only drops down that far when it actually needs to clear the hero. */
-    .portal-msg-panel.tall-header{top:226px;height:min(480px,calc(100vh - 250px));}
+    .portal-msg-panel.tall-header{top:214px;height:min(480px,calc(100vh - 238px));}
+    /* The Dashboard hero's bottom padding only exists to leave navy showing behind the
+       stat cards' overlap — trimming it a little (only while the tall-header panel is
+       showing, so every other context keeps the full-size hero) buys the panel real
+       headroom without visibly cramping the cards. */
+    .portal-msg-panel.tall-header ~ #app .dash-hero{padding-bottom:34px;}
     .portal-msg-panel:empty{display:none;}
     /* Plain #app (no .client-portal qualifier) so this covers the staff/admin shell's
        right-hand Messages panel too, not just the client/supplier portal's. */
