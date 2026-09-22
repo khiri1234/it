@@ -971,6 +971,15 @@ function iphoneStoreAdminFlag(u){
   return !!(u.username && u.username.toLowerCase()==='hatef');
 }
 function isIphoneStoreAdmin(){ return iphoneStoreAdminFlag(CURRENT_USER); }
+// Superadmin: the only account allowed to create, edit, or remove other admin accounts —
+// protects against one admin locking another out or self-promoting. Same explicit-flag-
+// with-username-fallback pattern as iphoneStoreAdminFlag.
+function superAdminFlag(u){
+  if(!u) return false;
+  if(typeof u.superAdmin==='boolean') return u.superAdmin;
+  return !!(u.username && u.username.toLowerCase()==='hatef');
+}
+function isSuperAdmin(){ return superAdminFlag(CURRENT_USER); }
 // Which business(es) a client account can see in their portal — keeps the IT Solutions
 // side (Projects/Documents/Invoices) and the iPhone Store side separate per client.
 function clientBusinessOf(u){ return (u && u.clientBusiness) || 'both'; }
@@ -2125,7 +2134,7 @@ async function doLogin(){
   const passHash = await sha256(username+':'+pin);
   const user = S.users.find(u=>u.username===username && u.passHash===passHash);
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,clientBusiness:user.clientBusiness||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,clientBusiness:user.clientBusiness||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin,superAdmin:user.superAdmin};
   syncPushTopic();
   AUTH_ERR='';
   setRememberedUserId(user.id);
@@ -2845,7 +2854,7 @@ function __faceIDUnlock(){
   if(!user) return false;
   const badge = document.getElementById('faceidBadge');
   const finish = ()=>{
-    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,clientBusiness:user.clientBusiness||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
+    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,clientBusiness:user.clientBusiness||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin,superAdmin:user.superAdmin};
     syncPushTopic();
     AUTH_ERR='';
     if(!applyHashRoute()) render();
@@ -6125,7 +6134,7 @@ function renderMore(){
           </div>
           <div style="min-width:0">
             <div style="font-weight:600">${esc(CURRENT_USER.name)}</div>
-            <div class="tiny muted">@${esc(CURRENT_USER.username)} · ${CURRENT_USER.role==='admin'?'Admin':'Staff'}</div>
+            <div class="tiny muted">@${esc(CURRENT_USER.username)} · ${CURRENT_USER.role==='admin'?(isSuperAdmin()?'Superadmin':'Admin'):'Staff'}</div>
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="logout()">Log out</button>
@@ -6591,17 +6600,23 @@ function sendSupplierChatReply(supplier){
   render();
 }
 let TEAM_EDIT_ID = null;
-function editTeamMember(id){ TEAM_EDIT_ID=id; render(); }
+function editTeamMember(id){
+  const target = S.users.find(u=>u.id===id);
+  if(target && target.role==='admin' && !isSuperAdmin()){ toast('Only Hatef can manage admin accounts'); return; }
+  TEAM_EDIT_ID=id; render();
+}
 function cancelTeamEdit(){ TEAM_EDIT_ID=null; render(); }
 function toggleTeamRoleWraps(role){
   const c=document.getElementById('t_client_wrap'); if(c) c.style.display = role==='client'?'block':'none';
   const s=document.getElementById('t_supplier_wrap'); if(s) s.style.display = role==='supplier'?'block':'none';
   const p=document.getElementById('t_iphone_wrap'); if(p) p.style.display = (role==='client'||role==='supplier')?'none':'block';
+  const sa=document.getElementById('t_superadmin_wrap'); if(sa) sa.style.display = role==='admin'?'block':'none';
 }
 function renderTeamForm(){
   const staff = S.users.filter(u=>u.id!==CURRENT_USER.id);
   const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
   const role = editing ? editing.role : 'staff';
+  const canManageAdmins = isSuperAdmin();
   return `
   ${topbar('Team & logins','',true)}
   <div class="content">
@@ -6614,12 +6629,21 @@ function renderTeamForm(){
       <label>Role</label>
       <select id="t_role" onchange="toggleTeamRoleWraps(this.value)">
         <option value="staff" ${role==='staff'?'selected':''}>Staff — can't delete, edit prices, or change settings</option>
-        <option value="admin" ${role==='admin'?'selected':''}>Admin — full access</option>
+        ${canManageAdmins?`<option value="admin" ${role==='admin'?'selected':''}>Admin — full access</option>`:''}
         <option value="purchasing" ${role==='purchasing'?'selected':''}>Purchasing — only Stock, Purchases & RFQs</option>
         <option value="readonly" ${role==='readonly'?'selected':''}>Read only — can browse everything, can't change anything</option>
         <option value="client" ${role==='client'?'selected':''}>Client — view-only access to their own project(s)</option>
         <option value="supplier" ${role==='supplier'?'selected':''}>Supplier — logs in to submit prices for RFQs</option>
       </select>
+      ${canManageAdmins?`<div id="t_superadmin_wrap" style="display:${role==='admin'?'block':'none'}">
+        <div class="toggle-row">
+          <div>
+            <div class="small" style="font-weight:600">Superadmin</div>
+            <div class="tiny muted">Only a superadmin can create, edit, or remove other admin accounts.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="t_superadmin" ${editing?(superAdminFlag(editing)?'checked':''):''}><span class="slider"></span></label>
+        </div>
+      </div>`:''}
       <div id="t_client_wrap" style="display:${role==='client'?'block':'none'}">
         <label>Customer</label>
         <input id="t_customer" placeholder="Customer name (must match projects/invoices)" value="${editing?esc(editing.clientCustomer||''):''}" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
@@ -6656,13 +6680,17 @@ function renderTeamForm(){
     </div>
     <div class="section-title">Team</div>
     ${staff.length===0? `<div class="card"><div class="tiny muted">Just you so far — add teammates above.</div></div>` :
-      staff.map(u=>`<div class="card row-between">
-        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}${clientBusinessOf(u)!=='both'?` · ${clientBusinessOf(u)==='it'?'IT Solutions only':'iPhone Store only'}`:''}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:u.role==='purchasing'?'Purchasing':u.role==='readonly'?'Read only':'Staff'}</div></div>
+      staff.map(u=>{
+        const locked = u.role==='admin' && !canManageAdmins;
+        return `<div class="card row-between">
+        <div><div class="small" style="font-weight:600">${esc(u.name)}${u.role==='admin'&&superAdminFlag(u)?' · Superadmin':''}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}${clientBusinessOf(u)!=='both'?` · ${clientBusinessOf(u)==='it'?'IT Solutions only':'iPhone Store only'}`:''}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:u.role==='purchasing'?'Purchasing':u.role==='readonly'?'Read only':'Staff'}</div></div>
+        ${locked? `<div class="tiny muted">Managed by superadmin</div>` : `
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost btn-sm" onclick="editTeamMember('${u.id}')">${ic('edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
-        </div>
-      </div>`).join('')}
+        </div>`}
+      </div>`;
+      }).join('')}
   </div>`;
 }
 async function saveTeamMember(){
@@ -6674,8 +6702,12 @@ async function saveTeamMember(){
   const supplierName=document.getElementById('t_supplier').value.trim();
   const clientBusiness=document.getElementById('t_client_business').value;
   const iphoneStoreAdmin=document.getElementById('t_iphone_admin').checked;
+  const superAdminEl=document.getElementById('t_superadmin');
+  const superAdminChecked = superAdminEl ? superAdminEl.checked : false;
   const err=document.getElementById('t_err');
   const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
+  if(role==='admin' && !isSuperAdmin()){ err.textContent='Only Hatef (superadmin) can create or manage admin accounts.'; return; }
+  if(editing && editing.role==='admin' && !isSuperAdmin()){ err.textContent='Only Hatef (superadmin) can edit an admin account.'; return; }
   if(!name||!username||(!editing&&pin.length<4)||(pin&&pin.length<4)){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
   if(role==='client' && !clientCustomer){ err.textContent='Pick which customer this client account belongs to.'; return; }
   if(role==='supplier' && !supplierName){ err.textContent='Enter the supplier name this account belongs to.'; return; }
@@ -6686,6 +6718,7 @@ async function saveTeamMember(){
     if(role==='client'){ editing.clientCustomer=clientCustomer; editing.clientBusiness=clientBusiness; } else { delete editing.clientCustomer; delete editing.clientBusiness; }
     if(role==='supplier') editing.supplierName=supplierName; else delete editing.supplierName;
     if(role==='client'||role==='supplier') delete editing.iphoneStoreAdmin; else editing.iphoneStoreAdmin=iphoneStoreAdmin;
+    if(role==='admin' && isSuperAdmin()) editing.superAdmin=superAdminChecked; else delete editing.superAdmin;
     if(pin) editing.passHash=await sha256(username+':'+pin);
     await persist('users');
     logActivity(`Updated team member "${name}" (${label})`);
@@ -6697,6 +6730,7 @@ async function saveTeamMember(){
     if(role==='client'){ user.clientCustomer=clientCustomer; user.clientBusiness=clientBusiness; }
     if(role==='supplier') user.supplierName=supplierName;
     if(role!=='client' && role!=='supplier') user.iphoneStoreAdmin=iphoneStoreAdmin;
+    if(role==='admin' && isSuperAdmin()) user.superAdmin=superAdminChecked;
     S.users.push(user);
     await persist('users');
     logActivity(`Added team member "${name}" (${label})`);
@@ -6705,6 +6739,8 @@ async function saveTeamMember(){
   render();
 }
 function removeTeamMember(id){
+  const target = S.users.find(x=>x.id===id);
+  if(target && target.role==='admin' && !isSuperAdmin()){ toast('Only Hatef can manage admin accounts'); return; }
   showConfirm('Remove this team member? They will no longer be able to sign in.', ()=>{
   const u=S.users.find(x=>x.id===id);
   S.users=S.users.filter(u=>u.id!==id);
