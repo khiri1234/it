@@ -971,6 +971,11 @@ function iphoneStoreAdminFlag(u){
   return !!(u.username && u.username.toLowerCase()==='hatef');
 }
 function isIphoneStoreAdmin(){ return iphoneStoreAdminFlag(CURRENT_USER); }
+// Which business(es) a client account can see in their portal — keeps the IT Solutions
+// side (Projects/Documents/Invoices) and the iPhone Store side separate per client.
+function clientBusinessOf(u){ return (u && u.clientBusiness) || 'both'; }
+function clientSeesIT(u){ const b=clientBusinessOf(u); return b==='both'||b==='it'; }
+function clientSeesIphone(u){ const b=clientBusinessOf(u); return b==='both'||b==='iphone'; }
 function denyIfReadOnly(){
   if(isReadOnly()){ toast('View only — ask an admin to make changes'); return true; }
   return false;
@@ -2120,7 +2125,7 @@ async function doLogin(){
   const passHash = await sha256(username+':'+pin);
   const user = S.users.find(u=>u.username===username && u.passHash===passHash);
   if(!user){ AUTH_ERR='Incorrect username or PIN.'; render(); return; }
-  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
+  CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,clientBusiness:user.clientBusiness||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
   syncPushTopic();
   AUTH_ERR='';
   setRememberedUserId(user.id);
@@ -2341,18 +2346,8 @@ function renderStaffPanelThreadBody(type, name){
 
 /* ---------- CLIENT PORTAL (read-only — one customer's own projects/invoices/quotes,
    no cost prices, no profit margins, no edit controls of any kind) ---------- */
-function renderClientPortal(){
-  const customer = CURRENT_USER.clientCustomer;
-  const projects = S.projects.filter(p=>p.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  const docs = [...S.invoices.map(d=>({...d,kind:'invoice'})), ...S.quotes.map(d=>({...d,kind:'quote'}))]
-    .filter(d=>d.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  const clientChatMsgs = (S.clientChats && S.clientChats[customer]) || [];
-  markClientChatRead(customer,'client');
-  const clientChatSeenLabel = clientThreadSeenLabel(customer, clientChatMsgs, 'client');
+function renderClientProjectsSection(projects){
   return `
-  ${topbar(S.settings.companyName||'Ledger', `Client portal — ${customer}`, false,
-    `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
-  <div class="content">
     <div class="section-title" id="p-projects">Projects</div>
     ${projects.length===0? `<div class="card"><div class="tiny muted">No projects yet.</div></div>` :
       projects.map(p=>{
@@ -2390,13 +2385,10 @@ function renderClientPortal(){
             <div class="tiny mono muted">${fmtDate(pay.date)}</div>
           </div>`).join('')}` : ''}
         </div>`;
-      }).join('')}
-
-    <div class="section-title" id="p-iphones">iPhone Store</div>
-    ${renderIphoneStoreSection(customer)}
-
-    ${renderClientDocsSection(projects)}
-
+      }).join('')}`;
+}
+function renderClientInvoicesSection(docs){
+  return `
     <div class="section-title" id="p-docs">Invoices &amp; quotes</div>
     ${docs.length===0? `<div class="card"><div class="tiny muted">Nothing issued to you yet.</div></div>` :
       docs.map(d=>{
@@ -2424,7 +2416,28 @@ function renderClientPortal(){
             <img src="${d.clientSignature}" style="max-height:60px;margin-top:4px;background:#fff;border-radius:6px;padding:4px">
           </div>` : `<button class="btn btn-teal btn-block" style="margin-top:8px" onclick="openSignatureModal('quote','${d.id}')">${ic('edit')} Sign &amp; accept this quote</button>`) : ''}
         </div>`;
-      }).join('')}
+      }).join('')}`;
+}
+function renderClientPortal(){
+  const customer = CURRENT_USER.clientCustomer;
+  const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
+  const projects = S.projects.filter(p=>p.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const docs = [...S.invoices.map(d=>({...d,kind:'invoice'})), ...S.quotes.map(d=>({...d,kind:'quote'}))]
+    .filter(d=>d.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const clientChatMsgs = (S.clientChats && S.clientChats[customer]) || [];
+  markClientChatRead(customer,'client');
+  const clientChatSeenLabel = clientThreadSeenLabel(customer, clientChatMsgs, 'client');
+  return `
+  ${topbar(S.settings.companyName||'Ledger', `Client portal — ${customer}`, false,
+    `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
+  <div class="content">
+    ${seesIT? renderClientProjectsSection(projects) : ''}
+
+    ${seesIphone? `<div class="section-title" id="p-iphones">iPhone Store</div>${renderIphoneStoreSection(customer)}` : ''}
+
+    ${seesIT? renderClientDocsSection(projects) : ''}
+
+    ${seesIT? renderClientInvoicesSection(docs) : ''}
 
     ${isWideEnoughForMsgPanel() ? '' : `
     <div class="section-title" id="p-messages">Messages</div>
@@ -2832,7 +2845,7 @@ function __faceIDUnlock(){
   if(!user) return false;
   const badge = document.getElementById('faceidBadge');
   const finish = ()=>{
-    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
+    CURRENT_USER={id:user.id,name:user.name,username:user.username,role:user.role,clientCustomer:user.clientCustomer||null,clientBusiness:user.clientBusiness||null,supplierName:user.supplierName||null,photoURL:user.photoURL||null,iphoneStoreAdmin:user.iphoneStoreAdmin};
     syncPushTopic();
     AUTH_ERR='';
     if(!applyHashRoute()) render();
@@ -3223,13 +3236,15 @@ function renderSidebar(){
 let PORTAL_SECTION = '';
 const PORTAL_SUBVIEWS = ['supplier-rfq','supplier-purchase-view'];
 function portalNavItems(){
-  if(CURRENT_USER.role==='client') return [
-    ['p-projects','box','Projects'],
-    ['p-iphones','cart','iPhone Store'],
-    ['p-documents','file','Documents'],
-    ['p-docs','sales','Invoices & quotes'],
-    ['p-messages','chat','Messages'],
-  ];
+  if(CURRENT_USER.role==='client'){
+    const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
+    return [
+      ...(seesIT? [['p-projects','box','Projects']] : []),
+      ...(seesIphone? [['p-iphones','cart','iPhone Store']] : []),
+      ...(seesIT? [['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : []),
+      ['p-messages','chat','Messages'],
+    ];
+  }
   return [
     ['p-rfqs','reports','Requests for quotation'],
     ['p-pos','cart','Purchase orders'],
@@ -6610,6 +6625,13 @@ function renderTeamForm(){
         <input id="t_customer" placeholder="Customer name (must match projects/invoices)" value="${editing?esc(editing.clientCustomer||''):''}" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
         <div class="tiny muted" style="margin-top:2px">They'll see every project, invoice and quote billed to this exact customer name — nothing else.</div>
         ${customerDatalist()}
+        <label style="margin-top:10px">Business</label>
+        <select id="t_client_business">
+          <option value="both" ${(editing?clientBusinessOf(editing):'both')==='both'?'selected':''}>Both — IT Solutions &amp; iPhone Store</option>
+          <option value="it" ${editing&&clientBusinessOf(editing)==='it'?'selected':''}>IT Solutions only — no iPhone Store</option>
+          <option value="iphone" ${editing&&clientBusinessOf(editing)==='iphone'?'selected':''}>iPhone Store only — no Projects/Documents/Invoices</option>
+        </select>
+        <div class="tiny muted" style="margin-top:2px">Controls which sections of the portal this client sees. Messages is always available.</div>
       </div>
       <div id="t_supplier_wrap" style="display:${role==='supplier'?'block':'none'}">
         <label>Supplier name</label>
@@ -6635,7 +6657,7 @@ function renderTeamForm(){
     <div class="section-title">Team</div>
     ${staff.length===0? `<div class="card"><div class="tiny muted">Just you so far — add teammates above.</div></div>` :
       staff.map(u=>`<div class="card row-between">
-        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:u.role==='purchasing'?'Purchasing':u.role==='readonly'?'Read only':'Staff'}</div></div>
+        <div><div class="small" style="font-weight:600">${esc(u.name)}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}${clientBusinessOf(u)!=='both'?` · ${clientBusinessOf(u)==='it'?'IT Solutions only':'iPhone Store only'}`:''}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:u.role==='purchasing'?'Purchasing':u.role==='readonly'?'Read only':'Staff'}</div></div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost btn-sm" onclick="editTeamMember('${u.id}')">${ic('edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="removeTeamMember('${u.id}')">${ic('trash')}</button>
@@ -6650,6 +6672,7 @@ async function saveTeamMember(){
   const role=document.getElementById('t_role').value;
   const clientCustomer=document.getElementById('t_customer').value.trim();
   const supplierName=document.getElementById('t_supplier').value.trim();
+  const clientBusiness=document.getElementById('t_client_business').value;
   const iphoneStoreAdmin=document.getElementById('t_iphone_admin').checked;
   const err=document.getElementById('t_err');
   const editing = TEAM_EDIT_ID ? S.users.find(u=>u.id===TEAM_EDIT_ID) : null;
@@ -6660,7 +6683,7 @@ async function saveTeamMember(){
   const label = role==='client'?`client — ${clientCustomer}`:role==='supplier'?`supplier — ${supplierName}`:role;
   if(editing){
     editing.name=name; editing.username=username; editing.role=role;
-    if(role==='client') editing.clientCustomer=clientCustomer; else delete editing.clientCustomer;
+    if(role==='client'){ editing.clientCustomer=clientCustomer; editing.clientBusiness=clientBusiness; } else { delete editing.clientCustomer; delete editing.clientBusiness; }
     if(role==='supplier') editing.supplierName=supplierName; else delete editing.supplierName;
     if(role==='client'||role==='supplier') delete editing.iphoneStoreAdmin; else editing.iphoneStoreAdmin=iphoneStoreAdmin;
     if(pin) editing.passHash=await sha256(username+':'+pin);
@@ -6671,7 +6694,7 @@ async function saveTeamMember(){
   } else {
     const passHash=await sha256(username+':'+pin);
     const user={id:uid(), name, username, passHash, role};
-    if(role==='client') user.clientCustomer=clientCustomer;
+    if(role==='client'){ user.clientCustomer=clientCustomer; user.clientBusiness=clientBusiness; }
     if(role==='supplier') user.supplierName=supplierName;
     if(role!=='client' && role!=='supplier') user.iphoneStoreAdmin=iphoneStoreAdmin;
     S.users.push(user);
