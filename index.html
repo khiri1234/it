@@ -947,6 +947,7 @@ let SUPPLIER_CHAT_REPLY_WAS_FOCUSED=false;
 let STAFF_MSG_TAB='team'; // 'team' | 'clients' | 'suppliers'
 let STAFF_MSG_THREAD=null; // {type:'client'|'supplier', name} while viewing one thread; null = list
 let IPHONE_ORDER_QTY={}; // itemId -> qty, while a client is building an iPhone Store order
+let IPHONE_ORDER_DETAILS={}; // itemId -> {storage, color}, alongside IPHONE_ORDER_QTY
 let IPHONE_ORDER_NOTE='';
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
@@ -2608,7 +2609,11 @@ function renderPortalDocsSection(files, viewFn){
 }
 /* ---------- IPHONE STORE (client portal, orders visible only to isIphoneStoreAdmin()) ---------- */
 function iphoneStoreItems(){
-  return S.inventory.filter(i=>/iphone/i.test(i.name||''));
+  return S.inventory.filter(i=>/iphone\s*18/i.test(i.name||''));
+}
+const IPHONE_STORAGE_OPTIONS = ['64GB','128GB','256GB','512GB','1TB'];
+function iphoneOrderItemLabel(it){
+  return `${it.name}${it.storage?' '+it.storage:''}${it.color?' ('+it.color+')':''} ×${it.qty}`;
 }
 function renderIphoneStoreSection(customer){
   const items = iphoneStoreItems();
@@ -2619,21 +2624,38 @@ function renderIphoneStoreSection(customer){
     ${items.length===0? `<div class="tiny muted">No iPhone models available to order right now.</div>` : `
     ${items.map(i=>{
       const qty = IPHONE_ORDER_QTY[i.id]||0;
+      const detail = IPHONE_ORDER_DETAILS[i.id] || {storage:'', color:''};
       return `
-      <div class="row-between" style="padding:10px 0;border-bottom:1px solid var(--line)">
-        <div style="min-width:0">
-          <div class="small" style="font-weight:600">${esc(i.name)}</div>
-          <div class="tiny muted">${i.sellPrice>0?fmtMoney(i.sellPrice):'Price on request'} · ${i.stock>0?'In stock':'Out of stock — can still order'}</div>
+      <div style="padding:10px 0;border-bottom:1px solid var(--line)">
+        <div class="row-between">
+          <div style="min-width:0">
+            <div class="small" style="font-weight:600">${esc(i.name)}</div>
+            <div class="tiny muted">${i.sellPrice>0?fmtMoney(i.sellPrice):'Price on request'} · ${i.stock>0?'In stock':'Out of stock — can still order'}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 11px" onclick="stepIphoneOrderQty('${i.id}',-1)">−</button>
+            <div class="mono" style="min-width:16px;text-align:center">${qty}</div>
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 11px" onclick="stepIphoneOrderQty('${i.id}',1)">+</button>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-          <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 11px" onclick="stepIphoneOrderQty('${i.id}',-1)">−</button>
-          <div class="mono" style="min-width:16px;text-align:center">${qty}</div>
-          <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 11px" onclick="stepIphoneOrderQty('${i.id}',1)">+</button>
-        </div>
+        ${qty>0? `
+        <div class="item-grid" style="margin-top:8px">
+          <div>
+            <label class="tiny muted">Storage</label>
+            <select onchange="setIphoneOrderDetail('${i.id}','storage',this.value)">
+              <option value="">Select storage</option>
+              ${IPHONE_STORAGE_OPTIONS.map(o=>`<option value="${o}" ${detail.storage===o?'selected':''}>${o}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="tiny muted">Color (optional)</label>
+            <input value="${esc(detail.color)}" placeholder="e.g. Space Black" oninput="setIphoneOrderDetail('${i.id}','color',this.value)">
+          </div>
+        </div>` : ''}
       </div>`;
     }).join('')}
     <label style="margin-top:10px">Notes (optional)</label>
-    <textarea id="iphoneOrderNote" rows="2" placeholder="Color, storage size, anything else..." oninput="IPHONE_ORDER_NOTE=this.value">${esc(IPHONE_ORDER_NOTE)}</textarea>
+    <textarea id="iphoneOrderNote" rows="2" placeholder="Anything else we should know..." oninput="IPHONE_ORDER_NOTE=this.value">${esc(IPHONE_ORDER_NOTE)}</textarea>
     <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="submitIphoneOrder()">${ic('check')} Submit order</button>
     `}
   </div>
@@ -2642,7 +2664,7 @@ function renderIphoneStoreSection(customer){
   ${myOrders.map(o=>`
     <div class="card" style="margin-bottom:8px">
       <div class="row-between">
-        <div class="small" style="font-weight:600">${esc(o.items.map(it=>`${it.name} ×${it.qty}`).join(', '))}</div>
+        <div class="small" style="font-weight:600">${esc(o.items.map(iphoneOrderItemLabel).join(', '))}</div>
         <span class="badge ${orderStatusBadge[o.status]||'pending'}">${esc(o.status)}</span>
       </div>
       <div class="tiny mono muted">${fmtDate(new Date(o.ts).toISOString().slice(0,10))}</div>
@@ -2652,15 +2674,27 @@ function renderIphoneStoreSection(customer){
 }
 function stepIphoneOrderQty(itemId, delta){
   const next = Math.max(0, (IPHONE_ORDER_QTY[itemId]||0)+delta);
-  if(next===0) delete IPHONE_ORDER_QTY[itemId]; else IPHONE_ORDER_QTY[itemId]=next;
+  if(next===0){ delete IPHONE_ORDER_QTY[itemId]; delete IPHONE_ORDER_DETAILS[itemId]; }
+  else IPHONE_ORDER_QTY[itemId]=next;
   render();
+}
+function setIphoneOrderDetail(itemId, field, value){
+  if(!IPHONE_ORDER_DETAILS[itemId]) IPHONE_ORDER_DETAILS[itemId]={storage:'', color:''};
+  IPHONE_ORDER_DETAILS[itemId][field]=value;
 }
 function submitIphoneOrder(){
   const entries = Object.entries(IPHONE_ORDER_QTY).filter(([,qty])=>qty>0);
   if(entries.length===0){ toast('Pick at least one model and quantity'); return; }
+  const missingStorage = entries.find(([itemId])=>!(IPHONE_ORDER_DETAILS[itemId]&&IPHONE_ORDER_DETAILS[itemId].storage));
+  if(missingStorage){
+    const it = S.inventory.find(i=>i.id===missingStorage[0]);
+    toast(`Pick a storage size for ${it?it.name:'that model'}`);
+    return;
+  }
   const items = entries.map(([itemId,qty])=>{
     const it = S.inventory.find(i=>i.id===itemId);
-    return {itemId, name: it?it.name:'Item', sellPrice: it?(Number(it.sellPrice)||0):0, qty};
+    const detail = IPHONE_ORDER_DETAILS[itemId]||{storage:'',color:''};
+    return {itemId, name: it?it.name:'Item', sellPrice: it?(Number(it.sellPrice)||0):0, qty, storage: detail.storage, color: (detail.color||'').trim()};
   });
   if(!S.iphoneOrders) S.iphoneOrders=[];
   S.iphoneOrders.push({
@@ -2670,6 +2704,7 @@ function submitIphoneOrder(){
   });
   persist('iphoneOrders');
   IPHONE_ORDER_QTY={};
+  IPHONE_ORDER_DETAILS={};
   IPHONE_ORDER_NOTE='';
   toast('Order submitted — we\'ll be in touch');
   render();
@@ -6131,7 +6166,7 @@ function renderIphoneOrders(){
           </div>
           <span class="badge ${statusBadge[o.status]||'pending'}">${esc(o.status)}</span>
         </div>
-        <div class="small" style="margin-top:8px;line-height:1.5">${o.items.map(it=>`${esc(it.name)} ×${it.qty}${it.sellPrice>0?` — ${fmtMoney(it.sellPrice*it.qty)}`:''}`).join('<br>')}</div>
+        <div class="small" style="margin-top:8px;line-height:1.5">${o.items.map(it=>`${esc(it.name)}${it.storage?' '+esc(it.storage):''}${it.color?' ('+esc(it.color)+')':''} ×${it.qty}${it.sellPrice>0?` — ${fmtMoney(it.sellPrice*it.qty)}`:''}`).join('<br>')}</div>
         ${o.notes?`<div class="tiny muted" style="margin-top:6px">${esc(o.notes)}</div>`:''}
         <select style="margin-top:10px" onchange="setIphoneOrderStatus('${o.id}',this.value)">
           ${statusFlow.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
