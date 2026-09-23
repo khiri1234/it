@@ -950,6 +950,7 @@ let IPHONE_ORDER_QTY={}; // itemId -> qty, while a client is building an iPhone 
 let IPHONE_ORDER_DETAILS={}; // itemId -> {storage, color, country, activation}, alongside IPHONE_ORDER_QTY
 let IPHONE_ORDER_NOTE='';
 let IPHONE_ORDER_EDIT_ID=null; // set while a client is correcting one of their own still-'new' orders
+let IPHONE_REVISE_ORDER_ID=null; // set while Hatef is revising a price already sent on a priced/confirmed/declined order
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
@@ -6282,6 +6283,9 @@ function renderIphoneOrders(){
     ${orders.length===0? emptyState('cart','No orders yet','Orders clients place through the iPhone Store will show up here.') :
       orders.map(o=>{
         const total = iphoneOrderTotal(o);
+        const revising = IPHONE_REVISE_ORDER_ID===o.id;
+        const editingPrice = o.status==='new' || revising;
+        const canRevise = ['priced','confirmed','declined'].includes(o.status);
         return `
       <div class="card" style="margin-bottom:10px">
         <div class="row-between">
@@ -6291,18 +6295,25 @@ function renderIphoneOrders(){
           </div>
           <span class="badge ${IPHONE_ORDER_STATUS_BADGE[o.status]||'pending'}">${o.status.charAt(0).toUpperCase()+o.status.slice(1)}</span>
         </div>
+        ${revising? `<div class="tiny" style="margin-top:6px;color:var(--teal);font-weight:600">Revising price</div>` : ''}
         <div style="margin-top:8px">
           ${o.items.map(it=>`
           <div class="row-between" style="padding:4px 0;gap:10px">
             <div class="small" style="min-width:0">${esc(it.name)}${it.storage?' '+esc(it.storage):''}${it.color?' ('+esc(it.color)+')':''}${it.country?' · '+esc(it.country):''}${it.activation?' · '+esc(it.activation):''} ×${it.qty}</div>
-            ${o.status==='new'?
-              `<input type="number" min="0" step="0.01" id="iphonePrice_${o.id}_${it.itemId}" value="${it.suggestedPrice>0?it.suggestedPrice:''}" placeholder="Price" style="width:100px;flex-shrink:0">`
+            ${editingPrice?
+              `<input type="number" min="0" step="0.01" id="iphonePrice_${o.id}_${it.itemId}" value="${it.unitPrice>0?it.unitPrice:(it.suggestedPrice>0?it.suggestedPrice:'')}" placeholder="Price" style="width:100px;flex-shrink:0">`
               : `<div class="mono small" style="flex-shrink:0">${fmtMoney((Number(it.unitPrice)||0)*it.qty)}</div>`}
           </div>`).join('')}
         </div>
-        ${o.status!=='new'? `<div class="row-between" style="margin-top:4px;padding-top:6px;border-top:1px solid var(--line)"><div class="small" style="font-weight:600">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div></div>` : ''}
+        ${!editingPrice? `<div class="row-between" style="margin-top:4px;padding-top:6px;border-top:1px solid var(--line)"><div class="small" style="font-weight:600">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div></div>` : ''}
         ${o.notes?`<div class="tiny muted" style="margin-top:6px">${esc(o.notes)}</div>`:''}
         ${o.status==='new'? `<button class="btn btn-primary btn-block" style="margin-top:10px" onclick="sendIphoneOrderPrice('${o.id}')">${ic('check')} Send price to client</button>` : ''}
+        ${revising? `
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary" style="flex:1" onclick="sendIphoneOrderPrice('${o.id}')">${ic('check')} Send revised price</button>
+          <button class="btn btn-ghost" style="flex:1" onclick="cancelReviseIphonePrice()">Cancel</button>
+        </div>` : ''}
+        ${canRevise && !revising? `<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="startReviseIphonePrice('${o.id}')">${ic('edit')} Revise price</button>` : ''}
         <select style="margin-top:10px" onchange="setIphoneOrderStatus('${o.id}',this.value)">
           ${statusFlow.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
         </select>
@@ -6320,11 +6331,21 @@ function sendIphoneOrderPrice(orderId){
     if(!val || val<=0){ toast(`Enter a price for ${it.name}`); return; }
     prices.push(val);
   }
+  const wasRevision = o.status!=='new';
   o.items.forEach((it,idx)=>{ it.unitPrice = prices[idx]; });
   o.status='priced';
   o.pricedAt=Date.now();
   persist('iphoneOrders');
-  toast('Price sent to client');
+  IPHONE_REVISE_ORDER_ID=null;
+  toast(wasRevision ? 'Revised price sent to client' : 'Price sent to client');
+  render();
+}
+function startReviseIphonePrice(orderId){
+  IPHONE_REVISE_ORDER_ID=orderId;
+  render();
+}
+function cancelReviseIphonePrice(){
+  IPHONE_REVISE_ORDER_ID=null;
   render();
 }
 function setIphoneOrderStatus(id, status){
