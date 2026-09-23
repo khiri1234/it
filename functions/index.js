@@ -123,6 +123,56 @@ exports.notifyOnNewIphoneOrder = onDocumentWritten("ledger/iphoneOrders", async 
   }
 });
 
+// Admin sends or revises a price on an iPhone order: notify that client.
+// sendIphoneOrderPrice() in index.html stamps pricedAt on every send (initial and revision),
+// so a changed pricedAt is the signal regardless of which one it was.
+exports.notifyOnIphoneOrderPriced = onDocumentWritten("ledger/iphoneOrders", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeById = {};
+  beforeList.forEach((o) => { beforeById[o.id] = o; });
+
+  for (const o of afterList) {
+    const before = beforeById[o.id];
+    if (o.pricedAt && (!before || before.pricedAt !== o.pricedAt)) {
+      const total = (o.items || []).reduce((a, it) => a + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0), 0);
+      const isRevision = !!(before && before.pricedAt);
+      await sendPush(
+        `client_${slugifyTopic(o.customer)}`,
+        isRevision ? "Your iPhone order price was updated" : "Your iPhone order has been priced",
+        `Total: ${total.toFixed(2)} — tap to review and confirm.`,
+        { type: "iphone_order_priced", orderId: o.id || "" }
+      );
+    }
+  }
+});
+
+// Client confirms or declines a priced iPhone order (respondIphoneOrderPrice() in index.html):
+// notify the iPhone Store admin.
+exports.notifyOnIphoneOrderResponded = onDocumentWritten("ledger/iphoneOrders", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeById = {};
+  beforeList.forEach((o) => { beforeById[o.id] = o; });
+
+  for (const o of afterList) {
+    const before = beforeById[o.id];
+    const isNewResponse = (o.status === "confirmed" || o.status === "declined") && (!before || before.status !== o.status);
+    if (isNewResponse) {
+      await sendPush(
+        "iphone_orders",
+        o.status === "confirmed" ? `Order confirmed by ${o.customer || "client"}` : `Order declined by ${o.customer || "client"}`,
+        o.status === "confirmed" ? "The client accepted the quoted price." : "The client declined the quoted price.",
+        { type: "iphone_order_response", orderId: o.id || "" }
+      );
+    }
+  }
+});
+
 // Supplier submits (or resubmits) a quote: notify staff. Includes the RFQ id in the data
 // payload so a tap on the notification (handled natively in LedgerApp.swift/ContentView.swift)
 // jumps straight to that RFQ via the web app's #rfq=<id> deep link.
