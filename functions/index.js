@@ -101,6 +101,28 @@ exports.notifyOnNewRfq = onDocumentWritten("ledger/rfqs", async (event) => {
   }
 });
 
+// New iPhone Store order: notify the iPhone Store admin.
+exports.notifyOnNewIphoneOrder = onDocumentWritten("ledger/iphoneOrders", async (event) => {
+  const beforeList = parseJsonField(event.data.before.exists ? event.data.before.data() : null) || [];
+  const afterList = parseJsonField(event.data.after.exists ? event.data.after.data() : null);
+  if (!afterList) return;
+
+  const beforeIds = new Set(beforeList.map((o) => o.id));
+  const newOrders = afterList.filter((o) => !beforeIds.has(o.id));
+  for (const order of newOrders) {
+    const items = order.items || [];
+    const summary = items
+      .map((it) => `${it.qty || 1}x ${it.name || "iPhone"}${it.storage ? " " + it.storage : ""}`)
+      .join(", ");
+    await sendPush(
+      "iphone_orders",
+      `New iPhone order from ${order.customer || order.userName || "a client"}`,
+      summary || "New iPhone Store order request",
+      { type: "iphone_order", orderId: order.id || "" }
+    );
+  }
+});
+
 // Supplier submits (or resubmits) a quote: notify staff. Includes the RFQ id in the data
 // payload so a tap on the notification (handled natively in LedgerApp.swift/ContentView.swift)
 // jumps straight to that RFQ via the web app's #rfq=<id> deep link.
