@@ -928,6 +928,7 @@ let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PUR
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
 let UPLOADING_PROFILE_PHOTO=false;
+let UPLOADING_IPHONE_COLOR_PHOTO=null; // color name while its illustration photo is uploading
 let SCROLL_TO_PROJECT_DOCS=false; // set true to jump straight to the Documents section on the next project-view render
 let CHAT_DRAFT='';
 let CHAT_INPUT_WAS_FOCUSED=false;
@@ -2551,6 +2552,77 @@ async function uploadProfilePhoto(file){
     render();
   }
 }
+/* iPhone Store color illustration photos — one reference photo per color, shown to
+   clients when they pick that color so they know roughly what they're ordering. */
+function renderIphoneColorPhotosCard(){
+  if(!isIphoneStoreAdmin()) return '';
+  const photos = S.settings.iphoneColorPhotos||{};
+  return `
+    <div class="card" style="margin-top:14px">
+      <label>iPhone color illustration photos</label>
+      <div class="tiny muted" style="margin-bottom:6px">Shown to clients when they pick a color in the iPhone Store picker.</div>
+      ${IPHONE_COLOR_OPTIONS.map(o=>{
+        const url = photos[o];
+        const uploading = UPLOADING_IPHONE_COLOR_PHOTO===o;
+        return `
+        <div class="row-between" style="padding:8px 0;border-top:1px solid var(--line);gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0">
+            <span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;background:${IPHONE_COLOR_HEX[o]||'#ccc'};border:1px solid var(--line)"></span>
+            ${url?`<img src="${esc(url)}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex-shrink:0">`:''}
+            <div class="small" style="font-weight:600">${o}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            ${uploading? `<span class="spinner"></span>` : `
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+              ${url?'Replace':'Upload'}
+              <input type="file" accept="image/*" style="display:none" onchange="handleIphoneColorPhotoInput('${o}',this)">
+            </label>
+            ${url?`<button type="button" class="btn btn-ghost btn-sm" onclick="removeIphoneColorPhoto('${o}')">${ic('trash')}</button>`:''}`}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+function handleIphoneColorPhotoInput(color, inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  inputEl.value = '';
+  if(file) uploadIphoneColorPhoto(color, file);
+}
+async function uploadIphoneColorPhoto(color, file){
+  if(!isIphoneStoreAdmin()){ toast('Only the iPhone Store admin can manage these photos'); return; }
+  if(!FIREBASE_ENABLED || !fbStorage){ toast('Photo uploads need Firebase Storage set up — see the setup notes in index.html'); return; }
+  if(!(file.type||'').startsWith('image/')){ toast('Please choose an image file'); return; }
+  const maxBytes = 8*1024*1024;
+  if(file.size > maxBytes){ toast('That image is too large — max 8MB'); return; }
+  UPLOADING_IPHONE_COLOR_PHOTO = color;
+  render();
+  const path = `iphoneColorPhotos/${color}/${uid()}-${file.name}`;
+  const ref = fbStorage.ref().child(path);
+  const uploadTask = ref.put(file);
+  try{
+    await Promise.race([uploadTask, uploadTimeoutPromise(45000)]);
+    const url = await ref.getDownloadURL();
+    if(!S.settings.iphoneColorPhotos) S.settings.iphoneColorPhotos={};
+    S.settings.iphoneColorPhotos[color]=url;
+    await persist('settings');
+    toast(`${color} photo updated`);
+  }catch(e){
+    console.error('iphone color photo upload failed',e);
+    try{ uploadTask.cancel(); }catch(_){}
+    toast(e && e.message==='timeout' ? 'Upload timed out — check Storage is enabled in Firebase' : 'Upload failed — check your connection and Storage rules');
+  }finally{
+    UPLOADING_IPHONE_COLOR_PHOTO = null;
+    render();
+  }
+}
+function removeIphoneColorPhoto(color){
+  if(!isIphoneStoreAdmin()) return;
+  if(!S.settings.iphoneColorPhotos || !S.settings.iphoneColorPhotos[color]) return;
+  delete S.settings.iphoneColorPhotos[color];
+  persist('settings');
+  toast(`${color} photo removed`);
+  render();
+}
 // Same reasoning as clientPayViaWhatsapp/clientPayViaPaypal above: a plain
 // <a target="_blank"> silently does nothing in the Xcode-wrapped WKWebView
 // (no native delegate to open new windows) — only the OS's own long-press
@@ -2712,6 +2784,11 @@ function renderIphoneStoreSection(customer){
                 </button>`;
               }).join('')}
             </div>
+            ${detail.color && (S.settings.iphoneColorPhotos||{})[detail.color] ? `
+            <div style="margin-top:8px">
+              <img src="${esc(S.settings.iphoneColorPhotos[detail.color])}" alt="${esc(detail.color)}" style="width:100%;max-width:220px;border-radius:12px;border:1px solid var(--line);display:block">
+              <div class="tiny muted" style="margin-top:4px">Illustration — actual color may vary slightly</div>
+            </div>` : ''}
           </div>
         </div>` : ''}
       </div>`;
@@ -6859,6 +6936,7 @@ function renderSettingsForm(){
       <label>Purchase order prefix</label><input id="s_ppo" value="${esc(s.poPrefix)}">
     </div>
     <button class="btn btn-primary btn-block" onclick="saveSettings()">${ic('check')} Save settings</button>
+    ${renderIphoneColorPhotosCard()}
     <div class="card" style="margin-top:14px">
       <label>Danger zone</label>
       <div class="tiny muted" style="margin-bottom:10px">Permanently deletes every Team chat message and every client or supplier conversation. Use this to wipe out test messages before going live — it can't be undone.</div>
