@@ -2553,57 +2553,76 @@ async function uploadProfilePhoto(file){
   }
 }
 /* iPhone Store color illustration photos — one reference photo per color, shown to
-   clients when they pick that color so they know roughly what they're ordering. */
+   clients when they pick that color so they know roughly what they're ordering.
+   The Duo has a different body shape than the rest of the lineup, so its photos
+   are kept in a separate "duo" group rather than shared with the standard models. */
+function iphoneColorPhotoGroup(name){
+  return /duo/i.test(name||'') ? 'duo' : 'standard';
+}
+// Lazily built (rather than a top-level const) since IPHONE_COLOR_OPTIONS and
+// iphoneColorOptionsFor are declared further down the file.
+function iphoneColorPhotoGroups(){
+  return [
+    { key:'standard', label:'Standard iPhone 18 models', colors: IPHONE_COLOR_OPTIONS },
+    { key:'duo', label:'iPhone 18 Duo', colors: iphoneColorOptionsFor('iPhone 18 Duo') },
+  ];
+}
 function renderIphoneColorPhotosCard(){
   if(!isIphoneStoreAdmin()) return '';
-  const photos = S.settings.iphoneColorPhotos||{};
+  const allPhotos = S.settings.iphoneColorPhotos||{};
   return `
     <div class="card" style="margin-top:14px">
       <label>iPhone color illustration photos</label>
-      <div class="tiny muted" style="margin-bottom:6px">Shown to clients when they pick a color in the iPhone Store picker.</div>
-      ${IPHONE_COLOR_OPTIONS.map(o=>{
-        const url = photos[o];
-        const uploading = UPLOADING_IPHONE_COLOR_PHOTO===o;
+      <div class="tiny muted" style="margin-bottom:6px">Shown to clients when they pick a color in the iPhone Store picker. The Duo has its own shape, so it gets its own photos.</div>
+      ${iphoneColorPhotoGroups().map(g=>{
+        const photos = allPhotos[g.key]||{};
         return `
-        <div class="row-between" style="padding:8px 0;border-top:1px solid var(--line);gap:10px">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0">
-            <span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;background:${IPHONE_COLOR_HEX[o]||'#ccc'};border:1px solid var(--line)"></span>
-            ${url?`<img src="${esc(url)}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex-shrink:0">`:''}
-            <div class="small" style="font-weight:600">${o}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-            ${uploading? `<span class="spinner"></span>` : `
-            <label class="btn btn-ghost btn-sm" style="cursor:pointer">
-              ${url?'Replace':'Upload'}
-              <input type="file" accept="image/*" style="display:none" onchange="handleIphoneColorPhotoInput('${o}',this)">
-            </label>
-            ${url?`<button type="button" class="btn btn-ghost btn-sm" onclick="removeIphoneColorPhoto('${o}')">${ic('trash')}</button>`:''}`}
-          </div>
-        </div>`;
+        <div class="tiny muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:10px">${g.label}</div>
+        ${g.colors.map(o=>{
+          const url = photos[o];
+          const uploading = UPLOADING_IPHONE_COLOR_PHOTO===`${g.key}|${o}`;
+          return `
+          <div class="row-between" style="padding:8px 0;border-top:1px solid var(--line);gap:10px">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+              <span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;background:${IPHONE_COLOR_HEX[o]||'#ccc'};border:1px solid var(--line)"></span>
+              ${url?`<img src="${esc(url)}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex-shrink:0">`:''}
+              <div class="small" style="font-weight:600">${o}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              ${uploading? `<span class="spinner"></span>` : `
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+                ${url?'Replace':'Upload'}
+                <input type="file" accept="image/*" style="display:none" onchange="handleIphoneColorPhotoInput('${g.key}','${o}',this)">
+              </label>
+              ${url?`<button type="button" class="btn btn-ghost btn-sm" onclick="removeIphoneColorPhoto('${g.key}','${o}')">${ic('trash')}</button>`:''}`}
+            </div>
+          </div>`;
+        }).join('')}`;
       }).join('')}
     </div>`;
 }
-function handleIphoneColorPhotoInput(color, inputEl){
+function handleIphoneColorPhotoInput(group, color, inputEl){
   const file = inputEl.files && inputEl.files[0];
   inputEl.value = '';
-  if(file) uploadIphoneColorPhoto(color, file);
+  if(file) uploadIphoneColorPhoto(group, color, file);
 }
-async function uploadIphoneColorPhoto(color, file){
+async function uploadIphoneColorPhoto(group, color, file){
   if(!isIphoneStoreAdmin()){ toast('Only the iPhone Store admin can manage these photos'); return; }
   if(!FIREBASE_ENABLED || !fbStorage){ toast('Photo uploads need Firebase Storage set up — see the setup notes in index.html'); return; }
   if(!(file.type||'').startsWith('image/')){ toast('Please choose an image file'); return; }
   const maxBytes = 8*1024*1024;
   if(file.size > maxBytes){ toast('That image is too large — max 8MB'); return; }
-  UPLOADING_IPHONE_COLOR_PHOTO = color;
+  UPLOADING_IPHONE_COLOR_PHOTO = `${group}|${color}`;
   render();
-  const path = `iphoneColorPhotos/${color}/${uid()}-${file.name}`;
+  const path = `iphoneColorPhotos/${group}/${color}/${uid()}-${file.name}`;
   const ref = fbStorage.ref().child(path);
   const uploadTask = ref.put(file);
   try{
     await Promise.race([uploadTask, uploadTimeoutPromise(45000)]);
     const url = await ref.getDownloadURL();
     if(!S.settings.iphoneColorPhotos) S.settings.iphoneColorPhotos={};
-    S.settings.iphoneColorPhotos[color]=url;
+    if(!S.settings.iphoneColorPhotos[group]) S.settings.iphoneColorPhotos[group]={};
+    S.settings.iphoneColorPhotos[group][color]=url;
     await persist('settings');
     toast(`${color} photo updated`);
   }catch(e){
@@ -2615,10 +2634,11 @@ async function uploadIphoneColorPhoto(color, file){
     render();
   }
 }
-function removeIphoneColorPhoto(color){
+function removeIphoneColorPhoto(group, color){
   if(!isIphoneStoreAdmin()) return;
-  if(!S.settings.iphoneColorPhotos || !S.settings.iphoneColorPhotos[color]) return;
-  delete S.settings.iphoneColorPhotos[color];
+  const photos = S.settings.iphoneColorPhotos && S.settings.iphoneColorPhotos[group];
+  if(!photos || !photos[color]) return;
+  delete photos[color];
   persist('settings');
   toast(`${color} photo removed`);
   render();
@@ -2784,11 +2804,14 @@ function renderIphoneStoreSection(customer){
                 </button>`;
               }).join('')}
             </div>
-            ${detail.color && (S.settings.iphoneColorPhotos||{})[detail.color] ? `
-            <div style="margin-top:8px">
-              <img src="${esc(S.settings.iphoneColorPhotos[detail.color])}" alt="${esc(detail.color)}" style="width:100%;max-width:220px;border-radius:12px;border:1px solid var(--line);display:block">
-              <div class="tiny muted" style="margin-top:4px">Illustration — actual color may vary slightly</div>
-            </div>` : ''}
+            ${(()=>{
+              const photoUrl = detail.color && ((S.settings.iphoneColorPhotos||{})[iphoneColorPhotoGroup(i.name)]||{})[detail.color];
+              return photoUrl ? `
+              <div style="margin-top:8px">
+                <img src="${esc(photoUrl)}" alt="${esc(detail.color)}" style="width:100%;max-width:220px;border-radius:12px;border:1px solid var(--line);display:block">
+                <div class="tiny muted" style="margin-top:4px">Illustration — actual color may vary slightly</div>
+              </div>` : '';
+            })()}
           </div>
         </div>` : ''}
       </div>`;
