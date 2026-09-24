@@ -2639,6 +2639,7 @@ const IPHONE_STORAGE_OPTIONS = ['256GB','512GB','1TB','2TB'];
 const IPHONE_COUNTRY_OPTIONS = ['UAE','Hong Kong','China','Other'];
 const IPHONE_ACTIVATION_OPTIONS = ['Active','Non-Active'];
 const IPHONE_COLOR_OPTIONS = ['Burgundy','Glacier','Black','Silver'];
+const IPHONE_COLOR_HEX = { Burgundy:'#5C1A2B', Glacier:'#EAF1FB', Black:'#1C1C1E', Silver:'#D6D8DB' };
 const IPHONE_ORDER_STATUS_BADGE = {new:'pending', priced:'sent', confirmed:'accepted', declined:'overdue', fulfilled:'completed', cancelled:'overdue'};
 function iphoneOrderItemLabel(it){
   return `${it.name}${it.storage?' '+it.storage:''}${it.color?' ('+it.color+')':''}${it.country?' · '+it.country:''}${it.activation?' · '+it.activation:''} ×${it.qty}`;
@@ -2696,10 +2697,17 @@ function renderIphoneStoreSection(customer){
           </div>
           <div>
             <label class="tiny muted">Color (optional)</label>
-            <select onchange="setIphoneOrderDetail('${i.id}','color',this.value)">
-              <option value="">Not specified</option>
-              ${IPHONE_COLOR_OPTIONS.map(o=>`<option value="${o}" ${detail.color===o?'selected':''}>${o}</option>`).join('')}
-            </select>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">
+              ${IPHONE_COLOR_OPTIONS.map(o=>{
+                const sel = detail.color===o;
+                return `
+                <button type="button" onclick="setIphoneOrderDetail('${i.id}','color','${sel?'':o}');render()"
+                  style="display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;padding:2px;cursor:pointer">
+                  <span style="width:26px;height:26px;border-radius:50%;background:${IPHONE_COLOR_HEX[o]||'#ccc'};border:1px solid var(--line);box-shadow:${sel?'0 0 0 2px var(--surface), 0 0 0 4px var(--navy)':'none'}"></span>
+                  <span class="tiny${sel?'':' muted'}" style="${sel?'font-weight:600':''}">${o}</span>
+                </button>`;
+              }).join('')}
+            </div>
           </div>
         </div>` : ''}
       </div>`;
