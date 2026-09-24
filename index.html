@@ -6964,8 +6964,21 @@ function renderSettingsForm(){
       <label>Danger zone</label>
       <div class="tiny muted" style="margin-bottom:10px">Permanently deletes every Team chat message and every client or supplier conversation. Use this to wipe out test messages before going live — it can't be undone.</div>
       <button class="btn btn-danger btn-block" onclick="clearAllChats()">${ic('trash')} Clear all chat messages</button>
+      ${isIphoneStoreAdmin()?`
+      <div class="tiny muted" style="margin:14px 0 10px">Permanently deletes every iPhone Store order request, quote, and response placed so far. Use this once to clear out testing before going live for real — it can't be undone.</div>
+      <button class="btn btn-danger btn-block" onclick="clearIphoneOrders()">${ic('trash')} Clear all iPhone Store orders</button>`:''}
     </div>
   </div>`;
+}
+function clearIphoneOrders(){
+  if(!isIphoneStoreAdmin()){ toast('Only the iPhone Store admin can clear orders'); return; }
+  showConfirm('Clear all iPhone Store orders? This permanently deletes every order request, quote, and response placed so far — use this once, before going live for real. It can\'t be undone.', async ()=>{
+    S.iphoneOrders=[];
+    await persist('iphoneOrders');
+    logActivity('Cleared all iPhone Store test orders');
+    toast('All iPhone Store orders cleared');
+    goBack();
+  });
 }
 function clearAllChats(){
   if(!isAdmin()){ toast('Only admins can clear chat history'); return; }
