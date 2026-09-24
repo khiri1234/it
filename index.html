@@ -2445,7 +2445,7 @@ function renderClientPortal(){
   <div class="content">
     ${seesIT? renderClientProjectsSection(projects) : ''}
 
-    ${seesIphone? `<div class="section-title" id="p-iphones">iPhone Store</div>${renderIphoneStoreSection(customer)}` : ''}
+    ${seesIphone? `<div class="section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : ''}
 
     ${seesIT? renderClientDocsSection(projects) : ''}
 
@@ -2573,7 +2573,7 @@ function renderIphoneColorPhotosCard(){
   return `
     <div class="card" style="margin-top:14px">
       <label>iPhone color illustration photos</label>
-      <div class="tiny muted" style="margin-bottom:6px">Shown to clients when they pick a color in the iPhone Store picker. The Duo has its own shape, so it gets its own photos.</div>
+      <div class="tiny muted" style="margin-bottom:6px">Shown to clients when they pick a color in the Apple Store picker. The Duo has its own shape, so it gets its own photos.</div>
       ${iphoneColorPhotoGroups().map(g=>{
         const photos = allPhotos[g.key]||{};
         return `
@@ -2607,7 +2607,7 @@ function handleIphoneColorPhotoInput(group, color, inputEl){
   if(file) uploadIphoneColorPhoto(group, color, file);
 }
 async function uploadIphoneColorPhoto(group, color, file){
-  if(!isIphoneStoreAdmin()){ toast('Only the iPhone Store admin can manage these photos'); return; }
+  if(!isIphoneStoreAdmin()){ toast('Only the Apple Store admin can manage these photos'); return; }
   if(!FIREBASE_ENABLED || !fbStorage){ toast('Photo uploads need Firebase Storage set up — see the setup notes in index.html'); return; }
   if(!(file.type||'').startsWith('image/')){ toast('Please choose an image file'); return; }
   const maxBytes = 8*1024*1024;
@@ -3360,7 +3360,7 @@ function renderSidebar(){
   if(!CURRENT_USER) return '';
   let tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['reports','reports','Reports'],['more','more','More']];
   if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
-  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','iPhone Store']);
+  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','Apple Store']);
   const activeId = ['reports','chat','iphone-orders'].includes(VIEW.name) ? VIEW.name : (TAB_SECTIONS[VIEW.name] || 'dashboard');
   return `
   <button class="ds-toggle" onclick="toggleSidebarCollapse()" title="${DS_COLLAPSED?'Expand':'Collapse'} sidebar">${ic('chev')}</button>
@@ -3407,7 +3407,7 @@ function portalNavItems(){
     const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
     return [
       ...(seesIT? [['p-projects','box','Projects']] : []),
-      ...(seesIphone? [['p-iphones','cart','iPhone Store']] : []),
+      ...(seesIphone? [['p-iphones','cart','Apple Store']] : []),
       ...(seesIT? [['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : []),
       ['p-messages','chat','Messages'],
     ];
@@ -6328,7 +6328,7 @@ function renderMore(){
         </div>
       </div>
       ${isIphoneStoreAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('iphone-orders')">
-        <div class="small" style="font-weight:600">iPhone Store orders</div>
+        <div class="small" style="font-weight:600">Apple Store orders</div>
         <div style="display:flex;align-items:center;gap:8px">
           ${(S.iphoneOrders||[]).filter(o=>o.status==='new').length>0?`<span class="badge pending">${(S.iphoneOrders||[]).filter(o=>o.status==='new').length} new</span>`:''}
           ${ic('chev')}
@@ -6392,9 +6392,9 @@ function renderIphoneOrders(){
   const orders = (S.iphoneOrders||[]).slice().sort((a,b)=>b.ts-a.ts);
   const statusFlow = ['new','priced','confirmed','declined','fulfilled','cancelled'];
   return `
-  ${topbar('iPhone Store orders','Only visible to you', true)}
+  ${topbar('Apple Store orders','Only visible to you', true)}
   <div class="content">
-    ${orders.length===0? emptyState('cart','No orders yet','Orders clients place through the iPhone Store will show up here.') :
+    ${orders.length===0? emptyState('cart','No orders yet','Orders clients place through the Apple Store will show up here.') :
       orders.map(o=>{
         const total = iphoneOrderTotal(o);
         const revising = IPHONE_REVISE_ORDER_ID===o.id;
@@ -6829,9 +6829,9 @@ function renderTeamForm(){
         ${customerDatalist()}
         <label style="margin-top:10px">Business</label>
         <select id="t_client_business">
-          <option value="both" ${(editing?clientBusinessOf(editing):'both')==='both'?'selected':''}>Both — IT Solutions &amp; iPhone Store</option>
-          <option value="it" ${editing&&clientBusinessOf(editing)==='it'?'selected':''}>IT Solutions only — no iPhone Store</option>
-          <option value="iphone" ${editing&&clientBusinessOf(editing)==='iphone'?'selected':''}>iPhone Store only — no Projects/Documents/Invoices</option>
+          <option value="both" ${(editing?clientBusinessOf(editing):'both')==='both'?'selected':''}>Both — IT Solutions &amp; Apple Store</option>
+          <option value="it" ${editing&&clientBusinessOf(editing)==='it'?'selected':''}>IT Solutions only — no Apple Store</option>
+          <option value="iphone" ${editing&&clientBusinessOf(editing)==='iphone'?'selected':''}>Apple Store only — no Projects/Documents/Invoices</option>
         </select>
         <div class="tiny muted" style="margin-top:2px">Controls which sections of the portal this client sees. Messages is always available.</div>
       </div>
@@ -6844,8 +6844,8 @@ function renderTeamForm(){
       <div id="t_iphone_wrap" style="display:${(role==='client'||role==='supplier')?'none':'block'}">
         <div class="toggle-row">
           <div>
-            <div class="small" style="font-weight:600">iPhone Store access</div>
-            <div class="tiny muted">Only this person can see and manage orders placed through the client-facing iPhone Store.</div>
+            <div class="small" style="font-weight:600">Apple Store access</div>
+            <div class="tiny muted">Only this person can see and manage orders placed through the client-facing Apple Store.</div>
           </div>
           <label class="switch"><input type="checkbox" id="t_iphone_admin" ${editing?(iphoneStoreAdminFlag(editing)?'checked':''):''}><span class="slider"></span></label>
         </div>
@@ -6861,7 +6861,7 @@ function renderTeamForm(){
       staff.map(u=>{
         const locked = u.role==='admin' && !canManageAdmins;
         return `<div class="card row-between">
-        <div><div class="small" style="font-weight:600">${esc(u.name)}${u.role==='admin'&&superAdminFlag(u)?' · Superadmin':''}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}${clientBusinessOf(u)!=='both'?` · ${clientBusinessOf(u)==='it'?'IT Solutions only':'iPhone Store only'}`:''}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:u.role==='purchasing'?'Purchasing':u.role==='readonly'?'Read only':'Staff'}</div></div>
+        <div><div class="small" style="font-weight:600">${esc(u.name)}${u.role==='admin'&&superAdminFlag(u)?' · Superadmin':''}</div><div class="tiny muted">@${esc(u.username)} · ${u.role==='admin'?'Admin':u.role==='client'?`Client — ${esc(u.clientCustomer||'—')}${clientBusinessOf(u)!=='both'?` · ${clientBusinessOf(u)==='it'?'IT Solutions only':'Apple Store only'}`:''}`:u.role==='supplier'?`Supplier — ${esc(u.supplierName||'—')}`:u.role==='purchasing'?'Purchasing':u.role==='readonly'?'Read only':'Staff'}</div></div>
         ${locked? `<div class="tiny muted">Managed by superadmin</div>` : `
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost btn-sm" onclick="editTeamMember('${u.id}')">${ic('edit')}</button>
@@ -6967,18 +6967,18 @@ function renderSettingsForm(){
       <div class="tiny muted" style="margin-bottom:10px">Permanently deletes every Team chat message and every client or supplier conversation. Use this to wipe out test messages before going live — it can't be undone.</div>
       <button class="btn btn-danger btn-block" onclick="clearAllChats()">${ic('trash')} Clear all chat messages</button>
       ${isIphoneStoreAdmin()?`
-      <div class="tiny muted" style="margin:14px 0 10px">Permanently deletes every iPhone Store order request, quote, and response placed so far. Use this once to clear out testing before going live for real — it can't be undone.</div>
-      <button class="btn btn-danger btn-block" onclick="clearIphoneOrders()">${ic('trash')} Clear all iPhone Store orders</button>`:''}
+      <div class="tiny muted" style="margin:14px 0 10px">Permanently deletes every Apple Store order request, quote, and response placed so far. Use this once to clear out testing before going live for real — it can't be undone.</div>
+      <button class="btn btn-danger btn-block" onclick="clearIphoneOrders()">${ic('trash')} Clear all Apple Store orders</button>`:''}
     </div>
   </div>`;
 }
 function clearIphoneOrders(){
-  if(!isIphoneStoreAdmin()){ toast('Only the iPhone Store admin can clear orders'); return; }
-  showConfirm('Clear all iPhone Store orders? This permanently deletes every order request, quote, and response placed so far — use this once, before going live for real. It can\'t be undone.', async ()=>{
+  if(!isIphoneStoreAdmin()){ toast('Only the Apple Store admin can clear orders'); return; }
+  showConfirm('Clear all Apple Store orders? This permanently deletes every order request, quote, and response placed so far — use this once, before going live for real. It can\'t be undone.', async ()=>{
     S.iphoneOrders=[];
     await persist('iphoneOrders');
-    logActivity('Cleared all iPhone Store test orders');
-    toast('All iPhone Store orders cleared');
+    logActivity('Cleared all Apple Store test orders');
+    toast('All Apple Store orders cleared');
     goBack();
   });
 }
