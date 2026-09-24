@@ -3350,6 +3350,7 @@ function switchTab(id){
 }
 function openReportsFromSidebar(){ switchTab('more'); goPush('reports'); }
 function openChatFromSidebar(){ switchTab('more'); goPush('chat'); }
+function openIphoneOrdersFromSidebar(){ switchTab('more'); goPush('iphone-orders'); }
 function toggleSidebarCollapse(){
   DS_COLLAPSED = !DS_COLLAPSED;
   try{ localStorage.setItem('sidebarCollapsed', DS_COLLAPSED?'1':'0'); }catch(e){}
@@ -3359,7 +3360,8 @@ function renderSidebar(){
   if(!CURRENT_USER) return '';
   let tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['reports','reports','Reports'],['more','more','More']];
   if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
-  const activeId = ['reports','chat'].includes(VIEW.name) ? VIEW.name : (TAB_SECTIONS[VIEW.name] || 'dashboard');
+  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','iPhone Store']);
+  const activeId = ['reports','chat','iphone-orders'].includes(VIEW.name) ? VIEW.name : (TAB_SECTIONS[VIEW.name] || 'dashboard');
   return `
   <button class="ds-toggle" onclick="toggleSidebarCollapse()" title="${DS_COLLAPSED?'Expand':'Collapse'} sidebar">${ic('chev')}</button>
   <div class="ds-head">
@@ -3384,7 +3386,7 @@ function renderSidebar(){
   <div class="ds-nav">
     ${tabs.map(([id,icon,label])=>{
       const activeCls = activeId===id?'active':'';
-      const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : `switchTab('${id}')`;
+      const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrdersFromSidebar()' : `switchTab('${id}')`;
       return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`;
