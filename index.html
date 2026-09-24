@@ -2640,6 +2640,10 @@ const IPHONE_COUNTRY_OPTIONS = ['UAE','Hong Kong','China','Other'];
 const IPHONE_ACTIVATION_OPTIONS = ['Active','Non-Active'];
 const IPHONE_COLOR_OPTIONS = ['Burgundy','Glacier','Black','Silver'];
 const IPHONE_COLOR_HEX = { Burgundy:'#5C1A2B', Glacier:'#EAF1FB', Black:'#1C1C1E', Silver:'#D6D8DB' };
+/* iPhone 18 Duo only ships in Black and Silver — every other iPhone 18 model gets the full lineup. */
+function iphoneColorOptionsFor(name){
+  return /duo/i.test(name||'') ? ['Black','Silver'] : IPHONE_COLOR_OPTIONS;
+}
 const IPHONE_ORDER_STATUS_BADGE = {new:'pending', priced:'sent', confirmed:'accepted', declined:'overdue', fulfilled:'completed', cancelled:'overdue'};
 function iphoneOrderItemLabel(it){
   return `${it.name}${it.storage?' '+it.storage:''}${it.color?' ('+it.color+')':''}${it.country?' · '+it.country:''}${it.activation?' · '+it.activation:''} ×${it.qty}`;
@@ -2698,7 +2702,7 @@ function renderIphoneStoreSection(customer){
           <div>
             <label class="tiny muted">Color (optional)</label>
             <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">
-              ${IPHONE_COLOR_OPTIONS.map(o=>{
+              ${iphoneColorOptionsFor(i.name).map(o=>{
                 const sel = detail.color===o;
                 return `
                 <button type="button" onclick="setIphoneOrderDetail('${i.id}','color','${sel?'':o}');render()"
