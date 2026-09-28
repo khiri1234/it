@@ -1,8 +1,8 @@
 {
-  "name": "ledger-desktop",
-  "productName": "Ledger",
+  "name": "the-h-business-management-desktop",
+  "productName": "THE H BUSINESS MANAGEMENT",
   "version": "1.0.0",
-  "description": "Ledger — IT Business Suite, packaged as a macOS desktop app",
+  "description": "THE H BUSINESS MANAGEMENT, packaged as a macOS desktop app",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -16,8 +16,8 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
-    "appId": "com.thehitsolutions.ledger",
-    "productName": "Ledger",
+    "appId": "com.thehitsolutions.businessmanagement",
+    "productName": "THE H BUSINESS MANAGEMENT",
     "files": [
       "main.js",
       "preload.js",
@@ -32,7 +32,7 @@
       ]
     },
     "dmg": {
-      "title": "Ledger"
+      "title": "THE H BUSINESS MANAGEMENT"
     }
   }
 }
