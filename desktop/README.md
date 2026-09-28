@@ -1,9 +1,9 @@
-# Ledger — macOS desktop app
+# THE H BUSINESS MANAGEMENT — macOS desktop app
 
 This wraps the existing web app (`../index.html`) in an Electron shell so it
-runs as a native-feeling macOS app (Dock icon, `Ledger.app`, `.dmg` installer)
-instead of a browser tab. It's the same app, same Firebase backend — this is
-just packaging.
+runs as a native-feeling macOS app (Dock icon, `THE H BUSINESS MANAGEMENT.app`,
+`.dmg` installer) instead of a browser tab. It's the same app, same Firebase
+backend — this is just packaging.
 
 The outer `index.html` stays the single source of truth. `npm start` / `npm
 run dist` copy it (plus `vendor/`) into `desktop/app/` before running, so you
@@ -19,11 +19,12 @@ only works on macOS itself, so run this on a Mac, not in this sandbox:
 cd desktop
 npm install
 npm start          # launch it in dev mode to try it out
-npm run dist        # build Ledger.app + Ledger.dmg into desktop/dist/
+npm run dist        # build the .app + .dmg into desktop/dist/
 ```
 
-`npm run dist` produces both an unpacked `Ledger.app` and a `Ledger-<version>.dmg`
-you can drag-install like any other Mac app, under `desktop/dist/`.
+`npm run dist` produces both an unpacked `THE H BUSINESS MANAGEMENT.app` and a
+`THE H BUSINESS MANAGEMENT-<version>.dmg` you can drag-install like any other
+Mac app, under `desktop/dist/`.
 
 ## Notes
 
@@ -35,7 +36,7 @@ you can drag-install like any other Mac app, under `desktop/dist/`.
   in `package.json`.
 - **Camera permission.** The barcode/QR scanner feature uses the camera;
   the app is set up to grant that request automatically. macOS will still
-  show its own one-time system camera-permission prompt for `Ledger.app`.
+  show its own one-time system camera-permission prompt for the app.
 - **Icon.** `build/icon.png` was generated from the app's existing favicon,
   so it's fairly small/blurry at large sizes. Drop in your own 1024×1024 PNG
   at that path (square, transparent background) for a sharper icon —
