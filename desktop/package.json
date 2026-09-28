@@ -27,8 +27,8 @@
       "category": "public.app-category.business",
       "icon": "build/icon.png",
       "target": [
-        "dmg",
-        "zip"
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
       ]
     },
     "dmg": {
