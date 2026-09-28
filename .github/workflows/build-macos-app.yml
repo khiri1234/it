@@ -30,6 +30,16 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Verify universal binary
+        run: |
+          APP="$(find dist -maxdepth 2 -name '*.app' -print -quit)"
+          echo "App bundle: $APP"
+          BIN="$APP/Contents/MacOS/THE H BUSINESS MANAGEMENT"
+          file "$BIN"
+          lipo -archs "$BIN"
+          lipo -archs "$BIN" | grep -q x86_64
+          lipo -archs "$BIN" | grep -q arm64
+
       - uses: actions/upload-artifact@v4
         with:
           name: the-h-business-management-macos
