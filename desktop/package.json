@@ -1,0 +1,38 @@
+{
+  "name": "ledger-desktop",
+  "productName": "Ledger",
+  "version": "1.0.0",
+  "description": "Ledger — IT Business Suite, packaged as a macOS desktop app",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "copy-app": "node scripts/copy-app.js",
+    "start": "npm run copy-app && electron .",
+    "dist": "npm run copy-app && electron-builder --mac",
+    "dist:dir": "npm run copy-app && electron-builder --mac dir"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.thehitsolutions.ledger",
+    "productName": "Ledger",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "build/icon.png",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "dmg": {
+      "title": "Ledger"
+    }
+  }
+}
