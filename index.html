@@ -436,6 +436,8 @@
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
   @keyframes spin{to{transform:rotate(360deg);}}
   .spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+  @keyframes rowFlash{0%,35%{background:var(--teal-soft);}100%{background:transparent;}}
+  .row-flash{animation:rowFlash 1.3s ease;border-radius:10px;}
   .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
   /* ---------- AUTOCOMPLETE (custom scrollable dropdown, replaces native <datalist> —
      iOS renders datalist suggestions in the keyboard's QuickType bar, not a real list) ---------- */
@@ -2752,6 +2754,23 @@ function renderIphoneStoreSection(customer){
   <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
     <img src="${APPLE_STORE_HEADER_IMG}" alt="iPhone 18 Pro lineup" style="width:100%;display:block;background:#fff">
   </div>
+  ${items.length===0? '' : `
+  <div class="card" style="margin-bottom:14px">
+    <div class="display" style="font-size:19px;line-height:1.3;margin-bottom:2px"><span style="font-weight:700">Model.</span> <span style="font-weight:400;color:var(--ink-soft)">Which is best for you?</span></div>
+    <div class="tiny muted" style="margin-bottom:12px">Tap a model to select it below — no price is shown until we review your order.</div>
+    ${items.map(i=>{
+      const colorCount = iphoneColorOptionsFor(i.name).length;
+      const storageSpan = IPHONE_STORAGE_OPTIONS.length>1 ? `${IPHONE_STORAGE_OPTIONS[0]}–${IPHONE_STORAGE_OPTIONS[IPHONE_STORAGE_OPTIONS.length-1]}` : (IPHONE_STORAGE_OPTIONS[0]||'');
+      return `
+      <div class="row-between" style="padding:14px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;cursor:pointer" onclick="jumpToIphoneModel('${i.id}')">
+        <div style="min-width:0">
+          <div class="small" style="font-weight:700;font-size:15px">${esc(i.name)}</div>
+          <div class="tiny muted" style="margin-top:2px">${esc(storageSpan)}${colorCount?' · '+colorCount+' colors':''}</div>
+        </div>
+        <span class="muted" style="flex-shrink:0">${ic('chev')}</span>
+      </div>`;
+    }).join('')}
+  </div>`}
   <div class="card" style="margin-bottom:14px">
     ${IPHONE_ORDER_EDIT_ID? `<div class="row-between" style="margin-bottom:8px"><div class="tiny" style="font-weight:600;color:var(--teal)">Editing your order</div><span class="small" style="color:var(--teal);cursor:pointer" onclick="cancelIphoneOrderEdit()">Cancel</span></div>` : ''}
     ${items.length===0? `<div class="tiny muted">No iPhone models available to order right now.</div>` : `
@@ -2759,7 +2778,7 @@ function renderIphoneStoreSection(customer){
       const qty = IPHONE_ORDER_QTY[i.id]||0;
       const detail = IPHONE_ORDER_DETAILS[i.id] || {storage:'', color:'', country:'', activation:''};
       return `
-      <div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <div id="iphoneItemRow_${i.id}" style="padding:10px 0;border-bottom:1px solid var(--line)">
         <div class="row-between">
           <div style="min-width:0">
             <div class="small" style="font-weight:600">${esc(i.name)}</div>
@@ -2856,6 +2875,13 @@ function renderIphoneStoreSection(customer){
     </div>`;
   }).join('')}
   ` : ''}`;
+}
+function jumpToIphoneModel(itemId){
+  const el = document.getElementById('iphoneItemRow_'+itemId);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+  el.classList.remove('row-flash'); void el.offsetWidth; el.classList.add('row-flash');
+  setTimeout(()=>el.classList.remove('row-flash'), 1300);
 }
 function stepIphoneOrderQty(itemId, delta){
   const next = Math.max(0, (IPHONE_ORDER_QTY[itemId]||0)+delta);
