@@ -554,6 +554,7 @@
     .ds-section-label{font-size:10.5px;font-weight:700;color:var(--ds-text-soft);text-transform:uppercase;letter-spacing:.08em;padding:0 18px;margin:0 0 6px;}
     .desktop-sidebar.collapsed .ds-section-label{display:none;}
     .ds-nav{display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px;position:relative;}
+    .ds-nav-divider{height:1px;background:var(--ds-border);margin:5px 6px;flex-shrink:0;}
     .ds-nav::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--teal) 0%,var(--teal) 60%,var(--amber) 100%);opacity:.4;}
     .ds-navbtn{
       display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;border:none;
@@ -3421,7 +3422,8 @@ function renderSidebar(){
     ${tabs.map(([id,icon,label])=>{
       const activeCls = activeId===id?'active':'';
       const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrdersFromSidebar()' : `switchTab('${id}')`;
-      return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
+      const divider = id==='iphone-orders' ? `<div class="ds-nav-divider"></div>` : '';
+      return `${divider}<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`;
     }).join('')}
