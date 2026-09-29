@@ -6489,7 +6489,10 @@ function renderIphoneOrderCard(o){
             <div class="small" style="font-weight:600">${esc(o.customer||o.userName||'Client')}</div>
             <div class="tiny mono muted">${fmtDate(new Date(o.ts).toISOString().slice(0,10))}</div>
           </div>
-          <span class="badge ${IPHONE_ORDER_STATUS_BADGE[o.status]||'pending'}">${o.status.charAt(0).toUpperCase()+o.status.slice(1)}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span class="badge ${IPHONE_ORDER_STATUS_BADGE[o.status]||'pending'}">${o.status.charAt(0).toUpperCase()+o.status.slice(1)}</span>
+            <button type="button" class="icon-btn" style="width:28px;height:28px;color:var(--red)" title="Delete order" onclick="deleteIphoneOrder('${o.id}')">${ic('trash')}</button>
+          </div>
         </div>
         ${revising? `<div class="tiny" style="margin-top:6px;color:var(--teal);font-weight:600">Revising price</div>` : ''}
         <div style="margin-top:8px">
@@ -6576,6 +6579,17 @@ function setIphoneOrderStatus(id, status){
   o.status = status;
   persist('iphoneOrders');
   toast('Order updated');
+}
+function deleteIphoneOrder(id){
+  const o = (S.iphoneOrders||[]).find(x=>x.id===id);
+  if(!o) return;
+  showConfirm(`Delete this order from ${o.customer||o.userName||'this client'}? This can't be undone.`, ()=>{
+    S.iphoneOrders = (S.iphoneOrders||[]).filter(x=>x.id!==id);
+    persist('iphoneOrders');
+    logActivity(`Deleted an Apple Store order from "${o.customer||o.userName||'a client'}"`);
+    toast('Order deleted');
+    if(VIEW.name==='iphone-client' && !(S.iphoneOrders||[]).some(x=>x.customer===o.customer)) goBack(); else render();
+  });
 }
 
 /* ---------- TO-DO LIST ---------- */
