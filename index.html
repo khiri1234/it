@@ -952,6 +952,7 @@ let IPHONE_ORDER_DETAILS={}; // itemId -> {storage, color, country, activation},
 let IPHONE_ORDER_NOTE='';
 let IPHONE_ORDER_EDIT_ID=null; // set while a client is correcting one of their own still-'new' orders
 let IPHONE_REVISE_ORDER_ID=null; // set while Hatef is revising a price already sent on a priced/confirmed/declined order
+let IPHONE_STORE_TAB='clients'; // 'clients' (CRM dashboard) or 'orders' (flat order list) sub-tab on the Apple Store page
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
@@ -3237,7 +3238,7 @@ function render(){
   // staff can't reach admin-only views directly
   if(!isAdmin() && ['settings-form'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
   // iPhone Store orders are visible only to whoever iphoneStoreAdminFlag() singles out
-  if(!isIphoneStoreAdmin() && VIEW.name==='iphone-orders'){ VIEW={name:'more',params:{}}; }
+  if(!isIphoneStoreAdmin() && ['iphone-orders','iphone-client'].includes(VIEW.name)){ VIEW={name:'more',params:{}}; }
   // purchasing-only accounts are confined to the Stock section (purchases/RFQs/inventory)
   if(isPurchasingOnly() && (TAB_SECTIONS[VIEW.name]||'dashboard')!=='stock'){ VIEW={name:'stock',params:{}}; }
   // read-only accounts can browse everything but never reach a create/edit form
@@ -3280,6 +3281,7 @@ function render(){
     case 'rfq-view': body = renderRfqView(VIEW.params.id); break;
     case 'todos': body = renderTodos(); break;
     case 'iphone-orders': body = renderIphoneOrders(); break;
+    case 'iphone-client': body = renderIphoneClientDetail(VIEW.params.customer); break;
     default: body = renderDashboard();
   }
   CHAT_INPUT_WAS_FOCUSED = document.activeElement && document.activeElement.id==='chatInput';
@@ -3336,7 +3338,7 @@ const TAB_SECTIONS={
   'client-chats':'more','client-chat':'more',
   'supplier-chats':'more','supplier-chat':'more',
   'todos':'more',
-  'iphone-orders':'more',
+  'iphone-orders':'more','iphone-client':'more',
   'more':'more','settings-form':'more','team-form':'more','activity-log':'more'
 };
 function switchTab(id){
@@ -3365,7 +3367,9 @@ function renderSidebar(){
   let tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['reports','reports','Reports'],['more','more','More']];
   if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
   if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','Apple Store']);
-  const activeId = ['reports','chat','iphone-orders'].includes(VIEW.name) ? VIEW.name : (TAB_SECTIONS[VIEW.name] || 'dashboard');
+  const activeId = ['reports','chat'].includes(VIEW.name) ? VIEW.name
+    : ['iphone-orders','iphone-client'].includes(VIEW.name) ? 'iphone-orders'
+    : (TAB_SECTIONS[VIEW.name] || 'dashboard');
   return `
   <button class="ds-toggle" onclick="toggleSidebarCollapse()" title="${DS_COLLAPSED?'Expand':'Collapse'} sidebar">${ic('chev')}</button>
   <div class="ds-head">
@@ -6332,7 +6336,7 @@ function renderMore(){
         </div>
       </div>
       ${isIphoneStoreAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('iphone-orders')">
-        <div class="small" style="font-weight:600">Apple Store orders</div>
+        <div class="small" style="font-weight:600">Apple Store</div>
         <div style="display:flex;align-items:center;gap:8px">
           ${(S.iphoneOrders||[]).filter(o=>o.status==='new').length>0?`<span class="badge pending">${(S.iphoneOrders||[]).filter(o=>o.status==='new').length} new</span>`:''}
           ${ic('chev')}
@@ -6391,20 +6395,68 @@ function renderActivityLog(){
   </div>`;
 }
 
-/* ---------- IPHONE STORE ORDERS (staff side — gated to isIphoneStoreAdmin() in render()) ---------- */
-function renderIphoneOrders(){
-  const orders = (S.iphoneOrders||[]).slice().sort((a,b)=>b.ts-a.ts);
+/* ---------- IPHONE STORE ORDERS + CRM (staff side — gated to isIphoneStoreAdmin() in render()) ---------- */
+/* Groups every Apple Store order by customer so admins get a client-level view (spend,
+   pipeline, what still needs pricing) instead of only a flat order feed. */
+function iphoneClients(){
+  const byCustomer = {};
+  (S.iphoneOrders||[]).forEach(o=>{
+    const key = o.customer || o.userName || 'Unknown';
+    (byCustomer[key] = byCustomer[key] || []).push(o);
+  });
+  return Object.keys(byCustomer).map(customer=>{
+    const orders = byCustomer[customer].slice().sort((a,b)=>b.ts-a.ts);
+    const revenue = orders.filter(o=>o.status==='confirmed'||o.status==='fulfilled').reduce((a,o)=>a+iphoneOrderTotal(o),0);
+    const pipelineValue = orders.filter(o=>o.status==='priced').reduce((a,o)=>a+iphoneOrderTotal(o),0);
+    const awaitingCount = orders.filter(o=>o.status==='new').length;
+    return { customer, orders, revenue, pipelineValue, awaitingCount, lastOrderTs: orders[0].ts };
+  }).sort((a,b)=>b.lastOrderTs-a.lastOrderTs);
+}
+function setIphoneStoreTab(tab){ IPHONE_STORE_TAB=tab; render(); }
+function iphoneCrmStatsGrid(clients, perClient){
+  const totalRevenue = clients.reduce((a,c)=>a+c.revenue,0);
+  const pipelineValue = clients.reduce((a,c)=>a+c.pipelineValue,0);
+  const awaitingPricing = clients.reduce((a,c)=>a+c.awaitingCount,0);
+  const firstTile = perClient
+    ? `<div class="stat"><div class="num">${clients[0].orders.length}</div><div class="lbl">Orders</div></div>`
+    : `<div class="stat"><div class="num">${clients.length}</div><div class="lbl">Apple Store clients</div></div>`;
+  return `
+  <div class="grid2" style="margin-bottom:12px">
+    ${firstTile}
+    <div class="stat"><div class="num">${fmtMoney(totalRevenue)}</div><div class="lbl">Revenue (confirmed &amp; fulfilled)</div></div>
+    <div class="stat"><div class="num" style="color:${pipelineValue>0?'var(--blue)':'inherit'}">${fmtMoney(pipelineValue)}</div><div class="lbl">Priced — awaiting client</div></div>
+    <div class="stat"><div class="num" style="color:${awaitingPricing>0?'var(--amber)':'inherit'}">${awaitingPricing}</div><div class="lbl">Orders awaiting your pricing</div></div>
+  </div>`;
+}
+function renderIphoneClientRow(c){
+  const stripeClass = c.awaitingCount>0?'pending':(c.pipelineValue>0?'sent':'accepted');
+  const statusBadge = c.awaitingCount>0
+    ? `<span class="badge pending">${c.awaitingCount} to price</span>`
+    : c.pipelineValue>0 ? `<span class="badge sent">Awaiting client</span>` : `<span class="badge accepted">Up to date</span>`;
+  return `
+  <div class="card stripe ${stripeClass}" onclick="goPush('iphone-client',{customer:'${onclickStr(c.customer)}'})">
+    <div class="row-between">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div class="chat-avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${esc((c.customer||'?').trim().slice(0,1).toUpperCase())}</div>
+        <div style="min-width:0">
+          <div class="small" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.customer)}</div>
+          <div class="tiny muted">${c.orders.length} order${c.orders.length===1?'':'s'} · last ${fmtDate(new Date(c.lastOrderTs).toISOString().slice(0,10))}</div>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="mono small" style="font-weight:600">${fmtMoney(c.revenue)}</div>
+        ${statusBadge}
+      </div>
+    </div>
+  </div>`;
+}
+function renderIphoneOrderCard(o){
+  const total = iphoneOrderTotal(o);
+  const revising = IPHONE_REVISE_ORDER_ID===o.id;
+  const editingPrice = o.status==='new' || revising;
+  const canRevise = ['priced','confirmed','declined'].includes(o.status);
   const statusFlow = ['new','priced','confirmed','declined','fulfilled','cancelled'];
   return `
-  ${topbar('Apple Store orders','Only visible to you', true)}
-  <div class="content">
-    ${orders.length===0? emptyState('cart','No orders yet','Orders clients place through the Apple Store will show up here.') :
-      orders.map(o=>{
-        const total = iphoneOrderTotal(o);
-        const revising = IPHONE_REVISE_ORDER_ID===o.id;
-        const editingPrice = o.status==='new' || revising;
-        const canRevise = ['priced','confirmed','declined'].includes(o.status);
-        return `
       <div class="card" style="margin-bottom:10px">
         <div class="row-between">
           <div style="min-width:0">
@@ -6436,7 +6488,33 @@ function renderIphoneOrders(){
           ${statusFlow.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
         </select>
       </div>`;
-      }).join('')}
+}
+function renderIphoneOrders(){
+  const clients = iphoneClients();
+  const orders = (S.iphoneOrders||[]).slice().sort((a,b)=>b.ts-a.ts);
+  return `
+  ${topbar('Apple Store','Clients & orders', true, null, true)}
+  <div class="content">
+    ${iphoneCrmStatsGrid(clients)}
+    <div class="segmented" style="margin-bottom:12px">
+      <button class="${IPHONE_STORE_TAB==='clients'?'active':''}" onclick="setIphoneStoreTab('clients')">Clients</button>
+      <button class="${IPHONE_STORE_TAB==='orders'?'active':''}" onclick="setIphoneStoreTab('orders')">Orders</button>
+    </div>
+    ${IPHONE_STORE_TAB==='clients'?
+      (clients.length===0? emptyState('cart','No clients yet','Clients who place Apple Store orders will show up here.') : clients.map(renderIphoneClientRow).join(''))
+      : (orders.length===0? emptyState('cart','No orders yet','Orders clients place through the Apple Store will show up here.') : orders.map(renderIphoneOrderCard).join(''))}
+  </div>`;
+}
+function renderIphoneClientDetail(customer){
+  const c = iphoneClients().find(x=>x.customer===customer);
+  if(!c) return topbar('Not found','',true)+`<div class="content">${emptyState('cart','Not found','This client has no Apple Store orders.')}</div>`;
+  return `
+  ${topbar(c.customer,'Apple Store client', true)}
+  <div class="content">
+    ${iphoneCrmStatsGrid([c], true)}
+    <button class="btn btn-teal btn-block" style="margin-bottom:14px" onclick="goPush('client-chat',{customer:'${onclickStr(c.customer)}'})">${ic('chat')} Message ${esc(c.customer)}</button>
+    <div class="tiny muted" style="font-weight:600;text-transform:uppercase;margin-bottom:8px">Order history</div>
+    ${c.orders.map(renderIphoneOrderCard).join('')}
   </div>`;
 }
 function sendIphoneOrderPrice(orderId){
