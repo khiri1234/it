@@ -54,9 +54,10 @@ Mac app, under `desktop/dist/`.
 - **Camera permission.** The barcode/QR scanner feature uses the camera;
   the app is set up to grant that request automatically. macOS will still
   show its own one-time system camera-permission prompt for the app.
-- **Icon.** `build/icon.png` is a 1024×1024 PNG matching the app's brand
-  mark. electron-builder converts it to `.icns` automatically during the
-  build — drop in a different square PNG at that path if you want to change it.
+- **Icon.** `build/icon.png` was generated from the app's existing favicon,
+  so it's fairly small/blurry at large sizes. Drop in your own 1024×1024 PNG
+  at that path (square, transparent background) for a sharper icon —
+  electron-builder converts it to `.icns` automatically during the build.
 - **Links.** `wa.me` and `paypal.me` links (used for "pay via WhatsApp/PayPal")
   open in your default browser instead of inside the app, same as they would
   from a phone.
