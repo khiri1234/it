@@ -4198,7 +4198,7 @@ function buildPdfHTML(kind, id, opts){
       </tr>`;}).join('');
     return `
     <div class="pdf-page">
-      ${pdfHeader(kind==='invoice'?'Tax Invoice':'Quotation', d.number, d.status)}
+      ${pdfHeader(kind==='invoice'?'Invoice':'Quotation', d.number, d.status)}
       <div class="pdf-meta-grid">
         <div class="pdf-meta-block">
           <div class="label">${kind==='invoice'?'Bill to':'Prepared for'}</div>
