@@ -2174,6 +2174,30 @@ async function doLogin(){
   if(!applyHashRoute()) render();
 }
 function logout(){ CURRENT_USER=null; syncPushTopic(); setRememberedUserId(null); go('dashboard'); }
+// Full-data backup — every S key as one JSON file, downloaded client-side (no server
+// round-trip). Auto-includes any key added to S later instead of a hand-kept list, with
+// one deliberate exception: a user's passHash (their login PIN, hashed) is stripped so
+// the file is safe to keep in email/cloud storage without leaking credentials.
+function exportDataBackup(){
+  if(!isAdmin()){ toast('Only admins can export a backup'); return; }
+  const backup = { exportedAt: new Date().toISOString(), app: S.settings.companyName || 'THE H BUSINESS MANAGEMENT' };
+  Object.keys(S).forEach(key=>{
+    backup[key] = key==='users'
+      ? (S.users||[]).map(u=>{ const {passHash, webauthnCredentialId, ...rest} = u; return rest; })
+      : S[key];
+  });
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup-${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  logActivity('Exported a full data backup');
+  toast('Backup downloaded');
+}
 
 /* On a wide enough desktop, the client/supplier portal shows its Messages thread as a
    persistent right-hand column instead of a section at the bottom of the page — reused
@@ -6575,8 +6599,15 @@ function renderMore(){
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="TEAM_EDIT_ID=null;goPush('team-form')">
         <div class="small" style="font-weight:600">Team &amp; logins</div>${ic('chev')}
       </div>
-      <div class="row-between" style="padding:14px" onclick="goPush('activity-log')">
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('activity-log')">
         <div class="small" style="font-weight:600">Activity log</div>${ic('chev')}
+      </div>
+      <div class="row-between" style="padding:14px" onclick="exportDataBackup()">
+        <div>
+          <div class="small" style="font-weight:600">Export data backup</div>
+          <div class="tiny muted">Downloads everything as one JSON file</div>
+        </div>
+        ${ic('download')}
       </div>
     </div>` : `<div class="card">
       <div class="small muted">Business settings, team &amp; logins, and the activity log are admin only.</div>
