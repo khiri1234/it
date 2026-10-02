@@ -1,9 +1,10 @@
 {
   "name": "functions",
-  "description": "Cloud Functions for the Ledger app — push notifications",
+  "description": "Cloud Functions for the Ledger app — push notifications and the scheduled Firestore backup export",
   "engines": { "node": "22" },
   "main": "index.js",
   "dependencies": {
+    "@google-cloud/firestore": "^7.7.0",
     "firebase-admin": "^12.1.0",
     "firebase-functions": "^5.0.0"
   },
