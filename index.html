@@ -405,6 +405,18 @@
   .dash-stat .num{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
   .dash-stat .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
   .dash-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;animation:dashRise .55s ease .1s both;}
+  /* ---------- CRM-style stat cards (Apple Store dashboard) — same anatomy as
+     .dash-stat above, but a plain bordered card (no hero overlap/shadow) since
+     this sits under an ordinary topbar, not the Dashboard's hero banner. ---------- */
+  .crm-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .crm-stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;}
+  .crm-stat-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .crm-stat-icon svg{width:16px;height:16px;}
+  .crm-stat .num{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;}
+  .crm-stat .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-top:-5px;}
+  .crm-stat .trend{font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:3px;width:fit-content;}
+  .crm-stat .trend.up{color:var(--green);}
+  .crm-stat .trend.down{color:var(--red);}
   .dash-action{
     background:var(--surface);border:1px solid var(--line);border-radius:14px;
     padding:13px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;
@@ -607,6 +619,7 @@
     .content{padding-left:28px;padding-right:28px;max-width:936px;margin:0 auto;}
     .dash-hero{padding-left:28px;padding-right:28px;}
     .dash-stats{grid-template-columns:repeat(4,1fr);margin:-36px auto 0;max-width:936px;padding:0 28px;}
+    .crm-stats{grid-template-columns:repeat(4,1fr);}
     .dash-actions{grid-template-columns:repeat(4,1fr);}
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
@@ -955,7 +968,7 @@ let IPHONE_ORDER_DETAILS={}; // itemId -> {storage, color, country, activation},
 let IPHONE_ORDER_NOTE='';
 let IPHONE_ORDER_EDIT_ID=null; // set while a client is correcting one of their own still-'new' orders
 let IPHONE_REVISE_ORDER_ID=null; // set while Hatef is revising a price already sent on a priced/confirmed/declined order
-let IPHONE_STORE_TAB='clients'; // 'clients' (CRM dashboard) or 'orders' (flat order list) sub-tab on the Apple Store page
+let IPHONE_STORE_TAB='dashboard'; // 'dashboard' (charts), 'clients' (CRM list), or 'orders' (flat order list) sub-tab on the Apple Store page
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
@@ -1264,6 +1277,13 @@ async function persist(key){
 const uid=()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const todayISO=()=> new Date().toISOString().slice(0,10);
 function fmtMoney(n){ n = Number(n)||0; return S.settings.currency+' '+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+// Compact magnitude label for tight chart spaces (bar-top values, etc) — no currency symbol.
+function fmtMoneyShort(n){
+  n = Number(n)||0;
+  if(n>=1000000) return (n/1000000).toFixed(1).replace(/\.0$/,'')+'M';
+  if(n>=1000) return (n/1000).toFixed(1).replace(/\.0$/,'')+'K';
+  return String(Math.round(n));
+}
 function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso+'T00:00:00'); return d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}); }
 function fmtFileSize(bytes){
   bytes = Number(bytes)||0;
@@ -6520,18 +6540,256 @@ function renderIphoneOrderCard(o){
         </select>
       </div>`;
 }
+
+/* ---------- APPLE STORE DASHBOARD (charts — a read-only analytics view over
+   the same S.iphoneOrders data the Clients/Orders tabs already use) ---------- */
+function iphoneMonthKey(ts){ return new Date(ts).toISOString().slice(0,7); }
+function iphoneRevenueByMonth(months){
+  months = months || 6;
+  const now = new Date();
+  const keys = [];
+  for(let i=months-1;i>=0;i--) keys.push(new Date(now.getFullYear(), now.getMonth()-i, 1).toISOString().slice(0,7));
+  const byKey = {};
+  keys.forEach(k=>byKey[k]=0);
+  (S.iphoneOrders||[]).forEach(o=>{
+    if(o.status!=='confirmed' && o.status!=='fulfilled') return;
+    const k = iphoneMonthKey(o.ts);
+    if(k in byKey) byKey[k] += iphoneOrderTotal(o);
+  });
+  return keys.map(k=>({ label: new Date(k+'-02').toLocaleDateString(undefined,{month:'short'}), value: byKey[k] }));
+}
+// Buckets every order into one of 4 pipeline stages — the same groupings the
+// status badges already imply (declined/cancelled both read as "lost", etc),
+// just made explicit so a chart can show 4 distinguishable stages instead of 6
+// raw statuses. Each stage carries its own icon so identity never rests on
+// color alone (New/Lost use amber/red, which sit too close for deuteranopia).
+function iphoneStageBuckets(){
+  const stages = {
+    newo:     { label:'New',      count:0, value:0, icon:'alert', color:'amber' },
+    pipeline: { label:'Pipeline', count:0, value:0, icon:'mail',  color:'blue'  },
+    won:      { label:'Won',      count:0, value:0, icon:'check', color:'green' },
+    lost:     { label:'Lost',     count:0, value:0, icon:'x',     color:'red'   }
+  };
+  (S.iphoneOrders||[]).forEach(o=>{
+    const key = o.status==='new' ? 'newo' : o.status==='priced' ? 'pipeline' : (o.status==='confirmed'||o.status==='fulfilled') ? 'won' : 'lost';
+    stages[key].count++;
+    stages[key].value += iphoneOrderTotal(o);
+  });
+  return stages;
+}
+function iphoneTopModels(limit){
+  limit = limit || 5;
+  const byModel = {};
+  (S.iphoneOrders||[]).forEach(o=>{
+    if(o.status!=='confirmed' && o.status!=='fulfilled') return;
+    (o.items||[]).forEach(it=>{
+      if(!byModel[it.name]) byModel[it.name] = { name: it.name, qty:0, revenue:0 };
+      byModel[it.name].qty += Number(it.qty)||0;
+      byModel[it.name].revenue += (Number(it.unitPrice)||0) * (Number(it.qty)||0);
+    });
+  });
+  return Object.values(byModel).sort((a,b)=>b.revenue-a.revenue).slice(0, limit);
+}
+// 7 days × eight 3-hour blocks — same granularity as a typical "best time to
+// post" heatmap, coarse enough to stay legible on a phone-width card.
+function iphoneActivityGrid(){
+  const grid = Array.from({length:7}, ()=>Array(8).fill(0));
+  (S.iphoneOrders||[]).forEach(o=>{
+    const d = new Date(o.ts);
+    grid[d.getDay()][Math.floor(d.getHours()/3)]++;
+  });
+  return grid;
+}
+function iphoneMonthOverMonthPct(valueFn){
+  const now = new Date();
+  const thisKey = now.toISOString().slice(0,7);
+  const lastKey = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
+  let thisVal=0, lastVal=0;
+  (S.iphoneOrders||[]).forEach(o=>{
+    const k = iphoneMonthKey(o.ts);
+    if(k===thisKey) thisVal += valueFn(o);
+    else if(k===lastKey) lastVal += valueFn(o);
+  });
+  if(lastVal>0) return Math.round((thisVal-lastVal)/lastVal*100);
+  return thisVal>0 ? 100 : 0;
+}
+function iphoneNewClientsThisMonth(){
+  const thisKey = new Date().toISOString().slice(0,7);
+  const firstOrderMonth = {};
+  (S.iphoneOrders||[]).slice().sort((a,b)=>a.ts-b.ts).forEach(o=>{
+    const key = o.customer || o.userName || 'Unknown';
+    if(!(key in firstOrderMonth)) firstOrderMonth[key] = iphoneMonthKey(o.ts);
+  });
+  return Object.values(firstOrderMonth).filter(k=>k===thisKey).length;
+}
+function renderIphoneDashboardTab(){
+  const clients = iphoneClients();
+  const stages = iphoneStageBuckets();
+  const stageOrder = ['newo','pipeline','won','lost'];
+  const revTrend = iphoneRevenueByMonth(6);
+  const topModels = iphoneTopModels(5);
+  const activity = iphoneActivityGrid();
+
+  const totalRevenue = clients.reduce((a,c)=>a+c.revenue,0);
+  const revMoMPct = iphoneMonthOverMonthPct(o => (o.status==='confirmed'||o.status==='fulfilled') ? iphoneOrderTotal(o) : 0);
+  const newClients = iphoneNewClientsThisMonth();
+  const trend = pct => pct===0 ? '' : `<span class="trend ${pct>0?'up':'down'}">${pct>0?'▲':'▼'} ${Math.abs(pct)}% vs last month</span>`;
+
+  const maxRev = Math.max(1, ...revTrend.map(r=>r.value));
+  const maxStage = Math.max(1, ...stageOrder.map(k=>stages[k].count));
+  const maxActivity = Math.max(1, ...activity.flat());
+  const totalStageValue = stageOrder.reduce((a,k)=>a+stages[k].value,0) || 1;
+
+  // Donut geometry: one <circle> per stage, stroke-dasharray/offset carve it into
+  // arcs, with a 2px gap between segments (the stacked-fill spacer rule).
+  const R = 54, C = 2*Math.PI*R;
+  let donutOffset = 0;
+  const donutSegs = stageOrder.map(k=>{
+    const frac = stages[k].value / totalStageValue;
+    const len = Math.max(0, frac*C - 2);
+    const seg = `<circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--${stages[k].color})" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-donutOffset}" stroke-linecap="round"><title>${esc(stages[k].label)}: ${fmtMoney(stages[k].value)}</title></circle>`;
+    donutOffset += frac*C;
+    return seg;
+  }).join('');
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const blockLabels = ['12am','3am','6am','9am','12pm','3pm','6pm','9pm'];
+
+  return `
+  <div class="crm-stats">
+    <div class="crm-stat">
+      <div class="crm-stat-icon" style="background:var(--teal-soft);color:var(--teal)">${ic('card')}</div>
+      <div class="num">${clients.length}</div>
+      <div class="lbl">Clients</div>
+      ${newClients>0? `<span class="trend up">+${newClients} this month</span>` : `<span class="tiny muted">No new clients yet this month</span>`}
+    </div>
+    <div class="crm-stat">
+      <div class="crm-stat-icon" style="background:var(--green-soft);color:var(--green)">${ic('sales')}</div>
+      <div class="num">${fmtMoney(totalRevenue)}</div>
+      <div class="lbl">Revenue</div>
+      ${trend(revMoMPct) || `<span class="tiny muted">No won orders last month to compare</span>`}
+    </div>
+    <div class="crm-stat">
+      <div class="crm-stat-icon" style="background:var(--blue-soft);color:var(--blue)">${ic('mail')}</div>
+      <div class="num">${fmtMoney(stages.pipeline.value)}</div>
+      <div class="lbl">Pipeline</div>
+      <span class="tiny muted">${stages.pipeline.count} order${stages.pipeline.count===1?'':'s'} awaiting client</span>
+    </div>
+    <div class="crm-stat">
+      <div class="crm-stat-icon" style="background:var(--amber-soft);color:var(--amber)">${ic('alert')}</div>
+      <div class="num">${stages.newo.count}</div>
+      <div class="lbl">Awaiting pricing</div>
+      ${stages.newo.count>0? `<span class="tiny" style="color:var(--amber);font-weight:600">Needs your attention</span>` : `<span class="tiny muted">All caught up</span>`}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="small" style="font-weight:700">Revenue trend</div>
+    <div class="tiny muted" style="margin-bottom:4px">Won orders, by month placed — last 6 months</div>
+    <div style="display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:14px">
+      ${revTrend.map(r=>{
+        const h = Math.round(r.value/maxRev*112)+4;
+        return `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
+          <div class="tiny mono" style="font-size:9.5px;color:var(--ink-soft);white-space:nowrap">${r.value>0?fmtMoneyShort(r.value):''}</div>
+          <div title="${esc(r.label)}: ${fmtMoney(r.value)}" style="width:100%;max-width:34px;height:${h}px;border-radius:4px 4px 2px 2px;background:var(--teal)"></div>
+          <div class="tiny muted">${r.label}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-bottom:14px;align-items:stretch">
+    <div class="card">
+      <div class="small" style="font-weight:700">Orders by stage</div>
+      <div class="tiny muted" style="margin-bottom:12px">Where every order stands right now</div>
+      ${stageOrder.map(k=>{
+        const s = stages[k];
+        const w = Math.round(s.count/maxStage*100);
+        return `
+        <div style="margin-bottom:10px">
+          <div class="row-between tiny" style="margin-bottom:4px">
+            <span style="display:flex;align-items:center;gap:5px;color:var(--${s.color});font-weight:600">${ic(s.icon)} ${s.label}</span>
+            <span class="muted">${s.count}</span>
+          </div>
+          <div style="height:8px;border-radius:4px;background:var(--chip-bg);overflow:hidden">
+            <div style="width:${w}%;height:100%;border-radius:4px;background:var(--${s.color})"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="card">
+      <div class="small" style="font-weight:700">Order value by stage</div>
+      <div class="tiny muted" style="margin-bottom:12px">${fmtMoney(totalStageValue)} total</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <svg viewBox="0 0 140 140" style="width:108px;height:108px;flex-shrink:0;transform:rotate(-90deg)">
+          <circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--chip-bg)" stroke-width="16"/>
+          ${donutSegs}
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:120px;flex:1">
+          ${stageOrder.map(k=>{
+            const s = stages[k];
+            return `<div class="tiny" style="display:flex;align-items:center;gap:6px">
+              <span style="width:8px;height:8px;border-radius:2px;background:var(--${s.color});flex-shrink:0"></span>
+              <span style="color:var(--ink-soft)">${s.label}</span>
+              <span style="font-weight:600;margin-left:auto">${fmtMoney(s.value)}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="small" style="font-weight:700">Top models</div>
+    <div class="tiny muted" style="margin-bottom:12px">By revenue from won orders</div>
+    ${topModels.length===0? `<div class="tiny muted">No won orders yet.</div>` : topModels.map(m=>{
+      const w = Math.round(m.revenue/topModels[0].revenue*100);
+      return `
+      <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+        <div class="row-between tiny" style="margin-bottom:5px;gap:10px">
+          <span style="font-weight:600;min-width:0">${esc(m.name)}</span>
+          <span class="mono muted" style="flex-shrink:0">${m.qty} sold · ${fmtMoney(m.revenue)}</span>
+        </div>
+        <div style="height:6px;border-radius:3px;background:var(--chip-bg);overflow:hidden">
+          <div style="width:${w}%;height:100%;border-radius:3px;background:var(--teal)"></div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <div class="card">
+    <div class="small" style="font-weight:700">When orders come in</div>
+    <div class="tiny muted" style="margin-bottom:12px">Order count by day &amp; time of day</div>
+    <div style="overflow-x:auto">
+      <div style="display:grid;grid-template-columns:34px repeat(8,1fr);gap:3px;min-width:420px">
+        <div></div>
+        ${blockLabels.map(b=>`<div class="tiny muted" style="text-align:center;font-size:9px">${b}</div>`).join('')}
+        ${dayNames.map((d,di)=>`
+          <div class="tiny muted" style="display:flex;align-items:center">${d}</div>
+          ${activity[di].map(v=>{
+            const bg = v===0 ? 'var(--chip-bg)' : `rgba(14,156,144,${(0.18+(v/maxActivity)*0.72).toFixed(2)})`;
+            return `<div title="${d}: ${v} order${v===1?'':'s'}" style="aspect-ratio:1;border-radius:4px;background:${bg}"></div>`;
+          }).join('')}
+        `).join('')}
+      </div>
+    </div>
+  </div>`;
+}
 function renderIphoneOrders(){
   const clients = iphoneClients();
   const orders = (S.iphoneOrders||[]).slice().sort((a,b)=>b.ts-a.ts);
   return `
-  ${topbar('Apple Store','Clients & orders', true, null, true)}
+  ${topbar('Apple Store','Clients & orders', true, null, IPHONE_STORE_TAB!=='dashboard')}
   <div class="content">
-    ${iphoneCrmStatsGrid(clients)}
+    ${IPHONE_STORE_TAB!=='dashboard' ? iphoneCrmStatsGrid(clients) : ''}
     <div class="segmented" style="margin-bottom:12px">
+      <button class="${IPHONE_STORE_TAB==='dashboard'?'active':''}" onclick="setIphoneStoreTab('dashboard')">Dashboard</button>
       <button class="${IPHONE_STORE_TAB==='clients'?'active':''}" onclick="setIphoneStoreTab('clients')">Clients</button>
       <button class="${IPHONE_STORE_TAB==='orders'?'active':''}" onclick="setIphoneStoreTab('orders')">Orders</button>
     </div>
-    ${IPHONE_STORE_TAB==='clients'?
+    ${IPHONE_STORE_TAB==='dashboard' ? renderIphoneDashboardTab() :
+      IPHONE_STORE_TAB==='clients'?
       (clients.length===0? emptyState('cart','No clients yet','Clients who place Apple Store orders will show up here.') : clients.map(renderIphoneClientRow).join(''))
       : (orders.length===0? emptyState('cart','No orders yet','Orders clients place through the Apple Store will show up here.') : orders.map(renderIphoneOrderCard).join(''))}
   </div>`;
