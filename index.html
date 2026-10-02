@@ -404,6 +404,9 @@
   .dash-stat-icon svg{width:15px;height:15px;}
   .dash-stat .num{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
   .dash-stat .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+  .dash-stat .trend{font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;width:fit-content;}
+  .dash-stat .trend.up{color:var(--green);}
+  .dash-stat .trend.down{color:var(--red);}
   .dash-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;animation:dashRise .55s ease .1s both;}
   /* ---------- CRM-style stat cards (Apple Store dashboard) — same anatomy as
      .dash-stat above, but a plain bordered card (no hero overlap/shadow) since
@@ -3612,13 +3615,82 @@ function greeting(){
   const h = new Date().getHours();
   return h<5?'Good night':h<12?'Good morning':h<17?'Good afternoon':h<21?'Good evening':'Good night';
 }
+function dashMonthKey(dateStr){ return (dateStr||'').slice(0,7); }
+function dashPaidByMonth(months){
+  months = months || 6;
+  const now = new Date();
+  const keys = [];
+  for(let i=months-1;i>=0;i--) keys.push(new Date(now.getFullYear(), now.getMonth()-i, 1).toISOString().slice(0,7));
+  const byKey = {};
+  keys.forEach(k=>byKey[k]=0);
+  S.invoices.forEach(d=>(d.payments||[]).forEach(p=>{
+    const k = dashMonthKey(p.date);
+    if(k in byKey) byKey[k] += Number(p.amount)||0;
+  }));
+  return keys.map(k=>({ label: new Date(k+'-02').toLocaleDateString(undefined,{month:'short'}), value: byKey[k] }));
+}
+// Buckets every invoice into one stage, same spirit as the Apple Store dashboard's
+// New/Pipeline/Won/Lost split: Draft (needs finishing, amber) / Outstanding (sent or
+// partially paid, not yet overdue, blue) / Paid (green) / Overdue (red) — four
+// distinguishable stages instead of raw status strings, each icon + text labeled so
+// identity never rests on color alone (the same red/green pair that failed the
+// palette's colorblind check on the Apple Store dashboard shows up here too).
+function dashInvoiceBuckets(){
+  const buckets = {
+    draft:       { label:'Draft',       count:0, value:0, icon:'edit',  color:'amber' },
+    outstanding: { label:'Outstanding', count:0, value:0, icon:'mail',  color:'blue'  },
+    paid:        { label:'Paid',        count:0, value:0, icon:'check', color:'green' },
+    overdue:     { label:'Overdue',     count:0, value:0, icon:'alert', color:'red'   }
+  };
+  S.invoices.forEach(d=>{
+    const t = calcTotals(d.items, d.vatOn, d.vatRate, d.discountPct, d.charges);
+    const key = invoiceIsOverdue(d) ? 'overdue' : d.status==='paid' ? 'paid' : d.status==='draft' ? 'draft' : 'outstanding';
+    buckets[key].count++;
+    buckets[key].value += t.total;
+  });
+  return buckets;
+}
+function dashTopCustomers(limit){
+  limit = limit || 5;
+  const byCustomer = {};
+  S.invoices.forEach(d=>{
+    const paid = (d.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0);
+    if(paid<=0) return;
+    const key = d.customer || 'Unknown';
+    if(!byCustomer[key]) byCustomer[key] = { name:key, invoices:0, paid:0 };
+    byCustomer[key].invoices++;
+    byCustomer[key].paid += paid;
+  });
+  return Object.values(byCustomer).sort((a,b)=>b.paid-a.paid).slice(0, limit);
+}
 function renderDashboard(){
   const inv = S.invoices;
   const outstanding = inv.reduce((a,b)=>a+remaining(b),0);
   const now = new Date(); const thisMonth = now.toISOString().slice(0,7);
+  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
   const paidThisMonth = inv.reduce((a,b)=> a + (b.payments||[]).filter(p=>(p.date||'').slice(0,7)===thisMonth).reduce((x,p)=>x+(Number(p.amount)||0),0), 0);
+  const paidLastMonth = inv.reduce((a,b)=> a + (b.payments||[]).filter(p=>(p.date||'').slice(0,7)===lastMonth).reduce((x,p)=>x+(Number(p.amount)||0),0), 0);
+  const paidTrendPct = paidLastMonth>0 ? Math.round((paidThisMonth-paidLastMonth)/paidLastMonth*100) : (paidThisMonth>0?100:0);
   const lowStock = S.inventory.filter(i=> Number(i.stock) <= Number(i.lowStockThreshold||0));
   const draftQuotes = S.quotes.filter(q=>q.status!=='converted').length;
+
+  const paidTrend = paidTrendPct===0 ? '' : `<span class="trend ${paidTrendPct>0?'up':'down'}">${paidTrendPct>0?'▲':'▼'} ${Math.abs(paidTrendPct)}% vs last month</span>`;
+  const revByMonth = dashPaidByMonth(6);
+  const maxRevMonth = Math.max(1, ...revByMonth.map(r=>r.value));
+  const invBuckets = dashInvoiceBuckets();
+  const invStageOrder = ['draft','outstanding','paid','overdue'];
+  const maxInvStage = Math.max(1, ...invStageOrder.map(k=>invBuckets[k].count));
+  const totalInvValue = invStageOrder.reduce((a,k)=>a+invBuckets[k].value,0) || 1;
+  const invR = 54, invC = 2*Math.PI*invR;
+  let invDonutOffset = 0;
+  const invDonutSegs = invStageOrder.map(k=>{
+    const frac = invBuckets[k].value / totalInvValue;
+    const len = Math.max(0, frac*invC - 2);
+    const seg = `<circle cx="70" cy="70" r="${invR}" fill="none" stroke="var(--${invBuckets[k].color})" stroke-width="16" stroke-dasharray="${len} ${invC-len}" stroke-dashoffset="${-invDonutOffset}" stroke-linecap="round"><title>${esc(invBuckets[k].label)}: ${fmtMoney(invBuckets[k].value)}</title></circle>`;
+    invDonutOffset += frac*invC;
+    return seg;
+  }).join('');
+  const topCustomers = dashTopCustomers(5);
 
   const recent = [
     ...inv.map(d=>({...d,kind:'invoice'})),
@@ -3671,6 +3743,7 @@ function renderDashboard(){
       <div class="dash-stat-icon" style="background:var(--green-soft);color:var(--green)">${ic('check')}</div>
       <div class="num">${fmtMoney(paidThisMonth)}</div>
       <div class="lbl">Paid — this month</div>
+      ${paidTrend}
     </div>
     <div class="dash-stat">
       <div class="dash-stat-icon" style="background:var(--teal-soft);color:var(--teal)">${ic('reports')}</div>
@@ -3691,6 +3764,85 @@ function renderDashboard(){
       <button class="dash-action" onclick="newQuote()"><span class="ic-wrap">${ic('sales')}</span><span class="lbl">New quote</span></button>
       <button class="dash-action" onclick="newPurchase()"><span class="ic-wrap">${ic('cart')}</span><span class="lbl">New purchase</span></button>
       <button class="dash-action" onclick="newProject()"><span class="ic-wrap">${ic('box')}</span><span class="lbl">New project</span></button>
+    </div>
+
+    <div class="section-title dash-section">Revenue trend</div>
+    <div class="card dash-section">
+      <div class="tiny muted" style="margin-bottom:4px">Cash received, last 6 months</div>
+      <div style="display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:14px">
+        ${revByMonth.map(r=>{
+          const h = Math.round(r.value/maxRevMonth*112)+4;
+          return `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
+            <div class="tiny mono" style="font-size:9.5px;color:var(--ink-soft);white-space:nowrap">${r.value>0?fmtMoneyShort(r.value):''}</div>
+            <div title="${esc(r.label)}: ${fmtMoney(r.value)}" style="width:100%;max-width:34px;height:${h}px;border-radius:4px 4px 2px 2px;background:var(--teal)"></div>
+            <div class="tiny muted">${r.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="section-title dash-section">Invoices by stage</div>
+    <div class="grid2 dash-section" style="align-items:stretch">
+      <div class="card">
+        <div class="small" style="font-weight:700">By count</div>
+        <div class="tiny muted" style="margin-bottom:12px">Where every invoice stands right now</div>
+        ${invStageOrder.map(k=>{
+          const s = invBuckets[k];
+          const w = Math.round(s.count/maxInvStage*100);
+          return `
+          <div style="margin-bottom:10px">
+            <div class="row-between tiny" style="margin-bottom:4px">
+              <span style="display:flex;align-items:center;gap:5px;color:var(--${s.color});font-weight:600">${ic(s.icon)} ${s.label}</span>
+              <span class="muted">${s.count}</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:var(--chip-bg);overflow:hidden">
+              <div style="width:${w}%;height:100%;border-radius:4px;background:var(--${s.color})"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="card">
+        <div class="small" style="font-weight:700">By value</div>
+        <div class="tiny muted" style="margin-bottom:12px">${fmtMoney(totalInvValue)} total</div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <svg viewBox="0 0 140 140" style="width:108px;height:108px;flex-shrink:0;transform:rotate(-90deg)">
+            <circle cx="70" cy="70" r="${invR}" fill="none" stroke="var(--chip-bg)" stroke-width="16"/>
+            ${invDonutSegs}
+          </svg>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:120px;flex:1">
+            ${invStageOrder.map(k=>{
+              const s = invBuckets[k];
+              return `<div class="tiny" style="display:flex;align-items:center;gap:6px">
+                <span style="width:8px;height:8px;border-radius:2px;background:var(--${s.color});flex-shrink:0"></span>
+                <span style="color:var(--ink-soft)">${s.label}</span>
+                <span style="font-weight:600;margin-left:auto">${fmtMoney(s.value)}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title dash-section" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Top customers</span>
+      <span class="small" style="font-weight:600;color:var(--teal);cursor:pointer" onclick="openReportsFromSidebar()">Reports</span>
+    </div>
+    <div class="card dash-section">
+      <div class="tiny muted" style="margin-bottom:12px">By cash received, all time</div>
+      ${topCustomers.length===0? `<div class="tiny muted">No payments recorded yet.</div>` : topCustomers.map(c=>{
+        const w = Math.round(c.paid/topCustomers[0].paid*100);
+        return `
+        <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+          <div class="row-between tiny" style="margin-bottom:5px;gap:10px">
+            <span style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>
+            <span class="mono muted" style="flex-shrink:0">${c.invoices} invoice${c.invoices===1?'':'s'} · ${fmtMoney(c.paid)}</span>
+          </div>
+          <div style="height:6px;border-radius:3px;background:var(--chip-bg);overflow:hidden">
+            <div style="width:${w}%;height:100%;border-radius:3px;background:var(--teal)"></div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>
 
     <div class="section-title dash-section" style="display:flex;justify-content:space-between;align-items:center">
