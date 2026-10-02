@@ -4,6 +4,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getFirestore } = require("firebase-admin/firestore");
+const { v1: firestoreAdminV1 } = require("@google-cloud/firestore");
 
 // Matches where these were already deployed by hand — keep new deploys in the same region.
 setGlobalOptions({ region: "europe-west1" });
@@ -11,6 +12,7 @@ setGlobalOptions({ region: "europe-west1" });
 initializeApp();
 const messaging = getMessaging();
 const db = getFirestore();
+const firestoreAdminClient = new firestoreAdminV1.FirestoreAdminClient();
 
 function slugifyTopic(s) {
   return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100) || "unknown";
@@ -343,3 +345,31 @@ exports.notifyOnPurchaseSigned = onDocumentWritten("ledger/purchases", async (ev
     }
   }
 });
+
+// Runs nightly: a full, server-side Firestore export (every collection, not just the
+// `ledger/*` docs this file already watches) to the project's own default Storage
+// bucket, under firestore-backups/ — no separate bucket to create. This is the backend
+// counterpart to the "Export data backup" button in the app itself (More > Administration):
+// that one is a manual, on-demand JSON download; this one runs on its own every night
+// regardless of whether anyone remembers to click the button. Exports older than 30 days
+// are deleted by the lifecycle rule on that path (see functions/README.md) rather than
+// from here, since export jobs can still be in progress when this function returns.
+exports.scheduledFirestoreExport = onSchedule(
+  { schedule: "0 3 * * *", timeZone: "Asia/Dubai" },
+  async () => {
+    const projectId = process.env.GCLOUD_PROJECT;
+    const databaseName = firestoreAdminClient.databasePath(projectId, "(default)");
+    const outputUriPrefix = `gs://${projectId}.firebasestorage.app/firestore-backups`;
+    try {
+      const [response] = await firestoreAdminClient.exportDocuments({
+        name: databaseName,
+        outputUriPrefix,
+        // Empty = every collection in the database.
+        collectionIds: [],
+      });
+      console.log("Firestore export started:", response.name);
+    } catch (err) {
+      console.error("Failed to start Firestore export", err);
+    }
+  }
+);
