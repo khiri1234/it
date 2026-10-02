@@ -972,6 +972,8 @@ let IPHONE_ORDER_NOTE='';
 let IPHONE_ORDER_EDIT_ID=null; // set while a client is correcting one of their own still-'new' orders
 let IPHONE_REVISE_ORDER_ID=null; // set while Hatef is revising a price already sent on a priced/confirmed/declined order
 let IPHONE_STORE_TAB='dashboard'; // 'dashboard' (charts), 'clients' (CRM list), or 'orders' (flat order list) sub-tab on the Apple Store page
+let IPHONE_CLIENT_FILTER='all'; // 'all' | 'pending' (awaiting pricing) | 'sent' (awaiting client) | 'accepted' (up to date)
+let IPHONE_ORDER_FILTER='all'; // 'all' or one of the order statuses (new/priced/confirmed/declined/fulfilled/cancelled)
 let STAFF_PANEL_CHAT_INPUT_WAS_FOCUSED=false;
 let STAFF_PANEL_THREAD_INPUT_WAS_FOCUSED=false;
 let STACK=[]; // for back navigation
@@ -6670,6 +6672,12 @@ function iphoneClients(){
   }).sort((a,b)=>b.lastOrderTs-a.lastOrderTs);
 }
 function setIphoneStoreTab(tab){ IPHONE_STORE_TAB=tab; render(); }
+function setIphoneClientFilter(f){ IPHONE_CLIENT_FILTER=f; render(); }
+function setIphoneOrderFilter(f){ IPHONE_ORDER_FILTER=f; render(); }
+// Same 'pending' (needs your pricing) / 'sent' (priced, awaiting the client) / 'accepted'
+// (nothing outstanding) buckets the client row's stripe/badge already use — pulled out
+// so the Clients filter chips stay in sync with what each row actually shows.
+function iphoneClientStage(c){ return c.awaitingCount>0 ? 'pending' : c.pipelineValue>0 ? 'sent' : 'accepted'; }
 function iphoneCrmStatsGrid(clients, perClient){
   const totalRevenue = clients.reduce((a,c)=>a+c.revenue,0);
   const pipelineValue = clients.reduce((a,c)=>a+c.pipelineValue,0);
@@ -6686,7 +6694,7 @@ function iphoneCrmStatsGrid(clients, perClient){
   </div>`;
 }
 function renderIphoneClientRow(c){
-  const stripeClass = c.awaitingCount>0?'pending':(c.pipelineValue>0?'sent':'accepted');
+  const stripeClass = iphoneClientStage(c);
   const statusBadge = c.awaitingCount>0
     ? `<span class="badge pending">${c.awaitingCount} to price</span>`
     : c.pipelineValue>0 ? `<span class="badge sent">Awaiting client</span>` : `<span class="badge accepted">Up to date</span>`;
@@ -6988,6 +6996,19 @@ function renderIphoneDashboardTab(){
 function renderIphoneOrders(){
   const clients = iphoneClients();
   const orders = (S.iphoneOrders||[]).slice().sort((a,b)=>b.ts-a.ts);
+
+  const clientFilters = [
+    ['all','All', clients.length],
+    ['pending','Awaiting pricing', clients.filter(c=>iphoneClientStage(c)==='pending').length],
+    ['sent','Awaiting client', clients.filter(c=>iphoneClientStage(c)==='sent').length],
+    ['accepted','Up to date', clients.filter(c=>iphoneClientStage(c)==='accepted').length]
+  ];
+  const filteredClients = IPHONE_CLIENT_FILTER==='all' ? clients : clients.filter(c=>iphoneClientStage(c)===IPHONE_CLIENT_FILTER);
+
+  const orderStatusFlow = ['new','priced','confirmed','declined','fulfilled','cancelled'];
+  const orderFilters = [['all','All', orders.length], ...orderStatusFlow.map(s=>[s, s.charAt(0).toUpperCase()+s.slice(1), orders.filter(o=>o.status===s).length])];
+  const filteredOrders = IPHONE_ORDER_FILTER==='all' ? orders : orders.filter(o=>o.status===IPHONE_ORDER_FILTER);
+
   return `
   ${topbar('Apple Store','Clients & orders', true, null, IPHONE_STORE_TAB!=='dashboard')}
   <div class="content">
@@ -6997,10 +7018,18 @@ function renderIphoneOrders(){
       <button class="${IPHONE_STORE_TAB==='clients'?'active':''}" onclick="setIphoneStoreTab('clients')">Clients</button>
       <button class="${IPHONE_STORE_TAB==='orders'?'active':''}" onclick="setIphoneStoreTab('orders')">Orders</button>
     </div>
+    ${IPHONE_STORE_TAB==='clients' ? `
+    <div class="chip-row" style="margin-bottom:12px">
+      ${clientFilters.map(([k,l,n])=>`<div class="chip ${IPHONE_CLIENT_FILTER===k?'active':''}" onclick="setIphoneClientFilter('${k}')">${l} (${n})</div>`).join('')}
+    </div>` : ''}
+    ${IPHONE_STORE_TAB==='orders' ? `
+    <div class="chip-row" style="margin-bottom:12px">
+      ${orderFilters.map(([k,l,n])=>`<div class="chip ${IPHONE_ORDER_FILTER===k?'active':''}" onclick="setIphoneOrderFilter('${k}')">${l} (${n})</div>`).join('')}
+    </div>` : ''}
     ${IPHONE_STORE_TAB==='dashboard' ? renderIphoneDashboardTab() :
       IPHONE_STORE_TAB==='clients'?
-      (clients.length===0? emptyState('cart','No clients yet','Clients who place Apple Store orders will show up here.') : clients.map(renderIphoneClientRow).join(''))
-      : (orders.length===0? emptyState('cart','No orders yet','Orders clients place through the Apple Store will show up here.') : orders.map(renderIphoneOrderCard).join(''))}
+      (filteredClients.length===0? emptyState('cart', clients.length===0?'No clients yet':'No clients match this filter', clients.length===0?'Clients who place Apple Store orders will show up here.':'Try a different filter.') : filteredClients.map(renderIphoneClientRow).join(''))
+      : (filteredOrders.length===0? emptyState('cart', orders.length===0?'No orders yet':'No orders match this filter', orders.length===0?'Orders clients place through the Apple Store will show up here.':'Try a different filter.') : filteredOrders.map(renderIphoneOrderCard).join(''))}
   </div>`;
 }
 function renderIphoneClientDetail(customer){
