@@ -3471,22 +3471,25 @@ function renderSidebar(){
    first. PORTAL_SECTION just remembers the last one clicked, for the active highlight. */
 let PORTAL_SECTION = '';
 const PORTAL_SUBVIEWS = ['supplier-rfq','supplier-purchase-view'];
-function portalNavItems(){
+// Grouped the same way the staff sidebar is (#190) — labeled sections instead of
+// one flat list. A group with nothing in it (e.g. an Apple-Store-only client, who
+// has no Projects) is dropped entirely rather than shown with a header and no items.
+function portalNavGroups(){
   if(CURRENT_USER.role==='client'){
     const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
     return [
-      ...(seesIT? [['p-projects','box','Projects']] : []),
-      ...(seesIphone? [['p-iphones','cart','Apple Store']] : []),
-      ...(seesIT? [['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : []),
-      ['p-messages','chat','Messages'],
-    ];
+      { label:'Overview', items: [
+        ...(seesIT? [['p-projects','box','Projects']] : []),
+        ...(seesIphone? [['p-iphones','cart','Apple Store']] : [])
+      ] },
+      { label:'Documents', items: seesIT? [['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : [] },
+      { label:'Messages', items: [['p-messages','chat','Messages']] }
+    ].filter(g=>g.items.length);
   }
   return [
-    ['p-rfqs','reports','Requests for quotation'],
-    ['p-pos','cart','Purchase orders'],
-    ['p-documents','file','Documents'],
-    ['p-messages','chat','Messages'],
-  ];
+    { label:'Purchasing', items: [['p-rfqs','reports','Requests for quotation'],['p-pos','cart','Purchase orders'],['p-documents','file','Documents']] },
+    { label:'Messages', items: [['p-messages','chat','Messages']] }
+  ].filter(g=>g.items.length);
 }
 function portalGoTo(sectionId){
   const onSub = PORTAL_SUBVIEWS.includes(VIEW.name);
@@ -3527,12 +3530,14 @@ function renderPortalSidebar(){
     <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
     <div class="ds-urole">${esc(who)}</div>
   </div>
-  <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
-    ${portalNavItems().map(([id,icon,label])=>`
+    ${portalNavGroups().map(g=>`
+      <div class="ds-section-label">${esc(g.label)}</div>
+      ${g.items.map(([id,icon,label])=>`
       <button class="ds-navbtn ${activeId===id?'active':''}" onclick="portalGoTo('${id}')" title="${esc(label)}">
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`).join('')}
+    `).join('')}
   </div>
   <div class="ds-foot">
     <button class="ds-logout" onclick="logout()" title="Log out">${ic('logout')}<span>Log out</span></button>
