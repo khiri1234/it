@@ -6518,6 +6518,7 @@ function renderMore(){
       </div>
     </div>`;
     })() : ''}
+    <div class="section-title">Messages</div>
     <div class="card" style="padding:0;overflow:hidden">
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('chat')">
         <div class="small" style="font-weight:600">Team chat</div>${ic('chev')}
@@ -6525,9 +6526,13 @@ function renderMore(){
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('client-chats')">
         <div class="small" style="font-weight:600">Client messages</div>${ic('chev')}
       </div>
-      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('supplier-chats')">
+      <div class="row-between" style="padding:14px" onclick="goPush('supplier-chats')">
         <div class="small" style="font-weight:600">Supplier messages</div>${ic('chev')}
       </div>
+    </div>
+
+    <div class="section-title">Work</div>
+    <div class="card" style="padding:0;overflow:hidden">
       <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('todos')">
         <div class="small" style="font-weight:600">To-Do list</div>
         <div style="display:flex;align-items:center;gap:8px">
@@ -6535,28 +6540,34 @@ function renderMore(){
           ${ic('chev')}
         </div>
       </div>
-      ${isIphoneStoreAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('iphone-orders')">
+      <div class="row-between" style="padding:14px;${isIphoneStoreAdmin()?'border-bottom:1px solid var(--line)':''}" onclick="goPush('reports')">
+        <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
+      </div>
+      ${isIphoneStoreAdmin()?`<div class="row-between" style="padding:14px" onclick="goPush('iphone-orders')">
         <div class="small" style="font-weight:600">Apple Store</div>
         <div style="display:flex;align-items:center;gap:8px">
           ${(S.iphoneOrders||[]).filter(o=>o.status==='new').length>0?`<span class="badge pending">${(S.iphoneOrders||[]).filter(o=>o.status==='new').length} new</span>`:''}
           ${ic('chev')}
         </div>
       </div>`:''}
-      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('reports')">
-        <div class="small" style="font-weight:600">Reports</div>${ic('chev')}
-      </div>
-      ${isAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('settings-form')">
-        <div class="small" style="font-weight:600">Business settings</div>${ic('chev')}
-      </div>`:''}
-      ${isAdmin()?`<div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="TEAM_EDIT_ID=null;goPush('team-form')">
-        <div class="small" style="font-weight:600">Team & logins</div>${ic('chev')}
-      </div>`:`<div class="row-between" style="padding:14px">
-        <div class="small muted">Business settings — admin only</div>
-      </div>`}
-      ${isAdmin()?`<div class="row-between" style="padding:14px" onclick="goPush('activity-log')">
-        <div class="small" style="font-weight:600">Activity log</div>${ic('chev')}
-      </div>`:''}
     </div>
+
+    <div class="section-title">Administration</div>
+    ${isAdmin()?`<div class="card" style="padding:0;overflow:hidden">
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="goPush('settings-form')">
+        <div class="small" style="font-weight:600">Business settings</div>${ic('chev')}
+      </div>
+      <div class="row-between" style="padding:14px;border-bottom:1px solid var(--line)" onclick="TEAM_EDIT_ID=null;goPush('team-form')">
+        <div class="small" style="font-weight:600">Team &amp; logins</div>${ic('chev')}
+      </div>
+      <div class="row-between" style="padding:14px" onclick="goPush('activity-log')">
+        <div class="small" style="font-weight:600">Activity log</div>${ic('chev')}
+      </div>
+    </div>` : `<div class="card">
+      <div class="small muted">Business settings, team &amp; logins, and the activity log are admin only.</div>
+    </div>`}
+
+    <div class="section-title">System</div>
     <div class="card">
       <div class="row-between">
         <div class="tiny muted" style="font-weight:600;text-transform:uppercase">Sync</div>
