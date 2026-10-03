@@ -566,8 +566,7 @@
     .desktop-sidebar.collapsed .ds-search-btn{justify-content:center;padding:9px;}
     .desktop-sidebar.collapsed .ds-search-btn span,.desktop-sidebar.collapsed .ds-search-kbd{display:none;}
 
-    .ds-section-label{font-size:10.5px;font-weight:700;color:var(--ds-text-soft);text-transform:uppercase;letter-spacing:.08em;padding:0 18px;margin:16px 0 6px;}
-    .ds-section-label:first-child{margin-top:0;}
+    .ds-section-label{font-size:10.5px;font-weight:700;color:var(--ds-text-soft);text-transform:uppercase;letter-spacing:.08em;padding:0 18px;margin:0 0 6px;}
     .desktop-sidebar.collapsed .ds-section-label{display:none;}
     .ds-nav{display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px;position:relative;}
     .ds-nav::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--teal) 0%,var(--teal) 60%,var(--amber) 100%);opacity:.4;}
@@ -3440,18 +3439,9 @@ function toggleSidebarCollapse(){
 }
 function renderSidebar(){
   if(!CURRENT_USER) return '';
-  const purchasingOnly = isPurchasingOnly();
-  // Grouped the same way the mobile More page is (labeled sections instead of one
-  // flat list) — groups with no items for this user (e.g. a purchasing-only
-  // account, which only ever sees Stock) are dropped entirely rather than shown empty.
-  const navGroups = [
-    { label:'Overview', items: purchasingOnly? [] : [['dashboard','home','Home']] },
-    { label:'Business', items: purchasingOnly? [['stock','stock','Stock']] : [['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects']] },
-    { label:'Communication', items: purchasingOnly? [] : [['chat','chat','Chat']] },
-    { label:'Insights', items: purchasingOnly? [] : [['reports','reports','Reports']] },
-    { label:'Administration', items: isIphoneStoreAdmin()? [['iphone-orders','cart','Apple Store']] : [] },
-    { label:'Settings', items: purchasingOnly? [] : [['more','more','More']] }
-  ].filter(g=>g.items.length);
+  let tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['reports','reports','Reports'],['more','more','More']];
+  if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
+  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','Apple Store']);
   const activeId = ['reports','chat'].includes(VIEW.name) ? VIEW.name
     : ['iphone-orders','iphone-client'].includes(VIEW.name) ? 'iphone-orders'
     : (TAB_SECTIONS[VIEW.name] || 'dashboard');
@@ -3475,17 +3465,15 @@ function renderSidebar(){
   <div class="ds-search-btn" onclick="openCommandPalette()" title="Jump to (Ctrl/Cmd K)">
     ${ic('search')}<span>Search</span><span class="ds-search-kbd">${navigator.platform.includes('Mac')?'⌘K':'Ctrl K'}</span>
   </div>
+  <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
-    ${navGroups.map(g=>`
-      <div class="ds-section-label">${esc(g.label)}</div>
-      ${g.items.map(([id,icon,label])=>{
-        const activeCls = activeId===id?'active':'';
-        const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrdersFromSidebar()' : `switchTab('${id}')`;
-        return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
+    ${tabs.map(([id,icon,label])=>{
+      const activeCls = activeId===id?'active':'';
+      const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrdersFromSidebar()' : `switchTab('${id}')`;
+      return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`;
-      }).join('')}
-    `).join('')}
+    }).join('')}
   </div>
   <div class="ds-foot">
     <button class="ds-logout" onclick="logout()" title="Log out">${ic('logout')}<span>Log out</span></button>
@@ -3497,25 +3485,22 @@ function renderSidebar(){
    first. PORTAL_SECTION just remembers the last one clicked, for the active highlight. */
 let PORTAL_SECTION = '';
 const PORTAL_SUBVIEWS = ['supplier-rfq','supplier-purchase-view'];
-// Grouped the same way the staff sidebar is (#190) — labeled sections instead of
-// one flat list. A group with nothing in it (e.g. an Apple-Store-only client, who
-// has no Projects) is dropped entirely rather than shown with a header and no items.
-function portalNavGroups(){
+function portalNavItems(){
   if(CURRENT_USER.role==='client'){
     const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
     return [
-      { label:'Overview', items: [
-        ...(seesIT? [['p-projects','box','Projects']] : []),
-        ...(seesIphone? [['p-iphones','cart','Apple Store']] : [])
-      ] },
-      { label:'Documents', items: seesIT? [['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : [] },
-      { label:'Messages', items: [['p-messages','chat','Messages']] }
-    ].filter(g=>g.items.length);
+      ...(seesIT? [['p-projects','box','Projects']] : []),
+      ...(seesIphone? [['p-iphones','cart','Apple Store']] : []),
+      ...(seesIT? [['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : []),
+      ['p-messages','chat','Messages'],
+    ];
   }
   return [
-    { label:'Purchasing', items: [['p-rfqs','reports','Requests for quotation'],['p-pos','cart','Purchase orders'],['p-documents','file','Documents']] },
-    { label:'Messages', items: [['p-messages','chat','Messages']] }
-  ].filter(g=>g.items.length);
+    ['p-rfqs','reports','Requests for quotation'],
+    ['p-pos','cart','Purchase orders'],
+    ['p-documents','file','Documents'],
+    ['p-messages','chat','Messages'],
+  ];
 }
 function portalGoTo(sectionId){
   const onSub = PORTAL_SUBVIEWS.includes(VIEW.name);
@@ -3556,14 +3541,12 @@ function renderPortalSidebar(){
     <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
     <div class="ds-urole">${esc(who)}</div>
   </div>
+  <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
-    ${portalNavGroups().map(g=>`
-      <div class="ds-section-label">${esc(g.label)}</div>
-      ${g.items.map(([id,icon,label])=>`
+    ${portalNavItems().map(([id,icon,label])=>`
       <button class="ds-navbtn ${activeId===id?'active':''}" onclick="portalGoTo('${id}')" title="${esc(label)}">
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`).join('')}
-    `).join('')}
   </div>
   <div class="ds-foot">
     <button class="ds-logout" onclick="logout()" title="Log out">${ic('logout')}<span>Log out</span></button>
