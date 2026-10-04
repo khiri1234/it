@@ -3431,7 +3431,19 @@ function switchTab(id){
 }
 function openReportsFromSidebar(){ switchTab('more'); goPush('reports'); }
 function openChatFromSidebar(){ switchTab('more'); goPush('chat'); }
-function openIphoneOrdersFromSidebar(){ switchTab('more'); goPush('iphone-orders'); }
+// Shared by the sidebar's "Apple Store" row and the bottom tab bar's Home-button
+// double-tap shortcut below.
+function openIphoneOrders(){ switchTab('more'); goPush('iphone-orders'); }
+let HOME_TAB_LAST_TAP = 0;
+// A second tap on the Home tab within 400ms jumps straight to Apple Store — only
+// wired up for whoever can actually see that section (iphoneStoreAdminFlag).
+function handleHomeTabTap(){
+  const now = Date.now();
+  const isDoubleTap = (now - HOME_TAB_LAST_TAP) < 400;
+  HOME_TAB_LAST_TAP = isDoubleTap ? 0 : now;
+  if(isDoubleTap && isIphoneStoreAdmin()) openIphoneOrders();
+  else switchTab('dashboard');
+}
 function toggleSidebarCollapse(){
   DS_COLLAPSED = !DS_COLLAPSED;
   try{ localStorage.setItem('sidebarCollapsed', DS_COLLAPSED?'1':'0'); }catch(e){}
@@ -3469,7 +3481,7 @@ function renderSidebar(){
   <div class="ds-nav">
     ${tabs.map(([id,icon,label])=>{
       const activeCls = activeId===id?'active':'';
-      const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrdersFromSidebar()' : `switchTab('${id}')`;
+      const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrders()' : `switchTab('${id}')`;
       return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
         <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`;
@@ -3624,7 +3636,7 @@ function renderTabbar(){
       const isHome = id==='dashboard';
       const activeCls = active===id?'active':'';
       return isHome
-        ? `<button class="tabbtn tabbtn-home ${activeCls}" onclick="switchTab('${id}')">
+        ? `<button class="tabbtn tabbtn-home ${activeCls}" onclick="handleHomeTabTap()">
             <span class="home-circle"><img src="${HOME_LOGO_DATA_URI}" alt="Home"></span><span>${label}</span>
           </button>`
         : `<button class="tabbtn ${activeCls}" onclick="switchTab('${id}')">
