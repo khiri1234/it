@@ -43,6 +43,18 @@ npm run dist        # build the .app + .dmg into desktop/dist/
 `THE H BUSINESS MANAGEMENT-<version>.dmg` you can drag-install like any other
 Mac app, under `desktop/dist/`.
 
+## Dock quick-jump menu
+
+Press and hold (or right-click) the app's Dock icon for a menu of shortcuts —
+Dashboard, Apple Store, Invoices, Purchases, Projects — that jump straight to
+that section, bringing the window forward if it isn't already. A destination
+a signed-in user's role can't see (e.g. Invoices for a purchasing-only
+account, or Apple Store for anyone but the flagged iPhone Store admin) falls
+back to Dashboard/Stock instead of landing on a forbidden view, same as the
+in-app command palette (⌘K). This only customizes the menu while the app is
+already running — macOS still shows its own generic Dock menu (Open, Options,
+Quit) when the app hasn't been launched yet.
+
 ## Notes
 
 - **Unsigned build.** `npm run dist` as configured produces an unsigned app.
