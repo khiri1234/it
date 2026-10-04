@@ -89,6 +89,31 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+// Press-and-hold (or right-click) the Dock icon to jump straight to a section,
+// without having to bring the window forward and click through the sidebar first.
+function sendDockNavigate(section) {
+  if (!mainWindow) {
+    createWindow();
+    mainWindow.webContents.once('did-finish-load', () => mainWindow.webContents.send('dock-navigate', section));
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send('dock-navigate', section);
+}
+
+function buildDockMenu() {
+  if (process.platform !== 'darwin') return;
+  app.dock.setMenu(Menu.buildFromTemplate([
+    { label: 'Dashboard', click: () => sendDockNavigate('dashboard') },
+    { label: 'Apple Store', click: () => sendDockNavigate('iphone-orders') },
+    { label: 'Invoices', click: () => sendDockNavigate('invoices') },
+    { label: 'Purchases', click: () => sendDockNavigate('purchases') },
+    { label: 'Projects', click: () => sendDockNavigate('projects') }
+  ]));
+}
+
 app.whenReady().then(() => {
   // The barcode/QR scanner feature needs the camera; nothing else in the app
   // asks for a permission, so allow media and deny everything else.
@@ -97,6 +122,7 @@ app.whenReady().then(() => {
   });
 
   buildMenu();
+  buildDockMenu();
   createWindow();
 
   app.on('activate', () => {

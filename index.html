@@ -3627,6 +3627,22 @@ document.addEventListener('keydown', e=>{
     openCommandPalette();
   }
 });
+// Fired by the macOS desktop app's Dock "press and hold" menu (see desktop/main.js).
+// Same destinations as the command palette/sidebar — a role that can't see one of
+// these falls back to Dashboard (or Stock, for a purchasing-only account) instead
+// of landing on a blank or forbidden view.
+function handleDockNavigate(section){
+  if(!CURRENT_USER || CURRENT_USER.role==='client' || CURRENT_USER.role==='supplier') return;
+  STACK=[];
+  if(section==='iphone-orders' && isIphoneStoreAdmin()){ go('iphone-orders'); return; }
+  if(section==='invoices' && !isPurchasingOnly()){ SALES_TAB='invoices'; go('sales'); return; }
+  if(section==='purchases'){ STOCK_TAB='purchases'; go('stock'); return; }
+  if(section==='projects' && !isPurchasingOnly()){ go('projects'); return; }
+  go(isPurchasingOnly() ? 'stock' : 'dashboard');
+}
+if(window.electronAPI && window.electronAPI.onDockNavigate){
+  window.electronAPI.onDockNavigate(handleDockNavigate);
+}
 function renderTabbar(){
   let tabs=[['sales','sales','Sales'],['stock','stock','Stock'],['dashboard','home','Home'],['projects','box','Projects'],['more','more','More']];
   if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
