@@ -3819,7 +3819,10 @@ function renderDashboard(){
     </div>
 
     <div class="section-title dash-section" style="display:flex;justify-content:space-between;align-items:center">
-      <span>To-Do${openTodos.length?` (${openTodos.length})`:''}</span>
+      <span style="display:flex;align-items:center;gap:8px">
+        <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="event.stopPropagation();openQuickTodoAdd()" title="Add a quick to-do">${ic('plus')}</button>
+        <span>To-Do${openTodos.length?` (${openTodos.length})`:''}</span>
+      </span>
       <span class="small" style="font-weight:600;color:var(--teal);cursor:pointer" onclick="goPush('todos')">See all</span>
     </div>
     ${openTodos.length===0? `<div class="card dash-section"><div class="tiny muted">Nothing on your to-do list.</div></div>` :
@@ -7166,6 +7169,35 @@ function addTodo(){
   });
   TODO_DRAFT=''; TODO_ASSIGNEE=''; TODO_DUE='';
   persist('todos');
+  render();
+}
+// The dashboard's "+" next to To-Do — a one-field shortcut for jotting a task
+// without leaving the dashboard for the full To-Do page (assignee/due date still
+// live there, editable afterwards).
+function openQuickTodoAdd(){
+  if(!CURRENT_USER) return;
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet" style="max-width:380px">
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:10px">Quick to-do</div>
+      <input id="quickTodoInput" placeholder="Add a task…" onkeydown="if(event.key==='Enter'){event.preventDefault();addQuickTodo();}">
+      <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="addQuickTodo()">${ic('plus')} Add task</button>
+    </div>
+  </div>`;
+  setTimeout(()=>document.getElementById('quickTodoInput')?.focus(), 30);
+}
+function addQuickTodo(){
+  const input = document.getElementById('quickTodoInput');
+  const text = (input?input.value:'').trim();
+  if(!text) return;
+  if(!S.todos) S.todos=[];
+  S.todos.push({
+    id:uid(), text, done:false,
+    assigneeId:null, dueDate:null,
+    createdBy:CURRENT_USER.id, createdByName:CURRENT_USER.name, createdAt:Date.now()
+  });
+  persist('todos');
+  closeModal();
   render();
 }
 function toggleTodo(id){
