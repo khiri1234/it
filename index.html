@@ -5349,6 +5349,58 @@ function toggleRfqSupplierPicker(){
   const picker = document.getElementById('rfqSupplierPicker');
   if(picker) picker.style.display = all ? 'none' : '';
 }
+function renderRfqSupplierOptions(supplierAccounts, selectedNames){
+  if(supplierAccounts.length===0) return `<div class="tiny muted">No supplier accounts yet — add one ${isAdmin()?'below':'under Team & logins'}.</div>`;
+  return `
+    <select id="rfq_suppliers_select" multiple size="${Math.min(supplierAccounts.length,6)}" style="height:auto">
+      ${supplierAccounts.map(u=>`<option value="${esc(u.supplierName)}" ${selectedNames.includes(u.supplierName)?'selected':''}>${esc(u.supplierName)}</option>`).join('')}
+    </select>
+    <div class="tiny muted" style="margin-top:6px">Hold Ctrl (Windows) or ⌘ (Mac) and click to pick more than one.</div>`;
+}
+// Lets an admin create a supplier login right from the RFQ form instead of detouring
+// through Team & logins — the new account is auto-selected in the picker above without
+// disturbing whatever else has already been typed into the rest of the form.
+function openAddSupplierModal(){
+  if(!isAdmin()) return;
+  ensureModalRoot().innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet" style="max-width:380px">
+      <div style="font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:10px">New supplier</div>
+      <label>Supplier name</label>
+      <input id="ns_supplier" placeholder="Supplier / company name" autocomplete="off">
+      <label>Username</label>
+      <input id="ns_user" placeholder="username" autocapitalize="off" autocomplete="off">
+      <label>PIN / passcode (min 4 characters)</label>
+      <input id="ns_pin" type="password" placeholder="••••">
+      <div id="ns_err" class="tiny" style="color:var(--red);min-height:16px;margin-top:6px"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:4px" onclick="saveNewSupplierFromRfq()">${ic('plus')} Add supplier</button>
+    </div>
+  </div>`;
+  setTimeout(()=>document.getElementById('ns_supplier')?.focus(), 30);
+}
+async function saveNewSupplierFromRfq(){
+  const supplierName=document.getElementById('ns_supplier').value.trim();
+  const username=document.getElementById('ns_user').value.trim().toLowerCase();
+  const pin=document.getElementById('ns_pin').value;
+  const err=document.getElementById('ns_err');
+  if(!supplierName || !username || pin.length<4){ err.textContent='Fill in all fields — PIN needs 4+ characters.'; return; }
+  if(S.users.some(u=>u.username===username)){ err.textContent='That username is already taken.'; return; }
+  const passHash=await sha256(username+':'+pin);
+  S.users.push({id:uid(), name:supplierName, username, passHash, role:'supplier', supplierName});
+  await persist('users');
+  logActivity(`Added team member "${supplierName}" (supplier — ${supplierName})`);
+  toast('Supplier added');
+  closeModal();
+  const picker = document.getElementById('rfqSupplierPicker');
+  if(picker){
+    const existingSelect = document.getElementById('rfq_suppliers_select');
+    const alreadySelected = existingSelect ? [...existingSelect.selectedOptions].map(o=>o.value) : [];
+    picker.innerHTML = renderRfqSupplierOptions(rfqSupplierAccounts(), [...alreadySelected, supplierName]);
+    const allCheckbox = document.getElementById('rfq_all_suppliers');
+    if(allCheckbox){ allCheckbox.checked=false; }
+    picker.style.display='';
+  }
+}
 function renderRfqForm(id){
   const editing = id ? S.rfqs.find(r=>r.id===id) : null;
   const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'Please, provide us quote with model number and best price', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}], projectId:null, supplierNames:null};
@@ -5380,12 +5432,9 @@ function renderRfqForm(id){
         <span>All suppliers</span>
       </label>
       <div id="rfqSupplierPicker" style="margin-top:10px;${allSelected?'display:none':''}">
-        ${supplierAccounts.length===0? `<div class="tiny muted">No supplier accounts yet — add one under Team &amp; logins.</div>` : `
-          <select id="rfq_suppliers_select" multiple size="${Math.min(supplierAccounts.length,6)}" style="height:auto">
-            ${supplierAccounts.map(u=>`<option value="${esc(u.supplierName)}" ${rfq.supplierNames && rfq.supplierNames.includes(u.supplierName)?'selected':''}>${esc(u.supplierName)}</option>`).join('')}
-          </select>
-          <div class="tiny muted" style="margin-top:6px">Hold Ctrl (Windows) or ⌘ (Mac) and click to pick more than one.</div>`}
+        ${renderRfqSupplierOptions(supplierAccounts, rfq.supplierNames||[])}
       </div>
+      ${isAdmin()?`<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="openAddSupplierModal()">${ic('plus')} Add new supplier</button>`:''}
     </div>
     <div class="section-title">Items</div>
     <div id="rfqItemsWrap">${renderRfqRows(rfq.items)}</div>
