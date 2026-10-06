@@ -4918,7 +4918,7 @@ function renderStockList(){
               </div>
               <span class="badge ${rfqBadgeClass(r.status)}">${r.status}</span>
             </div>
-            <div class="tiny muted" style="margin-top:6px">${r.items.length} item${r.items.length===1?'':'s'} · ${quoteCount} supplier${quoteCount===1?'':'s'} quoted</div>
+            <div class="tiny muted" style="margin-top:6px">${r.items.length} item${r.items.length===1?'':'s'} · ${quoteCount} supplier${quoteCount===1?'':'s'} quoted · sent to ${esc(rfqSupplierSummary(r))}</div>
           </div>`;
         }).join('')}
     </div>
@@ -5333,9 +5333,27 @@ function deletePurchase(id){
    can one-tap turn a chosen supplier's priced items into a Purchase. */
 function rfqBadgeClass(status){ return status==='closed' ? 'completed' : 'sent'; }
 function newRfq(){ goPush('rfq-form',{id:null}); }
+// Supplier accounts an RFQ can be sent to — only logins with role 'supplier' can see
+// their portal's RFQ list at all, so this (not allSupplierNames(), which is just every
+// name ever typed on a purchase) is the pool worth picking from.
+function rfqSupplierAccounts(){
+  return S.users.filter(u=>u.role==='supplier' && u.supplierName).sort((a,b)=>a.supplierName.localeCompare(b.supplierName));
+}
+function rfqSupplierSummary(rfq){
+  if(!rfq.supplierNames || rfq.supplierNames.length===0) return 'All suppliers';
+  if(rfq.supplierNames.length===1) return rfq.supplierNames[0];
+  return `${rfq.supplierNames.length} suppliers`;
+}
+function toggleRfqSupplierPicker(){
+  const all = document.getElementById('rfq_all_suppliers').checked;
+  const picker = document.getElementById('rfqSupplierPicker');
+  if(picker) picker.style.display = all ? 'none' : '';
+}
 function renderRfqForm(id){
   const editing = id ? S.rfqs.find(r=>r.id===id) : null;
-  const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'Please, provide us quote with model number and best price', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}], projectId:null};
+  const rfq = editing || {id:null, number:null, date:todayISO(), title:'', notes:'Please, provide us quote with model number and best price', status:'open', items:[{id:uid(),desc:'',code:'',qty:1,unit:''}], projectId:null, supplierNames:null};
+  const allSelected = !rfq.supplierNames || rfq.supplierNames.length===0;
+  const supplierAccounts = rfqSupplierAccounts();
   return `
   ${topbar(editing?'Edit RFQ':'New RFQ', editing?rfq.number:'', true)}
   <div class="content">
@@ -5354,6 +5372,20 @@ function renderRfqForm(id){
       ${S.projects.length?`<button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" onclick="importProjectBoqIntoRfq()">${ic('box')} Import outstanding BOQ items from selected project</button>`:''}
       <label>Notes for suppliers (optional)</label>
       <textarea id="rfq_notes" rows="2" placeholder="Any extra instructions">${esc(rfq.notes)}</textarea>
+    </div>
+    <div class="section-title">Send to suppliers</div>
+    <div class="card">
+      <label style="display:flex;align-items:center;gap:10px;margin:0;text-transform:none;font-weight:400;color:var(--ink)">
+        <input type="checkbox" id="rfq_all_suppliers" ${allSelected?'checked':''} onchange="toggleRfqSupplierPicker()" style="width:18px;height:18px;flex-shrink:0">
+        <span>All suppliers</span>
+      </label>
+      <div id="rfqSupplierPicker" style="margin-top:10px;${allSelected?'display:none':''}">
+        ${supplierAccounts.length===0? `<div class="tiny muted">No supplier accounts yet — add one under Team &amp; logins.</div>` :
+          supplierAccounts.map(u=>`<label style="display:flex;align-items:center;gap:10px;margin:0 0 8px;text-transform:none;font-weight:400;color:var(--ink)">
+            <input type="checkbox" class="rfqSupplierCheck" value="${esc(u.supplierName)}" ${rfq.supplierNames && rfq.supplierNames.includes(u.supplierName)?'checked':''} style="width:18px;height:18px;flex-shrink:0">
+            <span>${esc(u.supplierName)}</span>
+          </label>`).join('')}
+      </div>
     </div>
     <div class="section-title">Items</div>
     <div id="rfqItemsWrap">${renderRfqRows(rfq.items)}</div>
@@ -5422,6 +5454,9 @@ function saveRfq(id){
   if(!title){ toast('Enter a title'); return; }
   const items=readRfqItemsFromDOM();
   if(items.length===0){ toast('Add at least one item'); return; }
+  const allSuppliers = document.getElementById('rfq_all_suppliers').checked;
+  const pickedSuppliers = [...document.querySelectorAll('.rfqSupplierCheck:checked')].map(c=>c.value);
+  if(!allSuppliers && pickedSuppliers.length===0){ toast('Select at least one supplier, or choose "All suppliers"'); return; }
   const numberInput = document.getElementById('rfq_number').value.trim();
   const isNew=!id; let r;
   if(isNew){ const generated=nextNumber('rfq'); r={id:uid(), number:numberInput || generated, status:'open'}; S.rfqs.push(r); }
@@ -5431,6 +5466,7 @@ function saveRfq(id){
   r.projectId=document.getElementById('rfq_project').value||null;
   r.notes=document.getElementById('rfq_notes').value;
   r.items=items;
+  r.supplierNames = allSuppliers ? null : pickedSuppliers;
   persist('rfqs'); persist('settings');
   logActivity(`${isNew?'Created':'Updated'} RFQ ${r.number} — ${title}`);
   toast('RFQ saved');
@@ -5496,6 +5532,10 @@ function renderRfqView(id){
         <span class="badge ${rfqBadgeClass(rfq.status)}">${rfq.status}</span>
         <div class="tiny muted">${fmtDate(rfq.date)}</div>
       </div>
+      <div class="row-between" style="margin-top:8px">
+        <div class="tiny muted">Visible to</div>
+        <div class="small" style="font-weight:600">${esc(rfqSupplierSummary(rfq))}</div>
+      </div>
       ${rfqProj?`<div class="row-between" style="margin-top:8px;cursor:pointer" onclick="go('project-view',{id:'${rfqProj.id}'})">
         <div class="tiny muted">Project</div>
         <div class="small" style="font-weight:600">${esc(rfqProj.number)} — ${esc(rfqProj.name)}</div>
@@ -5504,7 +5544,7 @@ function renderRfqView(id){
     </div>
 
     ${rfq.status==='open'? `<button class="btn btn-teal btn-block" onclick="inviteSuppliersToRfq('${rfq.id}')">${ic('share')} Notify suppliers</button>
-    <div class="tiny muted" style="margin:6px 0 4px">Shares this RFQ's item list — send it to any supplier's WhatsApp, email, or SMS. They'll need their supplier login to submit prices.</div>` : ''}
+    <div class="tiny muted" style="margin:6px 0 4px">Shares this RFQ's item list — send it to ${rfq.supplierNames && rfq.supplierNames.length ? 'the selected suppliers’' : 'any supplier’s'} WhatsApp, email, or SMS. They'll need their supplier login to submit prices.</div>` : ''}
 
     <div class="section-title">Items requested — compare by supplier</div>
     ${rfq.items.map(it=>{
@@ -5622,7 +5662,7 @@ function createPurchasesFromLowestPrices(rfqId){
 /* ---------- SUPPLIER PORTAL (login-only — sees open RFQs, submits prices) ---------- */
 function renderSupplierPortal(){
   const supplierName = CURRENT_USER.supplierName;
-  const rfqs = [...(S.rfqs||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const rfqs = [...(S.rfqs||[])].filter(r=>!r.supplierNames || r.supplierNames.length===0 || r.supplierNames.includes(supplierName)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const myQuotes = (S.supplierQuotes||[]).filter(q=>q.supplierName===supplierName);
   const myPurchases = S.purchases.filter(p=>p.supplier===supplierName).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const supplierChatMsgs = (S.supplierChats && S.supplierChats[supplierName]) || [];
@@ -5720,8 +5760,9 @@ function renderSupplierPurchaseView(id){
 }
 function renderSupplierRfqForm(id){
   const rfq = S.rfqs.find(r=>r.id===id);
-  if(!rfq) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This request may have been removed.')}</div>`;
   const supplierName = CURRENT_USER.supplierName;
+  const invited = rfq && (!rfq.supplierNames || rfq.supplierNames.length===0 || rfq.supplierNames.includes(supplierName));
+  if(!rfq || !invited) return topbar('Not found','',true)+`<div class="content">${emptyState('box','Not found','This request may have been removed.')}</div>`;
   const mine = (S.supplierQuotes||[]).find(q=>q.rfqId===id && q.supplierName===supplierName);
   const closed = rfq.status==='closed';
   return `
@@ -5747,6 +5788,7 @@ function saveSupplierQuote(rfqId){
   const rfq=S.rfqs.find(r=>r.id===rfqId); if(!rfq) return;
   if(rfq.status!=='open'){ toast('This RFQ is closed'); return; }
   const supplierName=CURRENT_USER.supplierName;
+  if(rfq.supplierNames && rfq.supplierNames.length && !rfq.supplierNames.includes(supplierName)) return;
   const items=rfq.items.map(it=>{
     const priceEl=document.getElementById('sq_price_'+it.id);
     const noteEl=document.getElementById('sq_note_'+it.id);
