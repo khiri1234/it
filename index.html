@@ -2497,11 +2497,11 @@ function renderClientPortal(){
   <div class="content">
     ${seesIT? renderClientProjectsSection(projects) : ''}
 
-    ${seesIphone? `<div class="section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : ''}
-
     ${seesIT? renderClientDocsSection(projects) : ''}
 
     ${seesIT? renderClientInvoicesSection(docs) : ''}
+
+    ${seesIphone? `<div class="section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : ''}
 
     ${isWideEnoughForMsgPanel() ? '' : `
     <div class="section-title" id="p-messages">Messages</div>
