@@ -5380,11 +5380,11 @@ function renderRfqForm(id){
         <span>All suppliers</span>
       </label>
       <div id="rfqSupplierPicker" style="margin-top:10px;${allSelected?'display:none':''}">
-        ${supplierAccounts.length===0? `<div class="tiny muted">No supplier accounts yet — add one under Team &amp; logins.</div>` :
-          supplierAccounts.map(u=>`<label style="display:flex;align-items:center;gap:10px;margin:0 0 8px;text-transform:none;font-weight:400;color:var(--ink)">
-            <input type="checkbox" class="rfqSupplierCheck" value="${esc(u.supplierName)}" ${rfq.supplierNames && rfq.supplierNames.includes(u.supplierName)?'checked':''} style="width:18px;height:18px;flex-shrink:0">
-            <span>${esc(u.supplierName)}</span>
-          </label>`).join('')}
+        ${supplierAccounts.length===0? `<div class="tiny muted">No supplier accounts yet — add one under Team &amp; logins.</div>` : `
+          <select id="rfq_suppliers_select" multiple size="${Math.min(supplierAccounts.length,6)}" style="height:auto">
+            ${supplierAccounts.map(u=>`<option value="${esc(u.supplierName)}" ${rfq.supplierNames && rfq.supplierNames.includes(u.supplierName)?'selected':''}>${esc(u.supplierName)}</option>`).join('')}
+          </select>
+          <div class="tiny muted" style="margin-top:6px">Hold Ctrl (Windows) or ⌘ (Mac) and click to pick more than one.</div>`}
       </div>
     </div>
     <div class="section-title">Items</div>
@@ -5455,7 +5455,8 @@ function saveRfq(id){
   const items=readRfqItemsFromDOM();
   if(items.length===0){ toast('Add at least one item'); return; }
   const allSuppliers = document.getElementById('rfq_all_suppliers').checked;
-  const pickedSuppliers = [...document.querySelectorAll('.rfqSupplierCheck:checked')].map(c=>c.value);
+  const supplierSelect = document.getElementById('rfq_suppliers_select');
+  const pickedSuppliers = supplierSelect ? [...supplierSelect.selectedOptions].map(o=>o.value) : [];
   if(!allSuppliers && pickedSuppliers.length===0){ toast('Select at least one supplier, or choose "All suppliers"'); return; }
   const numberInput = document.getElementById('rfq_number').value.trim();
   const isNew=!id; let r;
