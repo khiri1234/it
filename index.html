@@ -3501,9 +3501,8 @@ function portalNavItems(){
   if(CURRENT_USER.role==='client'){
     const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
     return [
-      ...(seesIT? [['p-projects','box','Projects']] : []),
+      ...(seesIT? [['p-projects','box','Projects'],['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : []),
       ...(seesIphone? [['p-iphones','cart','Apple Store']] : []),
-      ...(seesIT? [['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : []),
       ['p-messages','chat','Messages'],
     ];
   }
