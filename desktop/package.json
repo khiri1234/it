@@ -9,7 +9,8 @@
     "copy-app": "node scripts/copy-app.js",
     "start": "npm run copy-app && electron .",
     "dist": "npm run copy-app && electron-builder --mac",
-    "dist:dir": "npm run copy-app && electron-builder --mac dir"
+    "dist:dir": "npm run copy-app && electron-builder --mac dir",
+    "dist:mas": "npm run copy-app && electron-builder --mac mas"
   },
   "devDependencies": {
     "electron": "^32.0.0",
@@ -29,7 +30,14 @@
       "target": [
         { "target": "dmg", "arch": ["universal"] },
         { "target": "zip", "arch": ["universal"] }
-      ]
+      ],
+      "extendInfo": {
+        "NSCameraUsageDescription": "Used to scan barcodes and QR codes for inventory lookups."
+      }
+    },
+    "mas": {
+      "entitlements": "build/entitlements.mas.plist",
+      "entitlementsInherit": "build/entitlements.mas.inherit.plist"
     },
     "dmg": {
       "title": "THE H BUSINESS MANAGEMENT"

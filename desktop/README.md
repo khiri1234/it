@@ -55,6 +55,49 @@ in-app command palette (⌘K). This only customizes the menu while the app is
 already running — macOS still shows its own generic Dock menu (Open, Options,
 Quit) when the app hasn't been launched yet.
 
+## Submitting to the Mac App Store
+
+The project is wired up for an App Store build (`npm run dist:mas`, sandbox
+entitlements in `build/entitlements.mas*.plist`, the camera usage string
+`mac.extendInfo` needs), but the rest of this only Apple will let the app's
+own account holder do — none of it can be done from here:
+
+1. **Enroll in the Apple Developer Program** (developer.apple.com, $99/year).
+   Needs your own Apple ID and legal/business identity — this is the step
+   nothing else can substitute for.
+2. **Create an App ID** in Certificates, Identifiers & Profiles matching
+   `com.thehitsolutions.businessmanagement` (the `appId` already set in
+   `package.json`), with the **App Sandbox** capability enabled.
+3. **Generate and install two certificates** into your Mac's keychain (via
+   Xcode → Settings → Accounts, or the Developer portal): **Apple
+   Distribution** (signs the app) and **Mac Installer Distribution** (signs
+   the `.pkg`). `electron-builder` finds these automatically by type when it
+   builds the `mas` target — nothing to configure beyond having them
+   installed.
+4. **Create a Mac App Store provisioning profile** for that App ID, download
+   it, and save it as `desktop/build/embedded.provisionprofile` —
+   electron-builder picks it up from that path automatically.
+5. **Create the app record in App Store Connect** (same bundle ID), and fill
+   in the listing: screenshots, description, pricing/availability, age
+   rating, and the **App Privacy** questionnaire (this app talks to Firebase,
+   so expect to disclose that — have a privacy policy URL ready) and a
+   reviewer demo account/instructions, since this is a login-gated business
+   tool.
+6. **Build the signed package** on a Mac with those certs/profile installed:
+   ```sh
+   cd desktop
+   npm install
+   npm run dist:mas     # produces a signed .pkg under desktop/dist/
+   ```
+7. **Upload it** with the **Transporter** app (Mac App Store) or
+   `xcrun altool --upload-app`, pointed at the `.pkg` from step 6.
+8. **Submit for review** from the app's page in App Store Connect.
+
+Steps 1-2 and 5-8 all require signing in as the Apple Developer account that
+will own this app on the Store — they can't be done from a CI runner or this
+session. If you'd rather skip App Store review entirely, the direct-download
+`.dmg`/`.zip` build above (optionally notarized) works immediately.
+
 ## Notes
 
 - **Unsigned build.** `npm run dist` as configured produces an unsigned app.
