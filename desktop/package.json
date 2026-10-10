@@ -3,6 +3,7 @@
   "productName": "THE H BUSINESS MANAGEMENT",
   "version": "1.0.0",
   "description": "THE H BUSINESS MANAGEMENT, packaged as a macOS desktop app",
+  "author": "Hatef Hajizadeh",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -37,7 +38,8 @@
     },
     "mas": {
       "entitlements": "build/entitlements.mas.plist",
-      "entitlementsInherit": "build/entitlements.mas.inherit.plist"
+      "entitlementsInherit": "build/entitlements.mas.inherit.plist",
+      "provisioningProfile": "build/embedded.provisionprofile"
     },
     "dmg": {
       "title": "THE H BUSINESS MANAGEMENT"
