@@ -1,10 +1,13 @@
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onRequest } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getFirestore } = require("firebase-admin/firestore");
 const { v1: firestoreAdminV1 } = require("@google-cloud/firestore");
+const Anthropic = require("@anthropic-ai/sdk");
 
 // Matches where these were already deployed by hand — keep new deploys in the same region.
 setGlobalOptions({ region: "europe-west1" });
@@ -13,6 +16,8 @@ initializeApp();
 const messaging = getMessaging();
 const db = getFirestore();
 const firestoreAdminClient = new firestoreAdminV1.FirestoreAdminClient();
+// One-time setup: `firebase functions:secrets:set ANTHROPIC_API_KEY` (see functions/README.md).
+const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
 function slugifyTopic(s) {
   return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100) || "unknown";
@@ -21,6 +26,15 @@ function slugifyTopic(s) {
 function parseJsonField(data) {
   if (!data || !data.json) return null;
   try { return JSON.parse(data.json); } catch (e) { return null; }
+}
+
+// Same `ledger/<key>` doc shape the client itself reads/writes (persist() in index.html) —
+// one Firestore document per top-level app-state key, holding the whole array/object as a
+// JSON string field.
+async function fetchLedger(key, fallback) {
+  const snap = await db.collection("ledger").doc(key).get();
+  const parsed = parseJsonField(snap.exists ? snap.data() : null);
+  return parsed == null ? fallback : parsed;
 }
 
 async function sendPush(topic, title, body, data) {
@@ -221,13 +235,19 @@ exports.notifyOnSupplierQuoteAccepted = onDocumentWritten("ledger/supplierQuotes
 });
 
 // Mirrors calcTotals()/remaining() in index.html closely enough for an overdue check —
-// this only needs the total and amount paid, not every display field.
+// this only needs the total and amount paid, not every display field. Overall discount
+// can be a % (discountType:'pct', the default) or a flat amount (discountType:'amt');
+// older invoices only ever had discountPct, which this falls back to — same backward
+// compatibility index.html's docDiscountType()/docDiscountValue() keep client-side.
 function invoiceTotal(inv) {
   const subtotal = (inv.items || []).reduce((a, it) => {
     const qty = Number(it.qty) || 0, price = Number(it.price) || 0, disc = Number(it.discountPct) || 0;
     return a + qty * price * (1 - disc / 100);
   }, 0);
-  const afterDisc = subtotal * (1 - (Number(inv.discountPct) || 0) / 100);
+  const discType = inv.discountType === "amt" ? "amt" : "pct";
+  const discValue = Number(inv.discountType ? inv.discountValue : inv.discountPct) || 0;
+  const discAmt = discType === "amt" ? Math.min(Math.max(discValue, 0), subtotal) : subtotal * (Math.max(discValue, 0) / 100);
+  const afterDisc = subtotal - discAmt;
   const chargesTotal = (inv.charges || []).reduce((a, c) => a + (Number(c.amount) || 0), 0);
   const taxableBase = afterDisc + chargesTotal;
   const vatAmt = inv.vatOn ? taxableBase * ((Number(inv.vatRate) || 0) / 100) : 0;
@@ -370,6 +390,155 @@ exports.scheduledFirestoreExport = onSchedule(
       console.log("Firestore export started:", response.name);
     } catch (err) {
       console.error("Failed to start Firestore export", err);
+    }
+  }
+);
+
+// ---------- AI ASSISTANT ----------
+// A plain HTTPS function (not onCall) because this app doesn't use Firebase Auth — every
+// login is a row in ledger/users checked client-side, so the client just sends its
+// username and this function checks it's a real, non-portal account before doing anything.
+// That's the same trust level the rest of this app already runs on; it's not meant to
+// withstand a determined attacker, just keep the endpoint from being open to the world.
+function fmtMoney(n, currency) {
+  return `${currency} ${(Number(n) || 0).toFixed(2)}`;
+}
+
+// Pulls a bounded, token-cheap summary of the live business data — aggregate counts plus
+// the most recent/relevant rows of each kind, not the full history of every collection —
+// so a years-old business doesn't blow the context window on one chat message.
+async function buildBusinessContext() {
+  const [settings, invoices, quotes, purchases, inventory, projects, iphoneOrders, rfqs, todos] = await Promise.all([
+    fetchLedger("settings", {}),
+    fetchLedger("invoices", []),
+    fetchLedger("quotes", []),
+    fetchLedger("purchases", []),
+    fetchLedger("inventory", []),
+    fetchLedger("projects", []),
+    fetchLedger("iphoneOrders", []),
+    fetchLedger("rfqs", []),
+    fetchLedger("todos", []),
+  ]);
+
+  const currency = settings.currency || "AED";
+  const today = new Date().toISOString().slice(0, 10);
+
+  const invRows = invoices.map((inv) => ({
+    inv,
+    total: invoiceTotal(inv),
+    remaining: invoiceRemaining(inv),
+    overdue: isInvoiceOverdue(inv, today),
+  }));
+  const unpaid = invRows.filter((r) => r.remaining > 0.005);
+  const outstanding = unpaid.reduce((a, r) => a + r.remaining, 0);
+  const overdueRows = invRows.filter((r) => r.overdue);
+  const recentInvoices = [...invRows].sort((a, b) => (b.inv.date || "").localeCompare(a.inv.date || "")).slice(0, 25);
+  const recentQuotes = [...quotes].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 15);
+  const lowStock = inventory.filter((i) => (Number(i.stock) || 0) <= (Number(i.lowStockThreshold) || 0));
+  const openProjects = projects.filter((p) => p.status !== "completed" && p.status !== "cancelled");
+  const openTodos = todos.filter((t) => !t.done);
+  const pendingPurchases = purchases.filter((p) => p.status !== "received");
+  const openRfqs = rfqs.filter((r) => r.status === "open");
+
+  const lines = [];
+  lines.push(`Company: ${settings.companyName || "this business"}. Currency: ${currency}. Today's date: ${today}.`);
+  lines.push(`Invoices: ${invoices.length} total, ${unpaid.length} unpaid (${fmtMoney(outstanding, currency)} outstanding), ${overdueRows.length} overdue.`);
+  if (overdueRows.length) {
+    lines.push("Overdue invoices: " + overdueRows.slice(0, 15).map((r) =>
+      `${r.inv.number} (${r.inv.customer || "—"}, ${fmtMoney(r.remaining, currency)} remaining, due ${r.inv.dueDate})`
+    ).join("; "));
+  }
+  lines.push("Recent invoices (newest first): " + (recentInvoices.length ? recentInvoices.map((r) =>
+    `${r.inv.number} — ${r.inv.customer || "—"} — ${r.inv.status} — ${fmtMoney(r.total, currency)} (${fmtMoney(r.remaining, currency)} remaining) — ${r.inv.date}`
+  ).join(" | ") : "none"));
+  lines.push(`Quotes: ${quotes.length} total.`);
+  lines.push("Recent quotes: " + (recentQuotes.length ? recentQuotes.map((q) =>
+    `${q.number} — ${q.customer || "—"} — ${q.status} — ${q.date}`
+  ).join(" | ") : "none"));
+  lines.push(`Purchases: ${purchases.length} total, ${pendingPurchases.length} not yet received.`);
+  lines.push("Pending purchases: " + (pendingPurchases.length ? pendingPurchases.slice(0, 15).map((p) =>
+    `${p.number} — ${p.supplier || "—"} — ${p.status} — ${p.date}`
+  ).join(" | ") : "none"));
+  lines.push(`Inventory: ${inventory.length} items, ${lowStock.length} low on stock.`);
+  if (lowStock.length) {
+    lines.push("Low stock items: " + lowStock.slice(0, 30).map((i) => `${i.name} (${i.stock} left, threshold ${i.lowStockThreshold})`).join(", "));
+  }
+  lines.push(`Projects: ${projects.length} total, ${openProjects.length} open.`);
+  lines.push("Open projects: " + (openProjects.length ? openProjects.slice(0, 20).map((p) =>
+    `${p.number} — ${p.name} — ${p.customer || "—"} — ${p.status}`
+  ).join(" | ") : "none"));
+  if (iphoneOrders.length) {
+    const openIphone = iphoneOrders.filter((o) => o.status === "new" || o.status === "priced");
+    lines.push(`Apple Store orders: ${iphoneOrders.length} total, ${openIphone.length} awaiting action.`);
+  }
+  if (rfqs.length) {
+    lines.push("Open RFQs: " + (openRfqs.length ? openRfqs.slice(0, 15).map((r) => `${r.number} — ${r.title || "untitled"}`).join(" | ") : "none"));
+  }
+  if (openTodos.length) {
+    lines.push("Open to-dos: " + openTodos.slice(0, 20).map((t) => t.text).join(" | "));
+  }
+
+  return { companyName: settings.companyName || "THE H BUSINESS MANAGEMENT", summary: lines.join("\n") };
+}
+
+exports.aiAssistant = onRequest(
+  { cors: true, secrets: [anthropicApiKey], timeoutSeconds: 60, memory: "512MiB" },
+  async (req, res) => {
+    if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+
+    const { username, question, history } = req.body || {};
+    if (!username || !question || typeof question !== "string" || !question.trim()) {
+      res.status(400).json({ error: "username and question are required" });
+      return;
+    }
+
+    const users = await fetchLedger("users", []);
+    const user = users.find((u) => u.username === username);
+    if (!user || user.role === "client" || user.role === "supplier") {
+      res.status(403).json({ error: "Not authorized" });
+      return;
+    }
+
+    let context;
+    try {
+      context = await buildBusinessContext();
+    } catch (err) {
+      console.error("Failed to build AI assistant context", err);
+      res.status(500).json({ error: "Could not load business data" });
+      return;
+    }
+
+    const safeHistory = Array.isArray(history)
+      ? history
+          .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+          .slice(-20)
+      : [];
+
+    const client = new Anthropic({ apiKey: anthropicApiKey.value() });
+    try {
+      const response = await client.messages.create({
+        model: "claude-opus-5-5",
+        max_tokens: 2048,
+        output_config: { effort: "low" },
+        system: `You are the AI Assistant built into "${context.companyName}"'s internal business management app. ` +
+          `You help staff answer questions about the business's live data (invoices, quotes, purchases, inventory, projects, RFQs, to-dos) ` +
+          `and draft messages or notes (e.g. a payment reminder, a client update) when asked. ` +
+          `Keep answers short and direct — this is a chat panel, not a report. ` +
+          `The data below is a bounded summary (recent/relevant rows, not full history) as of right now — if something isn't in it, say you don't have that specific record rather than guessing. Never invent figures.\n\n` +
+          context.summary,
+        messages: [...safeHistory, { role: "user", content: question }],
+      });
+      const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      res.json({ reply: text || "(no response)" });
+    } catch (err) {
+      console.error("Anthropic API call failed", err);
+      if (err instanceof Anthropic.AuthenticationError) {
+        res.status(500).json({ error: "AI Assistant isn't set up yet — missing or invalid API key." });
+      } else if (err instanceof Anthropic.RateLimitError) {
+        res.status(429).json({ error: "AI Assistant is busy — try again in a moment." });
+      } else {
+        res.status(502).json({ error: "AI request failed — try again in a moment." });
+      }
     }
   }
 );

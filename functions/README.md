@@ -1,12 +1,16 @@
 # Cloud Functions
 
-Two unrelated jobs live here:
+Three unrelated jobs live here:
 
 - **Push notifications** (`notifyOn*`) — fire on Firestore writes, already deployed and running.
 - **`scheduledFirestoreExport`** — a nightly full-database backup. This is the server-side
   counterpart to the "Export data backup" button in the app itself (More → Administration):
   that one is a manual, on-demand JSON download; this one runs on its own every night at
   3am Gulf Standard Time, regardless of whether anyone remembers to click the button.
+- **`aiAssistant`** — the backend for the "AI Assistant" chat panel in the app (More →
+  AI Assistant). It reads a summary of the live business data from Firestore and calls the
+  Claude API to answer questions or draft messages. Needs a one-time secret setup before it
+  will actually answer anything — see below.
 
 ## Deploying the backup export
 
@@ -58,3 +62,33 @@ List available exports first with:
 ```sh
 gsutil ls gs://<project-id>.firebasestorage.app/firestore-backups/
 ```
+
+## Setting up the AI Assistant
+
+One-time setup, then a normal deploy:
+
+1. **Get an Anthropic API key** from console.anthropic.com if you don't already have one.
+2. **Store it as a Cloud Functions secret** (never put it in code or an env file):
+   ```sh
+   cd functions
+   firebase functions:secrets:set ANTHROPIC_API_KEY
+   ```
+   This prompts for the key value and stores it in Google Secret Manager — the function
+   declares it via `defineSecret`, so it's only ever readable at runtime by this function.
+3. **Deploy:**
+   ```sh
+   npm install
+   firebase deploy --only functions:aiAssistant
+   ```
+   (or `firebase deploy --only functions` to deploy everything in this directory at once.)
+
+That's it — the "AI Assistant" page in the app will start giving real answers instead of
+an error about missing setup. There's no separate billing to arrange beyond your own
+Anthropic API usage; calls are small (one bounded data summary plus the chat text) so
+cost per question is low.
+
+Access control here is intentionally lightweight, matching the rest of this app: since
+there's no Firebase Auth, the function just checks that the `username` the client sends
+is a real account in `ledger/users` and isn't a `client`/`supplier` portal login. It's
+not meant to withstand a determined attacker — just keep the endpoint from being wide
+open — the same trust level the app already runs on everywhere else.
