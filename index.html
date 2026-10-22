@@ -944,6 +944,7 @@ const DEFAULT_SETTINGS={
 let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{}, iphoneOrders:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
+let SALES_CUSTOMER_FILTER='', SALES_STATUS_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
 let UPLOADING_PROFILE_PHOTO=false;
@@ -4051,8 +4052,14 @@ function emptyState(icon,title,sub){
 
 /* ---------- SALES (Invoices / Quotes) ---------- */
 function renderSalesList(){
-  const list = SALES_TAB==='invoices'? S.invoices : S.quotes;
+  let list = SALES_TAB==='invoices'? S.invoices : S.quotes;
+  if(SALES_TAB==='invoices'){
+    if(SALES_CUSTOMER_FILTER) list = list.filter(d=>d.customer===SALES_CUSTOMER_FILTER);
+    if(SALES_STATUS_FILTER) list = list.filter(d=>(invoiceIsOverdue(d)?'overdue':d.status)===SALES_STATUS_FILTER);
+  }
   const sorted=[...list].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
+  const invoiceCustomers = [...new Set(S.invoices.map(i=>i.customer).filter(Boolean))].sort();
+  const hasFilter = SALES_TAB==='invoices' && (SALES_CUSTOMER_FILTER || SALES_STATUS_FILTER);
   return `
   ${topbar('Sales','Invoices & quotes', false, null, true)}
   <div class="content">
@@ -4061,8 +4068,25 @@ function renderSalesList(){
       <button class="${SALES_TAB==='quotes'?'active':''}" onclick="SALES_TAB='quotes';render()">Quotes</button>
     </div>
     ${SALES_TAB==='invoices'? `<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('bulk-payment',{})">${ic('cart')} Bulk payment — apply one payment across invoices</button></div>`:''}
+    ${SALES_TAB==='invoices' && invoiceCustomers.length? `
+    <label>Filter by client</label>
+    <select onchange="SALES_CUSTOMER_FILTER=this.value;render()">
+      <option value="" ${SALES_CUSTOMER_FILTER===''?'selected':''}>All clients</option>
+      ${invoiceCustomers.map(c=>`<option value="${esc(c)}" ${SALES_CUSTOMER_FILTER===c?'selected':''}>${esc(c)}</option>`).join('')}
+    </select>` : ''}
+    ${SALES_TAB==='invoices'? `
+    <label>Filter by status</label>
+    <select onchange="SALES_STATUS_FILTER=this.value;render()">
+      <option value="" ${SALES_STATUS_FILTER===''?'selected':''}>All</option>
+      <option value="draft" ${SALES_STATUS_FILTER==='draft'?'selected':''}>Draft</option>
+      <option value="sent" ${SALES_STATUS_FILTER==='sent'?'selected':''}>Sent (not paid)</option>
+      <option value="partial" ${SALES_STATUS_FILTER==='partial'?'selected':''}>Partially paid</option>
+      <option value="paid" ${SALES_STATUS_FILTER==='paid'?'selected':''}>Paid</option>
+      <option value="overdue" ${SALES_STATUS_FILTER==='overdue'?'selected':''}>Overdue</option>
+    </select>` : ''}
+    ${hasFilter? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="SALES_CUSTOMER_FILTER='';SALES_STATUS_FILTER='';render()">${ic('x')} Clear filters</button>` : ''}
     <div style="height:12px"></div>
-    ${sorted.length===0? emptyState('sales', SALES_TAB==='invoices'?'No invoices yet':'No quotes yet', 'Tap the + button to create one.') :
+    ${sorted.length===0? emptyState('sales', hasFilter?'No invoices match these filters':(SALES_TAB==='invoices'?'No invoices yet':'No quotes yet'), hasFilter?'Try different filters, or clear them.':'Tap the + button to create one.') :
       sorted.map(d=>{
         const t = calcTotals(d.items,d.vatOn,d.vatRate,docDiscountType(d),docDiscountValue(d),d.charges);
         const overdue = SALES_TAB==='invoices' && invoiceIsOverdue(d);
