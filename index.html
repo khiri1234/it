@@ -4060,6 +4060,8 @@ function renderSalesList(){
   const sorted=[...list].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
   const invoiceCustomers = [...new Set(S.invoices.map(i=>i.customer).filter(Boolean))].sort();
   const hasFilter = SALES_TAB==='invoices' && (SALES_CUSTOMER_FILTER || SALES_STATUS_FILTER);
+  const filteredTotal = hasFilter ? sorted.reduce((a,d)=>a+docTotal(d),0) : 0;
+  const filteredOutstanding = hasFilter ? sorted.reduce((a,d)=>a+remaining(d),0) : 0;
   return `
   ${topbar('Sales','Invoices & quotes', false, null, true)}
   <div class="content">
@@ -4086,6 +4088,10 @@ function renderSalesList(){
       <option value="overdue" ${SALES_STATUS_FILTER==='overdue'?'selected':''}>Overdue</option>
     </select>` : ''}
     ${hasFilter? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="SALES_CUSTOMER_FILTER='';SALES_STATUS_FILTER='';render()">${ic('x')} Clear filters</button>` : ''}
+    ${hasFilter && sorted.length>0? `<div class="stat" style="margin-top:12px">
+      <div class="num">${fmtMoney(filteredTotal)}</div>
+      <div class="lbl">${sorted.length} invoice${sorted.length===1?'':'s'} · Total amount${filteredOutstanding>0.005?` (${fmtMoney(filteredOutstanding)} outstanding)`:''}</div>
+    </div>` : ''}
     <div style="height:12px"></div>
     ${sorted.length===0? emptyState('sales', hasFilter?'No invoices match these filters':(SALES_TAB==='invoices'?'No invoices yet':'No quotes yet'), hasFilter?'Try different filters, or clear them.':'Tap the + button to create one.') :
       sorted.map(d=>{
