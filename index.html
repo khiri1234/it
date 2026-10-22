@@ -4055,7 +4055,7 @@ function renderSalesList(){
   let list = SALES_TAB==='invoices'? S.invoices : S.quotes;
   if(SALES_TAB==='invoices'){
     if(SALES_CUSTOMER_FILTER) list = list.filter(d=>d.customer===SALES_CUSTOMER_FILTER);
-    if(SALES_STATUS_FILTER) list = list.filter(d=>(invoiceIsOverdue(d)?'overdue':d.status)===SALES_STATUS_FILTER);
+    if(SALES_STATUS_FILTER) list = list.filter(d=> SALES_STATUS_FILTER==='unpaid' ? remaining(d)>0.005 : (invoiceIsOverdue(d)?'overdue':d.status)===SALES_STATUS_FILTER);
   }
   const sorted=[...list].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
   const invoiceCustomers = [...new Set(S.invoices.map(i=>i.customer).filter(Boolean))].sort();
@@ -4078,10 +4078,11 @@ function renderSalesList(){
     <label>Filter by status</label>
     <select onchange="SALES_STATUS_FILTER=this.value;render()">
       <option value="" ${SALES_STATUS_FILTER===''?'selected':''}>All</option>
-      <option value="draft" ${SALES_STATUS_FILTER==='draft'?'selected':''}>Draft</option>
-      <option value="sent" ${SALES_STATUS_FILTER==='sent'?'selected':''}>Sent (not paid)</option>
-      <option value="partial" ${SALES_STATUS_FILTER==='partial'?'selected':''}>Partially paid</option>
+      <option value="unpaid" ${SALES_STATUS_FILTER==='unpaid'?'selected':''}>Not paid (any)</option>
       <option value="paid" ${SALES_STATUS_FILTER==='paid'?'selected':''}>Paid</option>
+      <option value="draft" ${SALES_STATUS_FILTER==='draft'?'selected':''}>Draft</option>
+      <option value="sent" ${SALES_STATUS_FILTER==='sent'?'selected':''}>Sent</option>
+      <option value="partial" ${SALES_STATUS_FILTER==='partial'?'selected':''}>Partially paid</option>
       <option value="overdue" ${SALES_STATUS_FILTER==='overdue'?'selected':''}>Overdue</option>
     </select>` : ''}
     ${hasFilter? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="SALES_CUSTOMER_FILTER='';SALES_STATUS_FILTER='';render()">${ic('x')} Clear filters</button>` : ''}
