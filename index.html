@@ -23,6 +23,8 @@
     --blue-soft:#E5EEF7;
     --amber:#C77F16;
     --amber-soft:#FBF0DD;
+    --orange:#D2691E;
+    --orange-soft:#FCEADC;
     --red:#C4383D;
     --red-soft:#FBE7E7;
     --green:#2E8B4F;
@@ -106,7 +108,7 @@
   .stripe.pending{border-left-color:var(--amber);}
   .stripe.partial{border-left-color:var(--amber);}
   .stripe.planning{border-left-color:var(--ink-soft);}
-  .stripe.active{border-left-color:var(--teal);}
+  .stripe.active{border-left-color:var(--orange);}
   .stripe.completed{border-left-color:var(--green);}
   .stripe.on-hold{border-left-color:var(--amber);}
   .stripe.boq-installed{border-left-color:var(--green);}
@@ -128,7 +130,7 @@
   .badge.unpaid{background:var(--red-soft);color:var(--red);}
   .badge.converted{background:var(--chip-bg);color:var(--ink-soft);}
   .badge.planning{background:var(--chip-bg);color:var(--ink-soft);}
-  .badge.active{background:var(--teal-soft);color:var(--teal);}
+  .badge.active{background:var(--orange-soft);color:var(--orange);}
   .badge.completed{background:var(--green-soft);color:var(--green);}
   .badge.on-hold{background:var(--amber-soft);color:var(--amber);}
   .badge.boq-installed{background:var(--green-soft);color:var(--green);}
@@ -1553,6 +1555,12 @@ function projectCost(p){ return (p.boq||[]).reduce((a,b)=>a+boqLineCost(b),0) + 
 function projectProfit(p){ return projectValue(p)-projectCost(p); }
 function projectAdvances(p){ return (p.payments||[]).reduce((a,pay)=>a+(Number(pay.amount)||0),0); }
 function projectBalance(p){ return Math.max(0, projectValue(p)-projectAdvances(p)); }
+// The stored status value stays 'active' (filters, sorting, CSS classes all key off it) —
+// this only changes what's shown to a reader, so "In Progress" renders without touching data.
+function projectStatusLabel(status){
+  if(status==='active') return 'In Progress';
+  return status ? status[0].toUpperCase()+status.slice(1).replace('-',' ') : '';
+}
 function boqProgressPct(p, field){
   const totalQty = (p.boq||[]).reduce((a,b)=>a+(Number(b.qty)||0),0);
   if(totalQty<=0) return 0;
@@ -2446,7 +2454,7 @@ function renderClientProjectsSection(projects){
               <div style="font-weight:700;font-size:15px">${esc(p.name)}</div>
               <div class="tiny muted">${esc(p.number)} · ${fmtDate(p.date)}</div>
             </div>
-            <span class="badge ${p.status}">${esc(p.status)}</span>
+            <span class="badge ${p.status}">${esc(projectStatusLabel(p.status))}</span>
           </div>
           <div class="bar-wrap" style="margin-top:12px"><div style="width:74px" class="tiny muted">Installed</div><div class="bar-track"><div class="bar-fill" style="width:${installedPct}%"></div></div><div class="tiny mono" style="width:36px;text-align:right">${Math.round(installedPct)}%</div></div>
           <div class="grid2" style="margin-top:10px">
@@ -3958,7 +3966,7 @@ function renderDashboard(){
       `<div class="card dash-section">
         <div class="row-between" style="gap:10px;align-items:flex-start">
           <div>
-            <div class="tiny muted">Active ${activeCount} · Planning ${planningCount}</div>
+            <div class="tiny muted">In Progress ${activeCount} · Planning ${planningCount}</div>
             <div class="mono" style="font-weight:700;font-size:17px;margin-top:2px">${fmtMoney(liveValue)}</div>
             <div class="tiny muted">Total value</div>
           </div>
@@ -3977,7 +3985,7 @@ function renderDashboard(){
               </div>
               <div style="text-align:right;flex-shrink:0">
                 <div class="mono small" style="font-weight:600">${fmtMoney(projectValue(p))}</div>
-                <span class="badge ${p.status}">${p.status}</span>
+                <span class="badge ${p.status}">${projectStatusLabel(p.status)}</span>
               </div>
             </div>
             ${(p.boq&&p.boq.length)?`
@@ -6089,7 +6097,7 @@ function renderProjectsList(){
             </div>
             <div style="text-align:right">
               <div class="mono" style="font-weight:600">${fmtMoney(val)}</div>
-              <span class="badge ${p.status}">${p.status}</span>
+              <span class="badge ${p.status}">${projectStatusLabel(p.status)}</span>
             </div>
           </div>
           ${(p.boq&&p.boq.length)?`
@@ -6135,7 +6143,7 @@ function renderProjectForm(id){
       <label>Start date</label><input id="pj_date" type="date" value="${p.date}">
       <label>Status</label>
       <select id="pj_status">
-        ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1).replace('-',' ')}</option>`).join('')}
+        ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
       </select>
     </div>
     <div class="card">
@@ -6204,7 +6212,7 @@ function renderProjectView(id){
           <div style="font-weight:700;font-size:16px">${esc(p.name)}</div>
           <div class="tiny muted">${esc(p.customer)} · ${fmtDate(p.date)}</div>
         </div>
-        <span class="badge ${p.status}">${p.status}</span>
+        <span class="badge ${p.status}">${projectStatusLabel(p.status)}</span>
       </div>
     </div>
     <div class="grid2">
@@ -6311,7 +6319,7 @@ function renderProjectView(id){
 
     <label>Update status</label>
     <select onchange="quickProjectStatus('${p.id}',this.value)">
-      ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1).replace('-',' ')}</option>`).join('')}
+      ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
     </select>
     <div style="height:10px"></div>
     <button class="btn btn-ghost btn-block" onclick="go('project-form',{id:'${p.id}'})">${ic('edit')} Edit project details</button>
