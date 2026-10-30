@@ -6203,6 +6203,7 @@ function renderProjectView(id){
   const cost=projectCost(p), profit=projectProfit(p);
   const purchasedPct=boqProgressPct(p,'purchasedQty'), installedPct=boqProgressPct(p,'installedQty');
   const linkedInvoice = p.invoiceId ? S.invoices.find(i=>i.id===p.invoiceId) : null;
+  const linkedQuote = p.quoteId ? S.quotes.find(q=>q.id===p.quoteId) : null;
   return `
   ${topbar(p.number, p.name, true, `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="showShareMenu('project','${p.id}')">${ic('share')}</button>`)}
   <div class="content">
@@ -6242,6 +6243,21 @@ function renderProjectView(id){
         isAdmin()? `<button class="btn btn-primary btn-block" onclick="generateProjectInvoice('${p.id}')">${ic('sales')} Generate invoice from BOQ</button>
         <div class="tiny muted" style="margin-top:6px">Bills the full BOQ value and carries over advances already received as payments.</div>`
         : `<div class="tiny muted">No invoice generated yet — admin only.</div>`}
+    </div>
+
+    <div class="section-title">Quote</div>
+    <div class="card">
+      ${linkedQuote? `
+        <div class="row-between">
+          <div>
+            <div class="small" style="font-weight:600">${linkedQuote.number}</div>
+            <div class="tiny muted">Generated from this project</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="go('quote-view',{id:'${linkedQuote.id}'})">View quote</button>
+        </div>` :
+        isAdmin()? `<button class="btn btn-ghost btn-block" onclick="generateProjectQuote('${p.id}')">${ic('sales')} Generate quote from BOQ</button>
+        <div class="tiny muted" style="margin-top:6px">Drafts a quote for the full BOQ value — useful for sending a price before the work is confirmed.</div>`
+        : `<div class="tiny muted">No quote generated yet — admin only.</div>`}
     </div>
 
     <div class="section-title">Bill of quantities</div>
@@ -6458,6 +6474,33 @@ function generateProjectInvoice(projId){
   logActivity(`Generated invoice ${inv.number} from project ${p.number}`);
   toast('Invoice generated');
   go('invoice-view',{id:inv.id});
+  }, {danger:false, label:'Generate'});
+}
+function generateProjectQuote(projId){
+  if(!isAdmin()){ toast('Only admins can generate quotes'); return; }
+  const p=S.projects.find(x=>x.id===projId); if(!p) return;
+  if(p.quoteId){
+    const existing = S.quotes.find(q=>q.id===p.quoteId);
+    if(existing){ toast('A quote was already generated for this project'); go('quote-view',{id:p.quoteId}); return; }
+    p.quoteId=null; // the linked quote no longer exists — allow generating a new one
+  }
+  if(!p.boq || p.boq.length===0){ toast('Add BOQ lines before generating a quote'); return; }
+  showConfirm('Generate a quote for the full BOQ value?', ()=>{
+  const q = {
+    id:uid(), number:nextNumber('quote'), date:todayISO(), dueDate:'',
+    customer:p.customer, phone:p.phone||'', email:p.email||'',
+    items: p.boq.map(b=>({desc:b.desc, qty:b.qty, price:b.unitPrice, discountPct:0, invId:null})),
+    charges: (p.charges||[]).map(c=>({...c,id:uid()})),
+    vatOn:S.settings.vatDefaultOn, vatRate:S.settings.vatRate, discountType:'pct', discountValue:0,
+    status:'draft', notes:`Generated from project ${p.number} — ${p.name}`,
+    payments:[]
+  };
+  S.quotes.push(q);
+  p.quoteId=q.id;
+  persist('quotes'); persist('projects'); persist('settings');
+  logActivity(`Generated quote ${q.number} from project ${p.number}`);
+  toast('Quote generated');
+  go('quote-view',{id:q.id});
   }, {danger:false, label:'Generate'});
 }
 function updateBoqProgress(projId,itemId,field,val){
