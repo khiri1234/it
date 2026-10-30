@@ -4501,7 +4501,7 @@ function buildPdfHTML(kind, id, opts){
     const paid = kind==='invoice' ? paymentsSum(d) : 0;
     const rem = kind==='invoice' ? Math.max(0,t.total-paid) : 0;
     const rows = t.calced.map((it,i)=>{
-      const invDesc = kind==='invoice' ? findInventoryByName(it.desc)?.sku : '';
+      const invDesc = findInventoryByName(it.desc)?.sku;
       return `
       <tr>
         <td>${i+1}</td>
@@ -4529,7 +4529,7 @@ function buildPdfHTML(kind, id, opts){
         </div>
       </div>
       <table class="pdf-table">
-        <thead><tr><th style="width:26px">#</th><th>${kind==='invoice'?'Item Description':'Description'}</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:110px">Unit price</th><th class="num" style="width:60px">Disc.</th><th class="num" style="width:120px">Amount</th></tr></thead>
+        <thead><tr><th style="width:26px">#</th><th>Item Description</th><th class="num" style="width:50px">Qty</th><th class="num" style="width:110px">Unit price</th><th class="num" style="width:60px">Disc.</th><th class="num" style="width:120px">Amount</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="pdf-totals">
