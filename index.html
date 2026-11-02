@@ -416,7 +416,6 @@
   .dash-stat .trend{font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;width:fit-content;}
   .dash-stat .trend.up{color:var(--green);}
   .dash-stat .trend.down{color:var(--red);}
-  .dash-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;animation:dashRise .55s ease .1s both;}
   /* ---------- CRM-style stat cards (Apple Store dashboard) — same anatomy as
      .dash-stat above, but a plain bordered card (no hero overlap/shadow) since
      this sits under an ordinary topbar, not the Dashboard's hero banner. ---------- */
@@ -429,18 +428,6 @@
   .crm-stat .trend{font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:3px;width:fit-content;}
   .crm-stat .trend.up{color:var(--green);}
   .crm-stat .trend.down{color:var(--red);}
-  .dash-action{
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;
-    padding:13px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;
-    cursor:pointer;transition:transform .15s ease;text-align:left;width:100%;
-    font-family:'IBM Plex Sans',sans-serif;color:var(--ink);
-  }
-  .dash-action:active{transform:scale(.95);}
-  .dash-action.primary{background:linear-gradient(135deg,var(--navy),var(--navy-2));border-color:transparent;color:#fff;}
-  .dash-action .ic-wrap{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--ink);}
-  .dash-action.primary .ic-wrap{background:rgba(255,255,255,.16);color:#fff;}
-  .dash-action .ic-wrap svg{width:16px;height:16px;}
-  .dash-action .lbl{font-weight:600;font-size:13.5px;}
   .dash-section{animation:dashRise .55s ease .15s both;}
   .activity-row{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;}
   .activity-row:last-child{border-bottom:none;}
@@ -638,7 +625,6 @@
     .dash-hero{padding-left:28px;padding-right:28px;}
     .dash-stats{grid-template-columns:repeat(4,1fr);margin:-36px auto 0;max-width:936px;padding:0 28px;}
     .crm-stats{grid-template-columns:repeat(4,1fr);}
-    .dash-actions{grid-template-columns:repeat(4,1fr);}
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
 
@@ -691,8 +677,8 @@
   }
   @media (min-width:960px) and (hover:hover){
     .card.stripe:hover{box-shadow:0 8px 22px rgba(21,32,51,.09);border-color:#C7D0DC;transform:translateY(-1px);}
-    .dash-action,.dash-stat{transition:transform .18s ease,box-shadow .18s ease;}
-    .dash-action:hover,.dash-stat:hover{box-shadow:0 10px 22px rgba(21,32,51,.1);transform:translateY(-2px);}
+    .dash-stat{transition:transform .18s ease,box-shadow .18s ease;}
+    .dash-stat:hover{box-shadow:0 10px 22px rgba(21,32,51,.1);transform:translateY(-2px);}
   }
   @media (min-width:1280px){
     .desktop-sidebar{--ds-w:264px;}
@@ -3884,14 +3870,6 @@ function renderDashboard(){
   </div>
 
   <div class="content">
-    <div class="section-title dash-section">Quick actions</div>
-    <div class="dash-actions">
-      <button class="dash-action primary" onclick="newInvoice()"><span class="ic-wrap">${ic('plus')}</span><span class="lbl">New invoice</span></button>
-      <button class="dash-action" onclick="newQuote()"><span class="ic-wrap">${ic('sales')}</span><span class="lbl">New quote</span></button>
-      <button class="dash-action" onclick="newPurchase()"><span class="ic-wrap">${ic('cart')}</span><span class="lbl">New purchase</span></button>
-      <button class="dash-action" onclick="newProject()"><span class="ic-wrap">${ic('box')}</span><span class="lbl">New project</span></button>
-    </div>
-
     <div class="section-title dash-section" style="display:flex;justify-content:space-between;align-items:center">
       <span style="display:flex;align-items:center;gap:8px">
         <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="event.stopPropagation();openQuickTodoAdd()" title="Add a quick to-do">${ic('plus')}</button>
