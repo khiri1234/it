@@ -460,6 +460,13 @@
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
   @keyframes spin{to{transform:rotate(360deg);}}
   .spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+  /* ---------- SKELETON LOADER (initial app boot, while Firebase/Firestore connects) ----------
+     Shapes mimic the Dashboard layout underneath, so the screen doesn't jump/reflow once the
+     real content swaps in. .skel is for light surfaces (cards); .skel-light for the dark hero
+     banner, where var(--chip-bg) would barely show up against the navy gradient. */
+  @keyframes skelPulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+  .skel{background:var(--chip-bg);border-radius:6px;animation:skelPulse 1.4s ease-in-out infinite;}
+  .skel-light{background:rgba(255,255,255,.16);border-radius:6px;animation:skelPulse 1.4s ease-in-out infinite;}
   @keyframes rowFlash{0%,35%{background:var(--teal-soft);}100%{background:transparent;}}
   .row-flash{animation:rowFlash 1.3s ease;border-radius:10px;}
   .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25);}
@@ -3277,9 +3284,30 @@ function noStorageBanner(){
   </div>`;
 }
 function renderLoading(){
-  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px;padding:24px;text-align:center">
-    <div class="spinner" style="width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite"></div>
-    <div class="small muted">Loading your ledger…</div>
+  // Shaped like the Dashboard (hero + stat tiles + a couple of list cards) so the page
+  // doesn't visibly jump once real content replaces it — see the .skel/.skel-light rules.
+  return `
+  <div class="dash-hero">
+    <div class="dash-hero-top">
+      <div>
+        <div class="skel-light" style="width:90px;height:9px;margin-bottom:9px"></div>
+        <div class="skel-light" style="width:160px;height:18px"></div>
+      </div>
+      <div class="skel-light" style="width:34px;height:34px;border-radius:10px"></div>
+    </div>
+  </div>
+  <div class="dash-stats">
+    ${[0,1,2,3].map(()=>`<div class="dash-stat">
+      <div class="skel" style="width:30px;height:30px;border-radius:9px"></div>
+      <div class="skel" style="width:65%;height:16px"></div>
+      <div class="skel" style="width:45%;height:9px"></div>
+    </div>`).join('')}
+  </div>
+  <div class="content">
+    ${[0,1,2].map(()=>`<div class="card" style="margin-bottom:10px">
+      <div class="skel" style="width:55%;height:13px;margin-bottom:9px"></div>
+      <div class="skel" style="width:85%;height:9px"></div>
+    </div>`).join('')}
   </div>`;
 }
 function renderConnectionError(){
