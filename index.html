@@ -953,6 +953,7 @@ const DEFAULT_SETTINGS={
 let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{}, iphoneOrders:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='', PURCHASE_SUPPLIER_FILTER='';
+let PROJECT_CUSTOMER_FILTER='', PROJECT_STATUS_FILTER='';
 let SALES_CUSTOMER_FILTER='', SALES_STATUS_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
@@ -6098,11 +6099,33 @@ function quickPurchaseStatus(id,val){
 /* ---------- PROJECTS ---------- */
 function newProject(){ goPush('project-form',{id:null}); }
 function renderProjectsList(){
-  const list=[...S.projects].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
+  let list=[...S.projects].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
+  if(PROJECT_CUSTOMER_FILTER) list=list.filter(p=>p.customer===PROJECT_CUSTOMER_FILTER);
+  if(PROJECT_STATUS_FILTER) list=list.filter(p=>p.status===PROJECT_STATUS_FILTER);
+  const projectCustomers=[...new Set(S.projects.map(p=>p.customer).filter(Boolean))].sort();
+  const hasFilter = PROJECT_CUSTOMER_FILTER || PROJECT_STATUS_FILTER;
+  const filteredTotal = hasFilter ? list.reduce((a,p)=>a+projectValue(p),0) : 0;
   return `
   ${topbar('Projects','Bill of quantities & site progress', false, null, true)}
   <div class="content">
-    ${list.length===0? emptyState('box','No projects yet','Tap + to start a project with a bill of quantities.') :
+    ${projectCustomers.length? `
+    <label>Filter by client</label>
+    <select onchange="PROJECT_CUSTOMER_FILTER=this.value;render()">
+      <option value="" ${PROJECT_CUSTOMER_FILTER===''?'selected':''}>All clients</option>
+      ${projectCustomers.map(c=>`<option value="${esc(c)}" ${PROJECT_CUSTOMER_FILTER===c?'selected':''}>${esc(c)}</option>`).join('')}
+    </select>` : ''}
+    <label>Filter by status</label>
+    <select onchange="PROJECT_STATUS_FILTER=this.value;render()">
+      <option value="" ${PROJECT_STATUS_FILTER===''?'selected':''}>All</option>
+      ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${PROJECT_STATUS_FILTER===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
+    </select>
+    ${hasFilter? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="PROJECT_CUSTOMER_FILTER='';PROJECT_STATUS_FILTER='';render()">${ic('x')} Clear filters</button>` : ''}
+    ${hasFilter && list.length>0? `<div class="stat" style="margin-top:12px">
+      <div class="num">${fmtMoney(filteredTotal)}</div>
+      <div class="lbl">${list.length} project${list.length===1?'':'s'} · Total value</div>
+    </div>` : ''}
+    <div style="height:12px"></div>
+    ${list.length===0? emptyState('box', hasFilter?'No projects match these filters':'No projects yet', hasFilter?'Try different filters, or clear them.':'Tap + to start a project with a bill of quantities.') :
       list.map(p=>{
         const val=projectValue(p), adv=projectAdvances(p), bal=projectBalance(p);
         return `<div class="card stripe ${p.status}" onclick="go('project-view',{id:'${p.id}'})">
