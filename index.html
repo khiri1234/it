@@ -952,7 +952,7 @@ const DEFAULT_SETTINGS={
 };
 let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{}, iphoneOrders:[] };
 let VIEW = {name:'dashboard', params:{}};
-let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='';
+let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='', PURCHASE_SUPPLIER_FILTER='';
 let SALES_CUSTOMER_FILTER='', SALES_STATUS_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
@@ -5023,13 +5023,21 @@ function renderStockList(){
     if(PURCHASE_PROJECT_FILTER==='__none__') list=list.filter(p=>!p.projectId);
     else if(PURCHASE_PROJECT_FILTER) list=list.filter(p=>p.projectId===PURCHASE_PROJECT_FILTER);
     if(PURCHASE_PAYMENT_FILTER) list=list.filter(p=>purchasePaymentStatus(p)===PURCHASE_PAYMENT_FILTER);
+    if(PURCHASE_SUPPLIER_FILTER) list=list.filter(p=>p.supplier===PURCHASE_SUPPLIER_FILTER);
     const sortedProjects=[...S.projects].sort((a,b)=>(a.number||'').localeCompare(b.number||''));
-    const hasFilter = PURCHASE_PROJECT_FILTER || PURCHASE_PAYMENT_FILTER;
+    const purchaseSuppliers=[...new Set(S.purchases.map(p=>p.supplier).filter(Boolean))].sort();
+    const hasFilter = PURCHASE_PROJECT_FILTER || PURCHASE_PAYMENT_FILTER || PURCHASE_SUPPLIER_FILTER;
     const listTotal = list.reduce((a,p)=>a+purchaseTotal(p),0);
     return `
     ${topbar('Stock','Inventory & purchases', false, null, true)}
     <div class="content">
       ${stockSegmented('purchases')}
+      ${purchaseSuppliers.length? `
+      <label>Filter by supplier</label>
+      <select onchange="PURCHASE_SUPPLIER_FILTER=this.value;render()">
+        <option value="" ${PURCHASE_SUPPLIER_FILTER===''?'selected':''}>All suppliers</option>
+        ${purchaseSuppliers.map(s=>`<option value="${esc(s)}" ${PURCHASE_SUPPLIER_FILTER===s?'selected':''}>${esc(s)}</option>`).join('')}
+      </select>` : ''}
       ${S.projects.length? `
       <label>Filter by project</label>
       <select onchange="PURCHASE_PROJECT_FILTER=this.value;render()">
@@ -5044,6 +5052,7 @@ function renderStockList(){
         <option value="partial" ${PURCHASE_PAYMENT_FILTER==='partial'?'selected':''}>Partially paid</option>
         <option value="paid" ${PURCHASE_PAYMENT_FILTER==='paid'?'selected':''}>Paid</option>
       </select>
+      ${hasFilter? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="PURCHASE_SUPPLIER_FILTER='';PURCHASE_PROJECT_FILTER='';PURCHASE_PAYMENT_FILTER='';render()">${ic('x')} Clear filters</button>` : ''}
       <div style="height:12px"></div>
       ${list.length>0? `<div class="stat" style="margin-bottom:12px">
         <div class="num">${fmtMoney(listTotal)}</div><div class="lbl">${list.length} purchase${list.length===1?'':'s'} · Total amount</div>
