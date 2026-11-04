@@ -116,6 +116,7 @@
   .stripe.overdue{border-left-color:var(--red);}
   .stripe.pending{border-left-color:var(--amber);}
   .stripe.partial{border-left-color:var(--amber);}
+  .stripe.inv-unpaid{border-left-color:var(--orange);}
   .stripe.planning{border-left-color:var(--ink-soft);}
   .stripe.active{border-left-color:var(--orange);}
   .stripe.completed{border-left-color:var(--green);}
@@ -136,6 +137,7 @@
   .badge.overdue{background:var(--red-soft);color:var(--red);}
   .badge.pending{background:var(--amber-soft);color:var(--amber);}
   .badge.partial{background:var(--amber-soft);color:var(--amber);}
+  .badge.inv-unpaid{background:var(--orange-soft);color:var(--orange);}
   .badge.unpaid{background:var(--red-soft);color:var(--red);}
   .badge.converted{background:var(--chip-bg);color:var(--ink-soft);}
   .badge.planning{background:var(--chip-bg);color:var(--ink-soft);}
@@ -4121,8 +4123,14 @@ function renderSalesList(){
       sorted.map(d=>{
         const t = calcTotals(d.items,d.vatOn,d.vatRate,docDiscountType(d),docDiscountValue(d),d.charges);
         const overdue = SALES_TAB==='invoices' && invoiceIsOverdue(d);
-        const displayStatus = overdue ? 'overdue' : d.status;
-        return `<div class="card stripe ${displayStatus}" onclick="go('${SALES_TAB==='invoices'?'invoice':'quote'}-view',{id:'${d.id}'})">
+        // Any not-yet-overdue invoice that still has a balance due (draft/sent/partial) is
+        // flagged orange as "unpaid" — a single, easy-to-scan color instead of three
+        // different ones for what's practically the same "you're owed money" state.
+        // Overdue stays its own red (more urgent); quotes are untouched (no "unpaid" concept).
+        const unpaid = SALES_TAB==='invoices' && !overdue && remaining(d)>0.005;
+        const statusClass = overdue ? 'overdue' : unpaid ? 'inv-unpaid' : d.status;
+        const statusLabel = unpaid ? 'unpaid' : statusClass;
+        return `<div class="card stripe ${statusClass}" onclick="go('${SALES_TAB==='invoices'?'invoice':'quote'}-view',{id:'${d.id}'})">
           <div class="row-between">
             <div>
               <div style="font-weight:600">${esc(d.customer||'Untitled')}</div>
@@ -4130,7 +4138,7 @@ function renderSalesList(){
             </div>
             <div style="text-align:right">
               <div class="mono" style="font-weight:600">${fmtMoney(t.total)}</div>
-              <span class="badge ${displayStatus}">${displayStatus}</span>
+              <span class="badge ${statusClass}">${statusLabel}</span>
             </div>
           </div>
         </div>`;
@@ -4376,7 +4384,12 @@ function renderDocView(type,id){
   const statusOptions = type==='invoice' ? ['draft','sent','partial','paid','overdue'] : ['draft','sent','accepted'];
   const paid = type==='invoice' ? paymentsSum(d) : 0;
   const rem = type==='invoice' ? Math.max(0,t.total-paid) : 0;
-  const displayStatus = type==='invoice' && invoiceIsOverdue(d) ? 'overdue' : d.status;
+  const overdueNow = type==='invoice' && invoiceIsOverdue(d);
+  // Mirrors the Sales list: any not-overdue invoice still owing money shows as orange
+  // "unpaid" instead of its raw draft/sent/partial status. Quotes are untouched.
+  const unpaidNow = type==='invoice' && !overdueNow && rem>0.005;
+  const displayStatus = overdueNow ? 'overdue' : unpaidNow ? 'inv-unpaid' : d.status;
+  const displayLabel = unpaidNow ? 'unpaid' : displayStatus;
 
   return `
   ${topbar(d.number, d.customer, true, `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="showShareMenu('${type}','${d.id}')">${ic('share')}</button>`)}
@@ -4388,7 +4401,7 @@ function renderDocView(type,id){
           <div class="tiny muted">${esc(S.settings.companyPhone||'')} ${S.settings.companyPhone&&S.settings.companyEmail?'·':''} ${esc(S.settings.companyEmail||'')}</div>
           <div class="tiny muted">${esc(S.settings.companyAddress||'')}</div>
         </div>
-        <span class="badge ${displayStatus}">${displayStatus}</span>
+        <span class="badge ${displayStatus}">${displayLabel}</span>
       </div>
       <div class="divider"></div>
       <div class="grid2">
