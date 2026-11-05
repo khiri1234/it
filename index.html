@@ -123,6 +123,7 @@
   .stripe.active{border-left-color:var(--orange);}
   .stripe.completed{border-left-color:var(--green);}
   .stripe.on-hold{border-left-color:var(--purple);}
+  .stripe.payment-pending{border-left-color:var(--red);}
   .stripe.boq-installed{border-left-color:var(--green);}
   .stripe.boq-purchased{border-left-color:var(--blue);}
   .stripe.boq-over{border-left-color:var(--amber);}
@@ -146,6 +147,7 @@
   .badge.active{background:var(--orange-soft);color:var(--orange);}
   .badge.completed{background:var(--green-soft);color:var(--green);}
   .badge.on-hold{background:var(--purple-soft);color:var(--purple);}
+  .badge.payment-pending{background:var(--red-soft);color:var(--red);}
   .badge.boq-installed{background:var(--green-soft);color:var(--green);}
   .badge.boq-purchased{background:var(--blue-soft);color:var(--blue);}
   .badge.boq-over{background:var(--amber-soft);color:var(--amber);}
@@ -6140,7 +6142,7 @@ function renderProjectsList(){
     <label>Filter by status</label>
     <select onchange="PROJECT_STATUS_FILTER=this.value;render()">
       <option value="" ${PROJECT_STATUS_FILTER===''?'selected':''}>All</option>
-      ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${PROJECT_STATUS_FILTER===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
+      ${['planning','active','on-hold','payment-pending','completed'].map(s=>`<option value="${s}" ${PROJECT_STATUS_FILTER===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
     </select>
     ${hasFilter? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="PROJECT_CUSTOMER_FILTER='';PROJECT_STATUS_FILTER='';render()">${ic('x')} Clear filters</button>` : ''}
     ${hasFilter && list.length>0? `<div class="stat" style="margin-top:12px">
@@ -6205,7 +6207,7 @@ function renderProjectForm(id){
       <label>Start date</label><input id="pj_date" type="date" value="${p.date}">
       <label>Status</label>
       <select id="pj_status">
-        ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
+        ${['planning','active','on-hold','payment-pending','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
       </select>
     </div>
     <div class="card">
@@ -6397,7 +6399,7 @@ function renderProjectView(id){
 
     <label>Update status</label>
     <select onchange="quickProjectStatus('${p.id}',this.value)">
-      ${['planning','active','on-hold','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
+      ${['planning','active','on-hold','payment-pending','completed'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${projectStatusLabel(s)}</option>`).join('')}
     </select>
     <div style="height:10px"></div>
     <button class="btn btn-ghost btn-block" onclick="go('project-form',{id:'${p.id}'})">${ic('edit')} Edit project details</button>
