@@ -2624,24 +2624,24 @@ function renderClientPortal(){
   const clientChatMsgs = (S.clientChats && S.clientChats[customer]) || [];
   markClientChatRead(customer,'client');
   const clientChatSeenLabel = clientThreadSeenLabel(customer, clientChatMsgs, 'client');
+  // Each top-level section is rendered separately, then joined with a visible divider
+  // and extra breathing room — instead of one continuous scroll where e.g. "Documents"
+  // (often just an empty-state card) butts straight into "Invoices & quotes" below it —
+  // so a client can tell at a glance where one section ends and the next begins.
+  const sections = [
+    seesIT? renderClientSummarySection(customer) : '',
+    seesIT? renderClientProjectsSection(projects) : '',
+    seesIT? renderClientDocsSection(projects) : '',
+    seesIT? renderClientInvoicesSection(docs) : '',
+    seesIphone? `<div class="section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : '',
+    isWideEnoughForMsgPanel() ? '' : `<div class="section-title" id="p-messages">Messages</div>
+      ${renderChatCard(clientChatMsgs, clientChatSeenLabel, 'client', {scroll:'clientChatScroll', input:'clientChatInput'}, CLIENT_CHAT_DRAFT, 'sendClientChatMessage', 'CLIENT_CHAT_DRAFT', 'inline')}`,
+  ].filter(Boolean);
   return `
   ${topbar(S.settings.companyName||'THE H BUSINESS MANAGEMENT', `Client portal — ${customer}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
   <div class="content">
-    ${seesIT? renderClientSummarySection(customer) : ''}
-
-    ${seesIT? renderClientProjectsSection(projects) : ''}
-
-    ${seesIT? renderClientDocsSection(projects) : ''}
-
-    ${seesIT? renderClientInvoicesSection(docs) : ''}
-
-    ${seesIphone? `<div class="section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : ''}
-
-    ${isWideEnoughForMsgPanel() ? '' : `
-    <div class="section-title" id="p-messages">Messages</div>
-    ${renderChatCard(clientChatMsgs, clientChatSeenLabel, 'client', {scroll:'clientChatScroll', input:'clientChatInput'}, CLIENT_CHAT_DRAFT, 'sendClientChatMessage', 'CLIENT_CHAT_DRAFT', 'inline')}
-    `}
+    ${sections.map((s,i)=> i===0 ? s : `<div class="divider" style="margin:28px 0"></div>${s}`).join('')}
   </div>`;
 }
 function sendClientChatMessage(){
