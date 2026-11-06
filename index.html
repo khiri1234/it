@@ -2489,8 +2489,15 @@ function renderClientSummarySection(customer){
   const paidFrac = sum.paid/total;
   const paidLen = Math.max(0, paidFrac*C - (sum.pending>0.005 ? 2 : 0));
   const pendingLen = Math.max(0, (1-paidFrac)*C - (sum.paid>0.005 ? 2 : 0));
+  const quoteCount = S.quotes.filter(q=>q.customer===customer).length;
+  const projectCount = S.projects.filter(p=>p.customer===customer).length;
   return `
     <div class="section-title" id="p-summary">Billing summary</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+      <div class="stat"><div class="num">${sum.count}</div><div class="lbl">Invoice${sum.count===1?'':'s'}</div></div>
+      <div class="stat"><div class="num">${quoteCount}</div><div class="lbl">Quote${quoteCount===1?'':'s'}</div></div>
+      <div class="stat"><div class="num">${projectCount}</div><div class="lbl">Project${projectCount===1?'':'s'}</div></div>
+    </div>
     <div class="grid2" style="margin-bottom:14px">
       <div class="stat"><div class="num">${fmtMoney(sum.billed)}</div><div class="lbl">Total billed</div></div>
       <div class="stat"><div class="num" style="color:var(--green)">${fmtMoney(sum.paid)}</div><div class="lbl">Paid</div></div>
