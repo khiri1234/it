@@ -2584,36 +2584,48 @@ function renderClientProjectsSection(projects){
         </div>`;
       }).join('')}`;
 }
+// One invoice/quote card — shared by the two sections below so invoices and quotes
+// render identically apart from the parts that only make sense for one kind
+// (balance due + payment buttons for invoices, sign-and-accept for quotes).
+function renderClientDocCard(d){
+  const total=docTotal(d), bal=remaining(d);
+  return `<div class="card" style="margin-bottom:8px">
+    <div class="row-between">
+      <div>
+        <div class="small" style="font-weight:600">${esc(d.number)}</div>
+        <div class="tiny mono muted">${fmtDate(d.date)}</div>
+      </div>
+      <span class="badge ${d.status}">${esc(d.status)}</span>
+    </div>
+    <div class="row-between" style="margin-top:8px">
+      <div class="tiny muted">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div>
+    </div>
+    ${d.kind==='invoice'?`<div class="row-between"><div class="tiny muted">Balance due</div><div class="small mono" style="font-weight:600;color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div></div>`:''}
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="shareMenuPDF('${d.kind}','${d.id}')">${ic('download')} View / download PDF</button>
+    ${d.kind==='invoice' && bal>0? `<div style="display:flex;gap:8px;margin-top:8px">
+      ${S.settings.paypalMeUsername?`<button class="btn btn-primary" style="flex:1" onclick="clientPayViaPaypal(${bal})">${ic('card')} PayPal</button>`:''}
+      <button class="btn btn-teal" style="flex:1" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay the balance of ${fmtMoney(bal)} on invoice ${d.number}.`)}')">${ic('chat')} WhatsApp</button>
+    </div>`:''}
+    ${d.kind==='quote' ? (d.clientSignature ? `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      <div class="tiny muted">Signed by ${esc(d.signedBy||'')} · ${fmtDate(new Date(d.signedAt).toISOString().slice(0,10))}</div>
+      <img src="${d.clientSignature}" style="max-height:60px;margin-top:4px;background:#fff;border-radius:6px;padding:4px">
+    </div>` : `<button class="btn btn-teal btn-block" style="margin-top:8px" onclick="openSignatureModal('quote','${d.id}')">${ic('edit')} Sign &amp; accept this quote</button>`) : ''}
+  </div>`;
+}
 function renderClientInvoicesSection(docs){
+  const invoices = docs.filter(d=>d.kind==='invoice');
   return `
-    <div class="section-title" id="p-docs">Invoices &amp; quotes</div>
-    ${docs.length===0? `<div class="card"><div class="tiny muted">Nothing issued to you yet.</div></div>` :
-      docs.map(d=>{
-        const total=docTotal(d), bal=remaining(d);
-        return `<div class="card" style="margin-bottom:8px">
-          <div class="row-between">
-            <div>
-              <div class="small" style="font-weight:600">${esc(d.number)} <span class="tiny muted" style="font-weight:400">· ${d.kind==='invoice'?'Invoice':'Quote'}</span></div>
-              <div class="tiny mono muted">${fmtDate(d.date)}</div>
-            </div>
-            <span class="badge ${d.status}">${esc(d.status)}</span>
-          </div>
-          <div class="row-between" style="margin-top:8px">
-            <div class="tiny muted">Total</div><div class="small mono" style="font-weight:600">${fmtMoney(total)}</div>
-          </div>
-          ${d.kind==='invoice'?`<div class="row-between"><div class="tiny muted">Balance due</div><div class="small mono" style="font-weight:600;color:${bal>0?'var(--amber)':'var(--green)'}">${fmtMoney(bal)}</div></div>`:''}
-          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="shareMenuPDF('${d.kind}','${d.id}')">${ic('download')} View / download PDF</button>
-          ${d.kind==='invoice' && bal>0? `<div style="display:flex;gap:8px;margin-top:8px">
-            ${S.settings.paypalMeUsername?`<button class="btn btn-primary" style="flex:1" onclick="clientPayViaPaypal(${bal})">${ic('card')} PayPal</button>`:''}
-            <button class="btn btn-teal" style="flex:1" onclick="clientPayViaWhatsapp('${onclickStr(`Hi, I'd like to pay the balance of ${fmtMoney(bal)} on invoice ${d.number}.`)}')">${ic('chat')} WhatsApp</button>
-          </div>`:''}
-          ${d.kind==='quote' ? (d.clientSignature ? `
-          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
-            <div class="tiny muted">Signed by ${esc(d.signedBy||'')} · ${fmtDate(new Date(d.signedAt).toISOString().slice(0,10))}</div>
-            <img src="${d.clientSignature}" style="max-height:60px;margin-top:4px;background:#fff;border-radius:6px;padding:4px">
-          </div>` : `<button class="btn btn-teal btn-block" style="margin-top:8px" onclick="openSignatureModal('quote','${d.id}')">${ic('edit')} Sign &amp; accept this quote</button>`) : ''}
-        </div>`;
-      }).join('')}`;
+    <div class="section-title" id="p-invoices">Invoices</div>
+    ${invoices.length===0? `<div class="card"><div class="tiny muted">No invoices issued to you yet.</div></div>` :
+      invoices.map(renderClientDocCard).join('')}`;
+}
+function renderClientQuotesSection(docs){
+  const quotes = docs.filter(d=>d.kind==='quote');
+  return `
+    <div class="section-title" id="p-quotes">Quotes</div>
+    ${quotes.length===0? `<div class="card"><div class="tiny muted">No quotes issued to you yet.</div></div>` :
+      quotes.map(renderClientDocCard).join('')}`;
 }
 function renderClientPortal(){
   const customer = CURRENT_USER.clientCustomer;
@@ -2633,6 +2645,7 @@ function renderClientPortal(){
     seesIT? renderClientProjectsSection(projects) : '',
     seesIT? renderClientDocsSection(projects) : '',
     seesIT? renderClientInvoicesSection(docs) : '',
+    seesIT? renderClientQuotesSection(docs) : '',
     seesIphone? `<div class="section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : '',
     isWideEnoughForMsgPanel() ? '' : `<div class="section-title" id="p-messages">Messages</div>
       ${renderChatCard(clientChatMsgs, clientChatSeenLabel, 'client', {scroll:'clientChatScroll', input:'clientChatInput'}, CLIENT_CHAT_DRAFT, 'sendClientChatMessage', 'CLIENT_CHAT_DRAFT', 'inline')}`,
