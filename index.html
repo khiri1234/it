@@ -381,6 +381,11 @@
   .bar-fill{height:100%;background:var(--teal);border-radius:6px;}
   .section-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin:18px 0 10px;color:var(--ink);}
   .section-title:first-child{margin-top:0;}
+  /* ---------- PORTAL SECTION HEADLINES (Client/Supplier portal) — the divider between
+     sections (see renderClientPortal()/renderSupplierPortal()) already provides the
+     vertical break, so these read as true headlines: bigger, bolder, tight margins
+     rather than the small uppercase-ish label .section-title uses everywhere else. ---------- */
+  .portal-section-title{font-size:21px;font-weight:700;letter-spacing:-0.01em;margin:0 0 12px;}
 
   /* ---------- DASHBOARD (Home) ---------- */
   @keyframes dashRise{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
@@ -2492,7 +2497,7 @@ function renderClientSummarySection(customer){
   const quoteCount = S.quotes.filter(q=>q.customer===customer).length;
   const projectCount = S.projects.filter(p=>p.customer===customer).length;
   return `
-    <div class="section-title" id="p-summary">Billing summary</div>
+    <div class="section-title portal-section-title" id="p-summary">Billing summary</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
       <div class="stat"><div class="num">${sum.count}</div><div class="lbl">Invoice${sum.count===1?'':'s'}</div></div>
       <div class="stat"><div class="num">${quoteCount}</div><div class="lbl">Quote${quoteCount===1?'':'s'}</div></div>
@@ -2545,7 +2550,7 @@ function renderClientSummarySection(customer){
 }
 function renderClientProjectsSection(projects){
   return `
-    <div class="section-title" id="p-projects">Projects</div>
+    <div class="section-title portal-section-title" id="p-projects">Projects</div>
     ${projects.length===0? `<div class="card"><div class="tiny muted">No projects yet.</div></div>` :
       projects.map(p=>{
         const val=projectValue(p), adv=projectAdvances(p), bal=projectBalance(p);
@@ -2616,14 +2621,14 @@ function renderClientDocCard(d){
 function renderClientInvoicesSection(docs){
   const invoices = docs.filter(d=>d.kind==='invoice');
   return `
-    <div class="section-title" id="p-invoices">Invoices</div>
+    <div class="section-title portal-section-title" id="p-invoices">Invoices</div>
     ${invoices.length===0? `<div class="card"><div class="tiny muted">No invoices issued to you yet.</div></div>` :
       invoices.map(renderClientDocCard).join('')}`;
 }
 function renderClientQuotesSection(docs){
   const quotes = docs.filter(d=>d.kind==='quote');
   return `
-    <div class="section-title" id="p-quotes">Quotes</div>
+    <div class="section-title portal-section-title" id="p-quotes">Quotes</div>
     ${quotes.length===0? `<div class="card"><div class="tiny muted">No quotes issued to you yet.</div></div>` :
       quotes.map(renderClientDocCard).join('')}`;
 }
@@ -2646,8 +2651,8 @@ function renderClientPortal(){
     seesIT? renderClientDocsSection(projects) : '',
     seesIT? renderClientInvoicesSection(docs) : '',
     seesIT? renderClientQuotesSection(docs) : '',
-    seesIphone? `<div class="section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : '',
-    isWideEnoughForMsgPanel() ? '' : `<div class="section-title" id="p-messages">Messages</div>
+    seesIphone? `<div class="section-title portal-section-title" id="p-iphones">Apple Store</div>${renderIphoneStoreSection(customer)}` : '',
+    isWideEnoughForMsgPanel() ? '' : `<div class="section-title portal-section-title" id="p-messages">Messages</div>
       ${renderChatCard(clientChatMsgs, clientChatSeenLabel, 'client', {scroll:'clientChatScroll', input:'clientChatInput'}, CLIENT_CHAT_DRAFT, 'sendClientChatMessage', 'CLIENT_CHAT_DRAFT', 'inline')}`,
   ].filter(Boolean);
   return `
@@ -2906,7 +2911,7 @@ function removeProjectDoc(projectId, docId){
 function renderPortalDocsSection(files, viewFn){
   files = files.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
   return `
-    <div class="section-title" id="p-documents">Documents</div>
+    <div class="section-title portal-section-title" id="p-documents">Documents</div>
     ${files.length===0? `<div class="card"><div class="tiny muted">No documents shared with you yet.</div></div>` :
       files.map(d=>{
         const isPdf=(d.type||'')==='application/pdf';
@@ -5994,7 +5999,7 @@ function renderSupplierSummarySection(supplierName){
   const rfqCount = (S.rfqs||[]).filter(r=>!r.supplierNames || r.supplierNames.length===0 || r.supplierNames.includes(supplierName)).length;
   const quoteCount = (S.supplierQuotes||[]).filter(q=>q.supplierName===supplierName).length;
   return `
-    <div class="section-title" id="p-summary">Billing summary</div>
+    <div class="section-title portal-section-title" id="p-summary">Billing summary</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
       <div class="stat"><div class="num">${sum.count}</div><div class="lbl">Purchase order${sum.count===1?'':'s'}</div></div>
       <div class="stat"><div class="num">${rfqCount}</div><div class="lbl">RFQ${rfqCount===1?'':'s'}</div></div>
@@ -6058,7 +6063,7 @@ function renderSupplierPortal(){
   // for quotation" doesn't butt straight into "Purchase orders" below it.
   const sections = [
     renderSupplierSummarySection(supplierName),
-    `<div class="section-title" id="p-rfqs">Requests for quotation</div>
+    `<div class="section-title portal-section-title" id="p-rfqs">Requests for quotation</div>
     ${rfqs.length===0? `<div class="card"><div class="tiny muted">No requests yet.</div></div>` :
       rfqs.map(r=>{
         const submitted = !!myQuotes.find(q=>q.rfqId===r.id);
@@ -6073,7 +6078,7 @@ function renderSupplierPortal(){
           </div>
         </div>`;
       }).join('')}`,
-    `<div class="section-title dash-section" id="p-pos">Purchase orders</div>
+    `<div class="section-title portal-section-title dash-section" id="p-pos">Purchase orders</div>
     ${myPurchases.length===0? `<div class="card"><div class="tiny muted">No purchase orders yet.</div></div>` :
       myPurchases.map(p=>{
         const attCount = (p.attachments||[]).length;
@@ -6092,7 +6097,7 @@ function renderSupplierPortal(){
         </div>`;
       }).join('')}`,
     renderSupplierDocsSection(myPurchases),
-    isWideEnoughForMsgPanel() ? '' : `<div class="section-title" id="p-messages">Messages</div>
+    isWideEnoughForMsgPanel() ? '' : `<div class="section-title portal-section-title" id="p-messages">Messages</div>
       ${renderChatCard(supplierChatMsgs, supplierChatSeenLabel, 'supplier', {scroll:'supplierChatScroll', input:'supplierChatInput'}, SUPPLIER_CHAT_DRAFT, 'sendSupplierChatMessage', 'SUPPLIER_CHAT_DRAFT', 'inline')}`,
   ].filter(Boolean);
   return `
