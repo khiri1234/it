@@ -5929,6 +5929,93 @@ function createPurchasesFromLowestPrices(rfqId){
 }
 
 /* ---------- SUPPLIER PORTAL (login-only — sees open RFQs, submits prices) ---------- */
+// Billed/paid/pending totals across just this supplier's own purchase orders — the
+// purchase-order equivalent of clientBillingSummary(). Purchases have no due-date/overdue
+// concept, so "unpaid orders" (a count) stands in for the client summary's overdue count.
+function supplierBillingSummary(supplierName){
+  const purchases = S.purchases.filter(p=>p.supplier===supplierName);
+  let billed=0, paid=0, pending=0, unpaidCount=0, paidCount=0;
+  purchases.forEach(p=>{
+    const total = purchaseTotal(p), rem = purchaseRemaining(p);
+    billed += total;
+    paid += total - rem;
+    pending += rem;
+    if(rem>0.005) unpaidCount++; else paidCount++;
+  });
+  return { count: purchases.length, billed, paid, pending, unpaidCount, paidCount };
+}
+// Same month-bucketing approach as clientBilledByMonth() — amount billed per month, by
+// purchase order date, for this supplier only, over the last N months.
+function supplierBilledByMonth(supplierName, months){
+  months = months || 6;
+  const now = new Date();
+  const keys = [];
+  for(let i=months-1;i>=0;i--) keys.push(new Date(now.getFullYear(), now.getMonth()-i, 1).toISOString().slice(0,7));
+  const byKey = {};
+  keys.forEach(k=>byKey[k]=0);
+  S.purchases.filter(p=>p.supplier===supplierName).forEach(p=>{
+    const k = (p.date||'').slice(0,7);
+    if(k in byKey) byKey[k] += purchaseTotal(p);
+  });
+  return keys.map(k=>({ label: new Date(k+'-02').toLocaleDateString(undefined,{month:'short'}), value: byKey[k] }));
+}
+function renderSupplierSummarySection(supplierName){
+  const sum = supplierBillingSummary(supplierName);
+  if(sum.count===0) return '';
+  const trend = supplierBilledByMonth(supplierName, 6);
+  const maxTrend = Math.max(1, ...trend.map(t=>t.value));
+  const total = Math.max(0.01, sum.paid + sum.pending);
+  const R = 42, C = 2*Math.PI*R;
+  const paidFrac = sum.paid/total;
+  const paidLen = Math.max(0, paidFrac*C - (sum.pending>0.005 ? 2 : 0));
+  const pendingLen = Math.max(0, (1-paidFrac)*C - (sum.paid>0.005 ? 2 : 0));
+  return `
+    <div class="section-title" id="p-summary">Billing summary</div>
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="stat"><div class="num">${fmtMoney(sum.billed)}</div><div class="lbl">Total billed</div></div>
+      <div class="stat"><div class="num" style="color:var(--green)">${fmtMoney(sum.paid)}</div><div class="lbl">Paid</div></div>
+      <div class="stat"><div class="num" style="color:${sum.pending>0.005?'var(--orange)':'inherit'}">${fmtMoney(sum.pending)}</div><div class="lbl">Pending</div></div>
+      <div class="stat"><div class="num" style="color:${sum.unpaidCount>0?'var(--red)':'inherit'}">${sum.unpaidCount}</div><div class="lbl">Unpaid order${sum.unpaidCount===1?'':'s'}</div></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="small" style="font-weight:700">Paid vs pending</div>
+      <div class="tiny muted" style="margin-bottom:4px">Across ${sum.count} purchase order${sum.count===1?'':'s'}</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <svg viewBox="0 0 108 108" style="width:92px;height:92px;flex-shrink:0;transform:rotate(-90deg)">
+          <circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--chip-bg)" stroke-width="13"/>
+          ${sum.paid>0.005?`<circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--green)" stroke-width="13" stroke-dasharray="${paidLen} ${C-paidLen}" stroke-linecap="round"><title>Paid: ${fmtMoney(sum.paid)}</title></circle>`:''}
+          ${sum.pending>0.005?`<circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--orange)" stroke-width="13" stroke-dasharray="${pendingLen} ${C-pendingLen}" stroke-dashoffset="${-paidFrac*C}" stroke-linecap="round"><title>Pending: ${fmtMoney(sum.pending)}</title></circle>`:''}
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:120px;flex:1">
+          <div class="tiny" style="display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:2px;background:var(--green);flex-shrink:0"></span>
+            <span style="color:var(--ink-soft)">Paid</span>
+            <span style="font-weight:600;margin-left:auto">${fmtMoney(sum.paid)}</span>
+          </div>
+          <div class="tiny" style="display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:2px;background:var(--orange);flex-shrink:0"></span>
+            <span style="color:var(--ink-soft)">Pending</span>
+            <span style="font-weight:600;margin-left:auto">${fmtMoney(sum.pending)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="small" style="font-weight:700">Billed by month</div>
+      <div class="tiny muted" style="margin-bottom:4px">Last 6 months</div>
+      <div style="display:flex;align-items:flex-end;gap:10px;height:130px;padding-top:14px">
+        ${trend.map(t=>{
+          const h = t.value>0 ? Math.round(t.value/maxTrend*94)+4 : 2;
+          return `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
+            <div class="tiny mono" style="font-size:9.5px;color:var(--ink-soft);white-space:nowrap">${t.value>0?fmtMoneyShort(t.value):''}</div>
+            <div title="${esc(t.label)}: ${fmtMoney(t.value)}" style="width:100%;max-width:34px;height:${h}px;border-radius:4px 4px 2px 2px;background:${t.value>0?'var(--teal)':'var(--chip-bg)'}"></div>
+            <div class="tiny muted">${t.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
 function renderSupplierPortal(){
   const supplierName = CURRENT_USER.supplierName;
   const rfqs = [...(S.rfqs||[])].filter(r=>!r.supplierNames || r.supplierNames.length===0 || r.supplierNames.includes(supplierName)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -5941,6 +6028,8 @@ function renderSupplierPortal(){
   ${topbar(S.settings.companyName||'THE H BUSINESS MANAGEMENT', `Supplier portal — ${supplierName}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
   <div class="content">
+    ${renderSupplierSummarySection(supplierName)}
+
     <div class="section-title" id="p-rfqs">Requests for quotation</div>
     ${rfqs.length===0? `<div class="card"><div class="tiny muted">No requests yet.</div></div>` :
       rfqs.map(r=>{
