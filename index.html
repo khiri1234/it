@@ -2449,6 +2449,93 @@ function renderStaffPanelThreadBody(type, name){
 
 /* ---------- CLIENT PORTAL (read-only — one customer's own projects/invoices/quotes,
    no cost prices, no profit margins, no edit controls of any kind) ---------- */
+// Billed/paid/pending/overdue totals across just this client's own invoices — quotes
+// aren't "bills" yet (nothing owed until accepted and converted), so they're excluded.
+function clientBillingSummary(customer){
+  const invoices = S.invoices.filter(i=>i.customer===customer);
+  let billed=0, paid=0, pending=0, overdueAmt=0, overdueCount=0, paidCount=0;
+  invoices.forEach(inv=>{
+    const total = docTotal(inv), rem = remaining(inv);
+    billed += total;
+    paid += total - rem;
+    pending += rem;
+    if(rem>0.005) { if(invoiceIsOverdue(inv)){ overdueAmt += rem; overdueCount++; } }
+    else paidCount++;
+  });
+  return { count: invoices.length, billed, paid, pending, overdueAmt, overdueCount, paidCount };
+}
+// Same month-bucketing approach as iphoneRevenueByMonth() — amount billed per month,
+// by invoice date, for this client only, over the last N months.
+function clientBilledByMonth(customer, months){
+  months = months || 6;
+  const now = new Date();
+  const keys = [];
+  for(let i=months-1;i>=0;i--) keys.push(new Date(now.getFullYear(), now.getMonth()-i, 1).toISOString().slice(0,7));
+  const byKey = {};
+  keys.forEach(k=>byKey[k]=0);
+  S.invoices.filter(i=>i.customer===customer).forEach(inv=>{
+    const k = (inv.date||'').slice(0,7);
+    if(k in byKey) byKey[k] += docTotal(inv);
+  });
+  return keys.map(k=>({ label: new Date(k+'-02').toLocaleDateString(undefined,{month:'short'}), value: byKey[k] }));
+}
+function renderClientSummarySection(customer){
+  const sum = clientBillingSummary(customer);
+  if(sum.count===0) return '';
+  const trend = clientBilledByMonth(customer, 6);
+  const maxTrend = Math.max(1, ...trend.map(t=>t.value));
+  const total = Math.max(0.01, sum.paid + sum.pending);
+  const R = 42, C = 2*Math.PI*R;
+  const paidFrac = sum.paid/total;
+  const paidLen = Math.max(0, paidFrac*C - (sum.pending>0.005 ? 2 : 0));
+  const pendingLen = Math.max(0, (1-paidFrac)*C - (sum.paid>0.005 ? 2 : 0));
+  return `
+    <div class="section-title" id="p-summary">Billing summary</div>
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="stat"><div class="num">${fmtMoney(sum.billed)}</div><div class="lbl">Total billed</div></div>
+      <div class="stat"><div class="num" style="color:var(--green)">${fmtMoney(sum.paid)}</div><div class="lbl">Paid</div></div>
+      <div class="stat"><div class="num" style="color:${sum.pending>0.005?'var(--orange)':'inherit'}">${fmtMoney(sum.pending)}</div><div class="lbl">Pending</div></div>
+      <div class="stat"><div class="num" style="color:${sum.overdueCount>0?'var(--red)':'inherit'}">${sum.overdueCount}</div><div class="lbl">Overdue invoice${sum.overdueCount===1?'':'s'}</div></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="small" style="font-weight:700">Paid vs pending</div>
+      <div class="tiny muted" style="margin-bottom:4px">Across ${sum.count} invoice${sum.count===1?'':'s'}</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <svg viewBox="0 0 108 108" style="width:92px;height:92px;flex-shrink:0;transform:rotate(-90deg)">
+          <circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--chip-bg)" stroke-width="13"/>
+          ${sum.paid>0.005?`<circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--green)" stroke-width="13" stroke-dasharray="${paidLen} ${C-paidLen}" stroke-linecap="round"><title>Paid: ${fmtMoney(sum.paid)}</title></circle>`:''}
+          ${sum.pending>0.005?`<circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--orange)" stroke-width="13" stroke-dasharray="${pendingLen} ${C-pendingLen}" stroke-dashoffset="${-paidFrac*C}" stroke-linecap="round"><title>Pending: ${fmtMoney(sum.pending)}</title></circle>`:''}
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:120px;flex:1">
+          <div class="tiny" style="display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:2px;background:var(--green);flex-shrink:0"></span>
+            <span style="color:var(--ink-soft)">Paid</span>
+            <span style="font-weight:600;margin-left:auto">${fmtMoney(sum.paid)}</span>
+          </div>
+          <div class="tiny" style="display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:2px;background:var(--orange);flex-shrink:0"></span>
+            <span style="color:var(--ink-soft)">Pending</span>
+            <span style="font-weight:600;margin-left:auto">${fmtMoney(sum.pending)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="small" style="font-weight:700">Billed by month</div>
+      <div class="tiny muted" style="margin-bottom:4px">Last 6 months</div>
+      <div style="display:flex;align-items:flex-end;gap:10px;height:130px;padding-top:14px">
+        ${trend.map(t=>{
+          const h = t.value>0 ? Math.round(t.value/maxTrend*94)+4 : 2;
+          return `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
+            <div class="tiny mono" style="font-size:9.5px;color:var(--ink-soft);white-space:nowrap">${t.value>0?fmtMoneyShort(t.value):''}</div>
+            <div title="${esc(t.label)}: ${fmtMoney(t.value)}" style="width:100%;max-width:34px;height:${h}px;border-radius:4px 4px 2px 2px;background:${t.value>0?'var(--teal)':'var(--chip-bg)'}"></div>
+            <div class="tiny muted">${t.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
 function renderClientProjectsSection(projects){
   return `
     <div class="section-title" id="p-projects">Projects</div>
@@ -2534,6 +2621,8 @@ function renderClientPortal(){
   ${topbar(S.settings.companyName||'THE H BUSINESS MANAGEMENT', `Client portal — ${customer}`, false,
     `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
   <div class="content">
+    ${seesIT? renderClientSummarySection(customer) : ''}
+
     ${seesIT? renderClientProjectsSection(projects) : ''}
 
     ${seesIT? renderClientDocsSection(projects) : ''}
