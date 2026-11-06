@@ -6040,13 +6040,12 @@ function renderSupplierPortal(){
   const supplierChatMsgs = (S.supplierChats && S.supplierChats[supplierName]) || [];
   markSupplierChatRead(supplierName,'supplier');
   const supplierChatSeenLabel = supplierThreadSeenLabel(supplierName, supplierChatMsgs, 'supplier');
-  return `
-  ${topbar(S.settings.companyName||'THE H BUSINESS MANAGEMENT', `Supplier portal — ${supplierName}`, false,
-    `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
-  <div class="content">
-    ${renderSupplierSummarySection(supplierName)}
-
-    <div class="section-title" id="p-rfqs">Requests for quotation</div>
+  // Same section-by-section layout as the Client Portal: collect each section's HTML,
+  // drop the empty ones, and join what's left with a visible divider so e.g. "Requests
+  // for quotation" doesn't butt straight into "Purchase orders" below it.
+  const sections = [
+    renderSupplierSummarySection(supplierName),
+    `<div class="section-title" id="p-rfqs">Requests for quotation</div>
     ${rfqs.length===0? `<div class="card"><div class="tiny muted">No requests yet.</div></div>` :
       rfqs.map(r=>{
         const submitted = !!myQuotes.find(q=>q.rfqId===r.id);
@@ -6060,8 +6059,8 @@ function renderSupplierPortal(){
             <span class="badge ${statusBadge.cls}">${statusBadge.label}</span>
           </div>
         </div>`;
-      }).join('')}
-    <div class="section-title dash-section" id="p-pos">Purchase orders</div>
+      }).join('')}`,
+    `<div class="section-title dash-section" id="p-pos">Purchase orders</div>
     ${myPurchases.length===0? `<div class="card"><div class="tiny muted">No purchase orders yet.</div></div>` :
       myPurchases.map(p=>{
         const attCount = (p.attachments||[]).length;
@@ -6078,14 +6077,16 @@ function renderSupplierPortal(){
           </div>
           ${attCount?`<div class="tiny muted" style="margin-top:6px">${ic('file')} ${attCount} file${attCount===1?'':'s'} attached</div>`:''}
         </div>`;
-      }).join('')}
-
-    ${renderSupplierDocsSection(myPurchases)}
-
-    ${isWideEnoughForMsgPanel() ? '' : `
-    <div class="section-title" id="p-messages">Messages</div>
-    ${renderChatCard(supplierChatMsgs, supplierChatSeenLabel, 'supplier', {scroll:'supplierChatScroll', input:'supplierChatInput'}, SUPPLIER_CHAT_DRAFT, 'sendSupplierChatMessage', 'SUPPLIER_CHAT_DRAFT', 'inline')}
-    `}
+      }).join('')}`,
+    renderSupplierDocsSection(myPurchases),
+    isWideEnoughForMsgPanel() ? '' : `<div class="section-title" id="p-messages">Messages</div>
+      ${renderChatCard(supplierChatMsgs, supplierChatSeenLabel, 'supplier', {scroll:'supplierChatScroll', input:'supplierChatInput'}, SUPPLIER_CHAT_DRAFT, 'sendSupplierChatMessage', 'SUPPLIER_CHAT_DRAFT', 'inline')}`,
+  ].filter(Boolean);
+  return `
+  ${topbar(S.settings.companyName||'THE H BUSINESS MANAGEMENT', `Supplier portal — ${supplierName}`, false,
+    `<button class="icon-btn" style="background:rgba(255,255,255,.08);border-color:transparent;color:#fff" onclick="logout()">${ic('logout')}</button>`)}
+  <div class="content">
+    ${sections.map((s,i)=> i===0 ? s : `<div class="divider" style="margin:28px 0"></div>${s}`).join('')}
   </div>`;
 }
 function sendSupplierChatMessage(){
