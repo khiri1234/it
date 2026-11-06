@@ -5976,8 +5976,17 @@ function renderSupplierSummarySection(supplierName){
   const paidFrac = sum.paid/total;
   const paidLen = Math.max(0, paidFrac*C - (sum.pending>0.005 ? 2 : 0));
   const pendingLen = Math.max(0, (1-paidFrac)*C - (sum.paid>0.005 ? 2 : 0));
+  // Same RFQ-relevance rule renderSupplierPortal() uses: untargeted RFQs (no
+  // supplierNames list) are open to everyone, so they count for this supplier too.
+  const rfqCount = (S.rfqs||[]).filter(r=>!r.supplierNames || r.supplierNames.length===0 || r.supplierNames.includes(supplierName)).length;
+  const quoteCount = (S.supplierQuotes||[]).filter(q=>q.supplierName===supplierName).length;
   return `
     <div class="section-title" id="p-summary">Billing summary</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+      <div class="stat"><div class="num">${sum.count}</div><div class="lbl">Purchase order${sum.count===1?'':'s'}</div></div>
+      <div class="stat"><div class="num">${rfqCount}</div><div class="lbl">RFQ${rfqCount===1?'':'s'}</div></div>
+      <div class="stat"><div class="num">${quoteCount}</div><div class="lbl">Quote${quoteCount===1?'':'s'} submitted</div></div>
+    </div>
     <div class="grid2" style="margin-bottom:14px">
       <div class="stat"><div class="num">${fmtMoney(sum.billed)}</div><div class="lbl">Total billed</div></div>
       <div class="stat"><div class="num" style="color:var(--green)">${fmtMoney(sum.paid)}</div><div class="lbl">Paid</div></div>
