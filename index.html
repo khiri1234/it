@@ -7436,8 +7436,15 @@ function renderIphoneDashboardTab(){
 
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const blockLabels = ['12am','3am','6am','9am','12pm','3pm','6pm','9pm'];
+  const totalOrders = (S.iphoneOrders||[]).length;
 
   return `
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+    <div class="stat"><div class="num">${totalOrders}</div><div class="lbl">Order${totalOrders===1?'':'s'}</div></div>
+    <div class="stat"><div class="num" style="color:var(--green)">${stages.won.count}</div><div class="lbl">Won order${stages.won.count===1?'':'s'}</div></div>
+    <div class="stat"><div class="num" style="color:${stages.lost.count>0?'var(--red)':'inherit'}">${stages.lost.count}</div><div class="lbl">Lost order${stages.lost.count===1?'':'s'}</div></div>
+  </div>
+
   <div class="crm-stats">
     <div class="crm-stat">
       <div class="crm-stat-icon" style="background:var(--teal-soft);color:var(--teal)">${ic('card')}</div>
