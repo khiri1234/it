@@ -522,19 +522,23 @@
         var(--bg);
       background-attachment:fixed;
     }
-    /* a solid deep-navy rail, not glass — the one constant, confident brand
-       surface in the shell (same navy as the mobile topbar) that anchors the
-       whole layout and reads the same in light or dark content mode */
+    /* "Glassy SideBar" — a floating, rounded, frosted-navy panel inset from the
+       viewport edges rather than a flush-left opaque rail: translucent + blurred
+       (the body's navy/teal mesh shows through, same glass language as .card/
+       .modal-sheet elsewhere on desktop) while keeping the brand navy tint and
+       every existing --ds-text/--ds-hover-bg/--ds-active-bg variable valid. */
     .desktop-sidebar{
-      --ds-w:248px;
+      --ds-w:248px; --ds-gap:16px;
       display:flex;flex-direction:column;
-      position:fixed;top:0;left:0;bottom:0;width:var(--ds-w);
-      background:var(--ds-bg);
-      color:var(--ds-text);border-right:1px solid var(--ds-border);
-      box-shadow:6px 0 28px rgba(8,14,26,.22);
+      position:fixed;top:var(--ds-gap);left:var(--ds-gap);bottom:var(--ds-gap);width:var(--ds-w);
+      background:rgba(16,22,36,.68);
+      backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+      color:var(--ds-text);border:1px solid rgba(255,255,255,.1);border-radius:24px;
+      box-shadow:0 24px 54px rgba(8,14,26,.32), inset 0 1px 0 rgba(255,255,255,.08);
       padding:20px 0;z-index:50;overflow:visible;
       transition:width .22s cubic-bezier(.4,0,.2,1);
     }
+    :root[data-theme="dark"] .desktop-sidebar{background:rgba(8,13,24,.68);}
     .desktop-sidebar.collapsed{--ds-w:82px;}
     .desktop-sidebar:empty{display:none;}
 
@@ -558,15 +562,19 @@
     .desktop-sidebar.collapsed .ds-company,.desktop-sidebar.collapsed .ds-sub{display:none;}
 
     /* user card sits under the header, matching the icon-only rail when collapsed */
-    .ds-user-card{display:flex;flex-direction:column;align-items:center;text-align:center;padding:6px 18px 16px;border-bottom:1px solid var(--ds-border);margin-bottom:14px;}
-    .desktop-sidebar.collapsed .ds-user-card{padding:0 0 14px;}
-    .ds-avatar-wrap{position:relative;margin-bottom:8px;}
-    .ds-avatar{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;box-shadow:0 3px 8px rgba(0,0,0,.3);}
-    .desktop-sidebar.collapsed .ds-avatar{width:36px;height:36px;font-size:13px;border-radius:11px;}
-    .ds-status-dot{position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:#3DDC97;border:2px solid #101E38;}
-    .ds-uname{font-size:13px;font-weight:700;color:var(--ds-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
-    .ds-urole{font-size:10.5px;color:var(--ds-text-soft);margin-top:1px;}
-    .desktop-sidebar.collapsed .ds-uname,.desktop-sidebar.collapsed .ds-urole{display:none;}
+    /* profile row — now lives at the bottom of the rail (inside .ds-foot, above
+       Log out) as a horizontal avatar+name row, matching the "Glassy SideBar"
+       reference's bottom profile row instead of sitting under the header. */
+    .ds-user-card{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:12px;margin-bottom:8px;}
+    .desktop-sidebar.collapsed .ds-user-card{justify-content:center;padding:6px 0;}
+    .ds-avatar-wrap{position:relative;flex-shrink:0;}
+    .ds-avatar{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14.5px;box-shadow:0 3px 8px rgba(0,0,0,.3);}
+    .desktop-sidebar.collapsed .ds-avatar{width:34px;height:34px;font-size:13px;border-radius:11px;}
+    .ds-status-dot{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;background:#3DDC97;border:2px solid #101620;}
+    .ds-user-info{min-width:0;flex:1;}
+    .ds-uname{font-size:12.5px;font-weight:700;color:var(--ds-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+    .ds-urole{font-size:10px;color:var(--ds-text-soft);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .desktop-sidebar.collapsed .ds-user-info{display:none;}
 
     /* search box — opens the Cmd/Ctrl+K jump-to-anywhere palette */
     .ds-search-btn{
@@ -587,16 +595,26 @@
     .ds-nav{display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px;position:relative;}
     .ds-nav::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--teal) 0%,var(--teal) 60%,var(--amber) 100%);opacity:.4;}
     .ds-navbtn{
-      display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;border:none;
+      display:flex;align-items:center;gap:11px;padding:7px 12px;border-radius:12px;border:none;
       background:none;color:var(--ds-text-soft);font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;
       cursor:pointer;text-align:left;transition:background .18s,color .18s,transform .18s;width:100%;position:relative;white-space:nowrap;
     }
-    .ds-navbtn svg{width:17px;height:17px;flex-shrink:0;transition:transform .18s;}
+    .ds-navbtn svg{width:16px;height:16px;flex-shrink:0;}
+    /* colorful rounded-square icon tile per nav item — the color comes from an
+       inline style (see the color map passed alongside each tab) so every item
+       gets its own identity instead of one flat icon color for the whole rail. */
+    .ds-icon{
+      width:30px;height:30px;border-radius:9px;flex-shrink:0;color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 2px 7px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18);
+      transition:transform .18s;
+    }
+    .ds-navbtn:hover .ds-icon{transform:scale(1.06);}
     .ds-navbtn:hover{background:var(--ds-hover-bg);color:var(--ds-text);transform:translateX(2px);}
     .ds-navbtn.active{background:var(--ds-active-bg);color:#fff;box-shadow:inset 0 0 0 1px rgba(14,156,144,.4);}
-    .ds-navbtn.active svg{transform:scale(1.08);color:#5FE3C9;}
+    .ds-navbtn.active .ds-icon{transform:scale(1.08);box-shadow:0 3px 11px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.22);}
     .ds-navbtn.active::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--teal);}
-    .desktop-sidebar.collapsed .ds-navbtn{justify-content:center;padding:10px;gap:0;}
+    .desktop-sidebar.collapsed .ds-navbtn{justify-content:center;padding:7px;gap:0;}
     .desktop-sidebar.collapsed .ds-navbtn:hover{transform:none;}
     .desktop-sidebar.collapsed .ds-navbtn span:last-child{display:none;}
 
@@ -611,8 +629,8 @@
        that mesh reads as one consistent background instead of only showing in
        the leftover gutters around a plain white 520px column */
     #app{background:transparent;}
-    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 248px;padding-bottom:0;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1);}
-    .desktop-sidebar.collapsed:not(:empty) ~ #app{margin-left:82px;}
+    .desktop-sidebar:not(:empty) ~ #app{max-width:none;margin:0 0 0 280px;padding-bottom:0;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1);}
+    .desktop-sidebar.collapsed:not(:empty) ~ #app{margin-left:114px;}
     .desktop-sidebar:not(:empty) ~ #app .tabbar{display:none !important;}
     .desktop-sidebar:not(:empty) ~ #app .fab{right:32px;bottom:32px;}
     /* the client/supplier portals escape the 520px mobile #app cap with a narrower
@@ -620,8 +638,8 @@
        present the column clears it, same as the staff shell */
     #app.client-portal{max-width:none;margin:0;padding-bottom:0;min-height:100vh;background:var(--bg);}
     #app.client-portal .content{max-width:760px;padding-top:28px;padding-bottom:40px;}
-    .desktop-sidebar:not(:empty) ~ #app.client-portal{margin-left:248px;transition:margin-left .22s cubic-bezier(.4,0,.2,1);}
-    .desktop-sidebar.collapsed:not(:empty) ~ #app.client-portal{margin-left:82px;}
+    .desktop-sidebar:not(:empty) ~ #app.client-portal{margin-left:280px;transition:margin-left .22s cubic-bezier(.4,0,.2,1);}
+    .desktop-sidebar.collapsed:not(:empty) ~ #app.client-portal{margin-left:114px;}
     /* login / first-run setup / connection-error — no sidebar, not a portal —
        become a single floating glass card centered over the mesh */
     .desktop-sidebar:empty ~ #app:not(.client-portal){
@@ -695,10 +713,10 @@
   }
   @media (min-width:1280px){
     .desktop-sidebar{--ds-w:264px;}
-    .desktop-sidebar:not(:empty) ~ #app{margin-left:264px;}
-    .desktop-sidebar.collapsed:not(:empty) ~ #app{margin-left:82px;}
-    .desktop-sidebar:not(:empty) ~ #app.client-portal{margin-left:264px;}
-    .desktop-sidebar.collapsed:not(:empty) ~ #app.client-portal{margin-left:82px;}
+    .desktop-sidebar:not(:empty) ~ #app{margin-left:296px;}
+    .desktop-sidebar.collapsed:not(:empty) ~ #app{margin-left:114px;}
+    .desktop-sidebar:not(:empty) ~ #app.client-portal{margin-left:296px;}
+    .desktop-sidebar.collapsed:not(:empty) ~ #app.client-portal{margin-left:114px;}
   }
 
   /* ---------- PORTAL MESSAGES — right-hand column (client/supplier, wide desktop only) ----------
@@ -3633,9 +3651,9 @@ function toggleSidebarCollapse(){
 }
 function renderSidebar(){
   if(!CURRENT_USER) return '';
-  let tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['ai-assistant','sparkle','AI Assistant'],['reports','reports','Reports'],['more','more','More']];
+  let tabs=[['dashboard','home','Home','orange'],['sales','sales','Sales','blue'],['stock','stock','Stock','teal'],['projects','box','Projects','purple'],['chat','chat','Chat','green'],['ai-assistant','sparkle','AI Assistant','yellow'],['reports','reports','Reports','amber'],['more','more','More','navy-2']];
   if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
-  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','Apple Store']);
+  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','Apple Store','red']);
   const activeId = ['reports','chat','ai-assistant'].includes(VIEW.name) ? VIEW.name
     : ['iphone-orders','iphone-client'].includes(VIEW.name) ? 'iphone-orders'
     : (TAB_SECTIONS[VIEW.name] || 'dashboard');
@@ -3648,28 +3666,30 @@ function renderSidebar(){
       <div class="ds-sub">IT Business Suite</div>
     </div>
   </div>
-  <div class="ds-user-card">
-    <div class="ds-avatar-wrap">
-      <div class="ds-avatar" style="${CURRENT_USER.photoURL?`background:url('${esc(CURRENT_USER.photoURL)}') center/cover`:''}">${CURRENT_USER.photoURL?'':esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
-      <span class="ds-status-dot"></span>
-    </div>
-    <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
-    <div class="ds-urole">${{admin:'Admin',purchasing:'Purchasing',readonly:'Read only'}[CURRENT_USER.role] || 'Staff'}</div>
-  </div>
   <div class="ds-search-btn" onclick="openCommandPalette()" title="Jump to (Ctrl/Cmd K)">
     ${ic('search')}<span>Search</span><span class="ds-search-kbd">${navigator.platform.includes('Mac')?'⌘K':'Ctrl K'}</span>
   </div>
   <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
-    ${tabs.map(([id,icon,label])=>{
+    ${tabs.map(([id,icon,label,color])=>{
       const activeCls = activeId===id?'active':'';
       const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='ai-assistant' ? 'openAiAssistantFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrders()' : `switchTab('${id}')`;
       return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
-        <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
+        <span class="ds-icon" style="background:var(--${color})">${ic(icon)}</span><span>${label}</span>
       </button>`;
     }).join('')}
   </div>
   <div class="ds-foot">
+    <div class="ds-user-card">
+      <div class="ds-avatar-wrap">
+        <div class="ds-avatar" style="${CURRENT_USER.photoURL?`background:url('${esc(CURRENT_USER.photoURL)}') center/cover`:''}">${CURRENT_USER.photoURL?'':esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
+        <span class="ds-status-dot"></span>
+      </div>
+      <div class="ds-user-info">
+        <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
+        <div class="ds-urole">${{admin:'Admin',purchasing:'Purchasing',readonly:'Read only'}[CURRENT_USER.role] || 'Staff'}</div>
+      </div>
+    </div>
     <button class="ds-logout" onclick="logout()" title="Log out">${ic('logout')}<span>Log out</span></button>
   </div>`;
 }
@@ -3683,16 +3703,23 @@ function portalNavItems(){
   if(CURRENT_USER.role==='client'){
     const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
     return [
-      ...(seesIT? [['p-projects','box','Projects'],['p-documents','file','Documents'],['p-docs','sales','Invoices & quotes']] : []),
-      ...(seesIphone? [['p-iphones','cart','Apple Store']] : []),
-      ['p-messages','chat','Messages'],
+      ...(seesIT? [
+        ['p-summary','card','Billing summary','teal'],
+        ['p-projects','box','Projects','purple'],
+        ['p-documents','file','Documents','blue'],
+        ['p-invoices','sales','Invoices','orange'],
+        ['p-quotes','sales','Quotes','amber'],
+      ] : []),
+      ...(seesIphone? [['p-iphones','cart','Apple Store','red']] : []),
+      ['p-messages','chat','Messages','green'],
     ];
   }
   return [
-    ['p-rfqs','reports','Requests for quotation'],
-    ['p-pos','cart','Purchase orders'],
-    ['p-documents','file','Documents'],
-    ['p-messages','chat','Messages'],
+    ['p-summary','card','Billing summary','teal'],
+    ['p-rfqs','reports','Requests for quotation','blue'],
+    ['p-pos','cart','Purchase orders','orange'],
+    ['p-documents','file','Documents','purple'],
+    ['p-messages','chat','Messages','green'],
   ];
 }
 function portalGoTo(sectionId){
@@ -3726,22 +3753,24 @@ function renderPortalSidebar(){
       <div class="ds-sub">${isClient?'Client portal':'Supplier portal'}</div>
     </div>
   </div>
-  <div class="ds-user-card">
-    <div class="ds-avatar-wrap">
-      <div class="ds-avatar" style="${CURRENT_USER.photoURL?`background:url('${esc(CURRENT_USER.photoURL)}') center/cover`:''}">${CURRENT_USER.photoURL?'':esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
-      <span class="ds-status-dot"></span>
-    </div>
-    <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
-    <div class="ds-urole">${esc(who)}</div>
-  </div>
   <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
-    ${portalNavItems().map(([id,icon,label])=>`
+    ${portalNavItems().map(([id,icon,label,color])=>`
       <button class="ds-navbtn ${activeId===id?'active':''}" onclick="portalGoTo('${id}')" title="${esc(label)}">
-        <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
+        <span class="ds-icon" style="background:var(--${color})">${ic(icon)}</span><span>${label}</span>
       </button>`).join('')}
   </div>
   <div class="ds-foot">
+    <div class="ds-user-card">
+      <div class="ds-avatar-wrap">
+        <div class="ds-avatar" style="${CURRENT_USER.photoURL?`background:url('${esc(CURRENT_USER.photoURL)}') center/cover`:''}">${CURRENT_USER.photoURL?'':esc((CURRENT_USER.name||'?').trim().slice(0,1).toUpperCase())}</div>
+        <span class="ds-status-dot"></span>
+      </div>
+      <div class="ds-user-info">
+        <div class="ds-uname">${esc(CURRENT_USER.name)}</div>
+        <div class="ds-urole">${esc(who)}</div>
+      </div>
+    </div>
     <button class="ds-logout" onclick="logout()" title="Log out">${ic('logout')}<span>Log out</span></button>
   </div>`;
 }
