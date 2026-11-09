@@ -659,13 +659,20 @@
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
 
-    /* keep the same navy header color across every section on desktop — the
-       dashboard's hero banner is navy, so the topbar on every other page (Projects,
-       Invoices, etc.) stays navy too instead of switching to a lighter glass bar */
+    /* "Glassy SideBar" treatment carried to the topbar: a floating, rounded,
+       frosted-navy bar inset from the viewport edges — same background/blur/
+       border values as .desktop-sidebar — instead of a flush opaque navy strip,
+       so every other page's header (Projects, Invoices, etc.) reads as part of
+       the same glass chrome as the rail. (The Dashboard keeps its own distinct
+       .dash-hero banner, out of scope here.) */
     .desktop-sidebar:not(:empty) ~ #app .topbar{
-      background:var(--navy);color:#fff;border-bottom:1px solid rgba(255,255,255,.08);
-      box-shadow:0 4px 20px rgba(8,14,26,.12);
+      position:sticky;top:16px;margin:16px 16px 16px 0;border-radius:20px;
+      background:rgba(16,22,36,.68);
+      backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+      color:#fff;border:1px solid rgba(255,255,255,.1);
+      box-shadow:0 14px 34px rgba(8,14,26,.24), inset 0 1px 0 rgba(255,255,255,.08);
     }
+    :root[data-theme="dark"] .desktop-sidebar:not(:empty) ~ #app .topbar{background:rgba(8,13,24,.68);}
     .desktop-sidebar:not(:empty) ~ #app .topbar .title{color:#fff;font-size:21px;font-weight:700;}
     .desktop-sidebar:not(:empty) ~ #app .topbar .sub{color:rgba(255,255,255,.55);}
     .desktop-sidebar:not(:empty) ~ #app .topbar .back{background:rgba(255,255,255,.08);color:#fff;transition:background .15s;}
