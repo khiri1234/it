@@ -40,6 +40,14 @@
     --red-soft:#FBE7E7;
     --green:#2E8B4F;
     --green-soft:#E7F5EC;
+    /* "Glassy SideBar" 60/30/10 palette — sidebar only (see --ds-* below), picked
+       from a reference the user shared: Midnight Navy (60% main), Powder Blue
+       (30% second), Sunflower Yellow (10% accent). Kept separate from the
+       app-wide --navy/--yellow/--amber tokens used elsewhere, which serve
+       unrelated purposes (status badges etc.) and shouldn't shift with this. */
+    --midnight-navy:#131D38;
+    --powder-blue:#ADC7E9;
+    --sunflower-yellow:#FFC20D;
     --chip-bg:#EEF1F5;
     --row-bg:#FAFBFC;
     --switch-track:#D7DDE5;
@@ -55,7 +63,7 @@
     --ds-text:rgba(255,255,255,.94);
     --ds-text-soft:rgba(255,255,255,.56);
     --ds-hover-bg:rgba(255,255,255,.07);
-    --ds-active-bg:linear-gradient(135deg,rgba(14,156,144,.4),rgba(14,156,144,.16));
+    --ds-active-bg:linear-gradient(135deg,rgba(255,194,13,.28),rgba(255,194,13,.1));
     --ds-border:rgba(255,255,255,.09);
   }
   :root[data-theme="dark"]{
@@ -531,14 +539,14 @@
       --ds-w:248px; --ds-gap:16px;
       display:flex;flex-direction:column;
       position:fixed;top:var(--ds-gap);left:var(--ds-gap);bottom:var(--ds-gap);width:var(--ds-w);
-      background:rgba(16,22,36,.68);
+      background:rgba(19,29,56,.72);
       backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
       color:var(--ds-text);border:1px solid rgba(255,255,255,.1);border-radius:24px;
       box-shadow:0 24px 54px rgba(8,14,26,.32), inset 0 1px 0 rgba(255,255,255,.08);
       padding:20px 0;z-index:50;overflow:visible;
       transition:width .22s cubic-bezier(.4,0,.2,1);
     }
-    :root[data-theme="dark"] .desktop-sidebar{background:rgba(8,13,24,.68);}
+    :root[data-theme="dark"] .desktop-sidebar{background:rgba(10,15,30,.78);}
     .desktop-sidebar.collapsed{--ds-w:82px;}
     .desktop-sidebar:empty{display:none;}
 
@@ -555,7 +563,7 @@
 
     .ds-head{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:0 18px;}
     .desktop-sidebar.collapsed .ds-head{padding:0;justify-content:center;}
-    .ds-logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--teal),#0C8378);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 14px rgba(0,0,0,.28);}
+    .ds-logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--powder-blue),var(--midnight-navy));display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 14px rgba(0,0,0,.28);}
     .ds-logo img{width:20px;height:20px;object-fit:contain;}
     .ds-company{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14.5px;line-height:1.2;color:var(--ds-text);white-space:nowrap;}
     .ds-sub{font-size:9.5px;color:var(--ds-text-soft);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;white-space:nowrap;}
@@ -568,7 +576,7 @@
     .ds-user-card{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:12px;margin-bottom:8px;}
     .desktop-sidebar.collapsed .ds-user-card{justify-content:center;padding:6px 0;}
     .ds-avatar-wrap{position:relative;flex-shrink:0;}
-    .ds-avatar{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14.5px;box-shadow:0 3px 8px rgba(0,0,0,.3);}
+    .ds-avatar{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--powder-blue),var(--midnight-navy));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14.5px;box-shadow:0 3px 8px rgba(0,0,0,.3);}
     .desktop-sidebar.collapsed .ds-avatar{width:34px;height:34px;font-size:13px;border-radius:11px;}
     .ds-status-dot{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;background:#3DDC97;border:2px solid #101620;}
     .ds-user-info{min-width:0;flex:1;}
@@ -593,27 +601,28 @@
     .ds-section-label{font-size:10.5px;font-weight:700;color:var(--ds-text-soft);text-transform:uppercase;letter-spacing:.08em;padding:0 18px;margin:0 0 6px;}
     .desktop-sidebar.collapsed .ds-section-label{display:none;}
     .ds-nav{display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px;position:relative;}
-    .ds-nav::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--teal) 0%,var(--teal) 60%,var(--amber) 100%);opacity:.4;}
+    .ds-nav::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--powder-blue) 0%,var(--powder-blue) 60%,var(--sunflower-yellow) 100%);opacity:.4;}
     .ds-navbtn{
       display:flex;align-items:center;gap:11px;padding:7px 12px;border-radius:12px;border:none;
       background:none;color:var(--ds-text-soft);font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;
       cursor:pointer;text-align:left;transition:background .18s,color .18s,transform .18s;width:100%;position:relative;white-space:nowrap;
     }
     .ds-navbtn svg{width:16px;height:16px;flex-shrink:0;}
-    /* colorful rounded-square icon tile per nav item — the color comes from an
-       inline style (see the color map passed alongside each tab) so every item
-       gets its own identity instead of one flat icon color for the whole rail. */
+    /* "Glassy SideBar" 60/30/10 palette: icon tiles are the recurring 30% accent
+       (powder blue), one flat color for the whole rail rather than a per-item
+       rainbow — the active tab's tile switches to the 10% sunflower-yellow accent. */
     .ds-icon{
-      width:30px;height:30px;border-radius:9px;flex-shrink:0;color:#fff;
+      width:30px;height:30px;border-radius:9px;flex-shrink:0;color:var(--midnight-navy);
+      background:var(--powder-blue);
       display:flex;align-items:center;justify-content:center;
       box-shadow:0 2px 7px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18);
-      transition:transform .18s;
+      transition:transform .18s,background .18s;
     }
     .ds-navbtn:hover .ds-icon{transform:scale(1.06);}
     .ds-navbtn:hover{background:var(--ds-hover-bg);color:var(--ds-text);transform:translateX(2px);}
-    .ds-navbtn.active{background:var(--ds-active-bg);color:#fff;box-shadow:inset 0 0 0 1px rgba(14,156,144,.4);}
-    .ds-navbtn.active .ds-icon{transform:scale(1.08);box-shadow:0 3px 11px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.22);}
-    .ds-navbtn.active::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--teal);}
+    .ds-navbtn.active{background:var(--ds-active-bg);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,194,13,.4);}
+    .ds-navbtn.active .ds-icon{background:var(--sunflower-yellow);transform:scale(1.08);box-shadow:0 3px 11px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.22);}
+    .ds-navbtn.active::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--sunflower-yellow);}
     .desktop-sidebar.collapsed .ds-navbtn{justify-content:center;padding:7px;gap:0;}
     .desktop-sidebar.collapsed .ds-navbtn:hover{transform:none;}
     .desktop-sidebar.collapsed .ds-navbtn span:last-child{display:none;}
@@ -3651,9 +3660,9 @@ function toggleSidebarCollapse(){
 }
 function renderSidebar(){
   if(!CURRENT_USER) return '';
-  let tabs=[['dashboard','home','Home','orange'],['sales','sales','Sales','blue'],['stock','stock','Stock','teal'],['projects','box','Projects','purple'],['chat','chat','Chat','green'],['ai-assistant','sparkle','AI Assistant','yellow'],['reports','reports','Reports','amber'],['more','more','More','navy-2']];
+  let tabs=[['dashboard','home','Home'],['sales','sales','Sales'],['stock','stock','Stock'],['projects','box','Projects'],['chat','chat','Chat'],['ai-assistant','sparkle','AI Assistant'],['reports','reports','Reports'],['more','more','More']];
   if(isPurchasingOnly()) tabs=tabs.filter(([id])=>id==='stock');
-  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','Apple Store','red']);
+  if(isIphoneStoreAdmin()) tabs.splice(tabs.length-1, 0, ['iphone-orders','cart','Apple Store']);
   const activeId = ['reports','chat','ai-assistant'].includes(VIEW.name) ? VIEW.name
     : ['iphone-orders','iphone-client'].includes(VIEW.name) ? 'iphone-orders'
     : (TAB_SECTIONS[VIEW.name] || 'dashboard');
@@ -3671,11 +3680,11 @@ function renderSidebar(){
   </div>
   <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
-    ${tabs.map(([id,icon,label,color])=>{
+    ${tabs.map(([id,icon,label])=>{
       const activeCls = activeId===id?'active':'';
       const onclick = id==='reports' ? 'openReportsFromSidebar()' : id==='chat' ? 'openChatFromSidebar()' : id==='ai-assistant' ? 'openAiAssistantFromSidebar()' : id==='iphone-orders' ? 'openIphoneOrders()' : `switchTab('${id}')`;
       return `<button class="ds-navbtn ${activeCls}" onclick="${onclick}" title="${esc(label)}">
-        <span class="ds-icon" style="background:var(--${color})">${ic(icon)}</span><span>${label}</span>
+        <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`;
     }).join('')}
   </div>
@@ -3704,22 +3713,22 @@ function portalNavItems(){
     const seesIT = clientSeesIT(CURRENT_USER), seesIphone = clientSeesIphone(CURRENT_USER);
     return [
       ...(seesIT? [
-        ['p-summary','card','Billing summary','teal'],
-        ['p-projects','box','Projects','purple'],
-        ['p-documents','file','Documents','blue'],
-        ['p-invoices','sales','Invoices','orange'],
-        ['p-quotes','sales','Quotes','amber'],
+        ['p-summary','card','Billing summary'],
+        ['p-projects','box','Projects'],
+        ['p-documents','file','Documents'],
+        ['p-invoices','sales','Invoices'],
+        ['p-quotes','sales','Quotes'],
       ] : []),
-      ...(seesIphone? [['p-iphones','cart','Apple Store','red']] : []),
-      ['p-messages','chat','Messages','green'],
+      ...(seesIphone? [['p-iphones','cart','Apple Store']] : []),
+      ['p-messages','chat','Messages'],
     ];
   }
   return [
-    ['p-summary','card','Billing summary','teal'],
-    ['p-rfqs','reports','Requests for quotation','blue'],
-    ['p-pos','cart','Purchase orders','orange'],
-    ['p-documents','file','Documents','purple'],
-    ['p-messages','chat','Messages','green'],
+    ['p-summary','card','Billing summary'],
+    ['p-rfqs','reports','Requests for quotation'],
+    ['p-pos','cart','Purchase orders'],
+    ['p-documents','file','Documents'],
+    ['p-messages','chat','Messages'],
   ];
 }
 function portalGoTo(sectionId){
@@ -3755,9 +3764,9 @@ function renderPortalSidebar(){
   </div>
   <div class="ds-section-label">Menu</div>
   <div class="ds-nav">
-    ${portalNavItems().map(([id,icon,label,color])=>`
+    ${portalNavItems().map(([id,icon,label])=>`
       <button class="ds-navbtn ${activeId===id?'active':''}" onclick="portalGoTo('${id}')" title="${esc(label)}">
-        <span class="ds-icon" style="background:var(--${color})">${ic(icon)}</span><span>${label}</span>
+        <span class="ds-icon">${ic(icon)}</span><span>${label}</span>
       </button>`).join('')}
   </div>
   <div class="ds-foot">
