@@ -974,14 +974,14 @@ const ICO = {
 const ic=(n,cls='')=>`<span class="${cls}" style="display:inline-flex;width:18px;height:18px">${ICO[n]||''}</span>`;
 
 /* ---------- STORAGE ---------- */
-const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos','supplierChats','supplierChatReads','iphoneOrders'];
+const KEYS=['settings','invoices','quotes','purchases','inventory','users','projects','activityLog','chat','clientChats','chatReads','clientChatReads','rfqs','supplierQuotes','todos','supplierChats','supplierChatReads','iphoneOrders','receivables'];
 const DEFAULT_SETTINGS={
   companyName:'The H IT Solutions', companyPhone:'', companyEmail:'', companyAddress:'', companyTRN:'', paypalMeUsername:'',
   currency:'AED', vatRate:5, vatDefaultOn:true,
   invoicePrefix:'INV', quotePrefix:'QT', poPrefix:'PO', projectPrefix:'PRJ', rfqPrefix:'RFQ',
   invoiceNext:1, quoteNext:1, poNext:1, projectNext:1, rfqNext:1
 };
-let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{}, iphoneOrders:[] };
+let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{}, iphoneOrders:[], receivables:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='', PURCHASE_SUPPLIER_FILTER='';
 let PROJECT_CUSTOMER_FILTER='', PROJECT_STATUS_FILTER='';
@@ -1238,7 +1238,7 @@ async function loadAll(){
   if(FIREBASE_ENABLED){ attachFirestoreListeners(); }
   else if(STORAGE_MODE!=='none' && STORAGE_MODE!=='loading'){ startSync(); }
 }
-const FORM_VIEWS=['invoice-form','quote-form','item-form','purchase-form','settings-form','team-form','bulk-payment','project-form','inventory-import','rfq-form'];
+const FORM_VIEWS=['invoice-form','quote-form','item-form','purchase-form','settings-form','team-form','bulk-payment','project-form','inventory-import','rfq-form','receivable-form'];
 
 /* Realtime path (Firebase) */
 function attachFirestoreListeners(){
@@ -1564,6 +1564,19 @@ function docTotal(d){ return calcTotals(d.items,d.vatOn,d.vatRate,docDiscountTyp
 function paymentsSum(d){ return (d.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0); }
 function remaining(d){ return Math.max(0, docTotal(d) - paymentsSum(d)); }
 function invoiceIsOverdue(d){ return d.status!=='paid' && !!d.dueDate && d.dueDate<todayISO() && remaining(d)>0.005; }
+// "Other receivables" — an amount a client owes with no invoice or project behind it
+// (a deposit, a retainer top-up, an old debt being migrated in, a one-off manual
+// charge). No stored .status: paid/partial/pending/overdue is always derived from
+// amount vs payments, the same way remaining()/invoiceIsOverdue() work for invoices.
+function receivableRemaining(r){ return Math.max(0, (Number(r.amount)||0) - paymentsSum(r)); }
+function receivableIsOverdue(r){ return !!r.dueDate && r.dueDate<todayISO() && receivableRemaining(r)>0.005; }
+function receivableStatus(r){
+  const rem = receivableRemaining(r);
+  if(rem<=0.005) return 'paid';
+  if(receivableIsOverdue(r)) return 'overdue';
+  if(paymentsSum(r)>0.005) return 'partial';
+  return 'pending';
+}
 function refreshPaymentStatus(d){
   const total=docTotal(d), paid=paymentsSum(d);
   if(total>0 && paid>=total-0.005) d.status='paid';
@@ -1653,9 +1666,12 @@ function showConfirm(message, onYes, opts){
   </div>`;
   window.__confirmYes = ()=>{ closeModal(); onYes(); };
 }
-function payKindStore(kind){ return kind==='project'? S.projects : kind==='purchase'? S.purchases : S.invoices; }
-function payKindKey(kind){ return kind==='project'? 'projects' : kind==='purchase'? 'purchases' : 'invoices'; }
-function payKindRemaining(kind,d){ return kind==='project'? projectBalance(d) : kind==='purchase'? purchaseRemaining(d) : remaining(d); }
+function payKindStore(kind){ return kind==='project'? S.projects : kind==='purchase'? S.purchases : kind==='receivable'? S.receivables : S.invoices; }
+function payKindKey(kind){ return kind==='project'? 'projects' : kind==='purchase'? 'purchases' : kind==='receivable'? 'receivables' : 'invoices'; }
+function payKindRemaining(kind,d){ return kind==='project'? projectBalance(d) : kind==='purchase'? purchaseRemaining(d) : kind==='receivable'? receivableRemaining(d) : remaining(d); }
+// invoices/purchases/projects are identified by their .number in payment log lines;
+// receivables have no formal number, so fall back to their free-text description.
+function payKindLabel(kind,d){ return kind==='receivable'? (d.description||'charge') : d.number; }
 let PAYMENT_ROWS=[];
 function paymentRowHtml(idx, r){
   return `<div class="item-row payRow" data-idx="${idx}">
@@ -1737,7 +1753,7 @@ function savePayments(kind, id){
   });
   if(kind==='invoice') refreshPaymentStatus(d);
   persist(payKindKey(kind));
-  logActivity(`Recorded ${rows.length>1?rows.length+' payments':'a payment'} totaling ${fmtMoney(total)} on ${kind} ${d.number}`);
+  logActivity(`Recorded ${rows.length>1?rows.length+' payments':'a payment'} totaling ${fmtMoney(total)} on ${kind} ${payKindLabel(kind,d)}`);
   closeModal();
   toast(rows.length>1? `${rows.length} payments recorded` : 'Payment recorded');
   render();
@@ -1750,7 +1766,7 @@ function removePayment(kind, id, payId){
   d.payments=(d.payments||[]).filter(p=>p.id!==payId);
   if(kind==='invoice') refreshPaymentStatus(d);
   persist(payKindKey(kind));
-  logActivity(`Removed a ${pay?fmtMoney(pay.amount)+' ':''}payment from ${kind} ${d.number}`);
+  logActivity(`Removed a ${pay?fmtMoney(pay.amount)+' ':''}payment from ${kind} ${payKindLabel(kind,d)}`);
   render();
   });
 }
@@ -1980,7 +1996,7 @@ function closeBarcodeScanner(){
 
 /* ---------- SAVED CONTACT NAMES (so customer/supplier names don't need retyping) ---------- */
 function allCustomerNames(){
-  return [...new Set([...S.invoices, ...S.quotes, ...S.projects].map(x=>x.customer).filter(Boolean))].sort();
+  return [...new Set([...S.invoices, ...S.quotes, ...S.projects, ...(S.receivables||[])].map(x=>x.customer).filter(Boolean))].sort();
 }
 function allSupplierNames(){
   return [...new Set(S.purchases.map(p=>p.supplier).filter(Boolean))].sort();
@@ -2479,10 +2495,13 @@ function renderStaffPanelThreadBody(type, name){
 
 /* ---------- CLIENT PORTAL (read-only — one customer's own projects/invoices/quotes,
    no cost prices, no profit margins, no edit controls of any kind) ---------- */
-// Billed/paid/pending/overdue totals across just this client's own invoices — quotes
-// aren't "bills" yet (nothing owed until accepted and converted), so they're excluded.
+// Billed/paid/pending/overdue totals across this client's own invoices, plus any
+// "other receivables" — amounts owed with no invoice or project behind them at all
+// (quotes aren't "bills" yet — nothing owed until accepted and converted — so
+// they're excluded, same as before).
 function clientBillingSummary(customer){
   const invoices = S.invoices.filter(i=>i.customer===customer);
+  const otherCharges = (S.receivables||[]).filter(r=>r.customer===customer);
   let billed=0, paid=0, pending=0, overdueAmt=0, overdueCount=0, paidCount=0;
   invoices.forEach(inv=>{
     const total = docTotal(inv), rem = remaining(inv);
@@ -2492,7 +2511,15 @@ function clientBillingSummary(customer){
     if(rem>0.005) { if(invoiceIsOverdue(inv)){ overdueAmt += rem; overdueCount++; } }
     else paidCount++;
   });
-  return { count: invoices.length, billed, paid, pending, overdueAmt, overdueCount, paidCount };
+  otherCharges.forEach(r=>{
+    const total = Number(r.amount)||0, rem = receivableRemaining(r);
+    billed += total;
+    paid += total - rem;
+    pending += rem;
+    if(rem>0.005) { if(receivableIsOverdue(r)){ overdueAmt += rem; overdueCount++; } }
+    else paidCount++;
+  });
+  return { count: invoices.length, otherChargesCount: otherCharges.length, billed, paid, pending, overdueAmt, overdueCount, paidCount };
 }
 // Same month-bucketing approach as iphoneRevenueByMonth() — amount billed per month,
 // by invoice date, for this client only, over the last N months.
@@ -2511,7 +2538,8 @@ function clientBilledByMonth(customer, months){
 }
 function renderClientSummarySection(customer){
   const sum = clientBillingSummary(customer);
-  if(sum.count===0) return '';
+  if(sum.count===0 && sum.otherChargesCount===0) return '';
+  const otherCharges = (S.receivables||[]).filter(r=>r.customer===customer).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const trend = clientBilledByMonth(customer, 6);
   const maxTrend = Math.max(1, ...trend.map(t=>t.value));
   const total = Math.max(0.01, sum.paid + sum.pending);
@@ -2523,10 +2551,11 @@ function renderClientSummarySection(customer){
   const projectCount = S.projects.filter(p=>p.customer===customer).length;
   return `
     <div class="section-title portal-section-title" id="p-summary">Billing summary</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:repeat(${otherCharges.length?4:3},1fr);gap:10px;margin-bottom:10px">
       <div class="stat"><div class="num">${sum.count}</div><div class="lbl">Invoice${sum.count===1?'':'s'}</div></div>
       <div class="stat"><div class="num">${quoteCount}</div><div class="lbl">Quote${quoteCount===1?'':'s'}</div></div>
       <div class="stat"><div class="num">${projectCount}</div><div class="lbl">Project${projectCount===1?'':'s'}</div></div>
+      ${otherCharges.length?`<div class="stat"><div class="num">${otherCharges.length}</div><div class="lbl">Other charge${otherCharges.length===1?'':'s'}</div></div>`:''}
     </div>
     <div class="grid2" style="margin-bottom:14px">
       <div class="stat"><div class="num">${fmtMoney(sum.billed)}</div><div class="lbl">Total billed</div></div>
@@ -2571,7 +2600,25 @@ function renderClientSummarySection(customer){
           </div>`;
         }).join('')}
       </div>
-    </div>`;
+    </div>
+    ${otherCharges.length? `
+    <div class="card" style="margin-bottom:14px">
+      <div class="small" style="font-weight:700">Other charges</div>
+      <div class="tiny muted" style="margin-bottom:8px">Amounts owed outside any invoice or project</div>
+      ${otherCharges.map(r=>{
+        const status = receivableStatus(r);
+        return `<div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--line)">
+          <div>
+            <div class="small" style="font-weight:600">${esc(r.description||'Charge')}</div>
+            <div class="tiny muted">${fmtDate(r.date)}${r.dueDate?' · Due '+fmtDate(r.dueDate):''}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="mono" style="font-weight:600">${fmtMoney(Number(r.amount)||0)}</div>
+            <span class="badge ${status}">${status}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : ''}`;
 }
 function renderClientProjectsSection(projects){
   return `
@@ -3536,6 +3583,8 @@ function render(){
     case 'quote-form': body = renderDocForm('quote', VIEW.params.id); break;
     case 'invoice-view': body = renderDocView('invoice', VIEW.params.id); break;
     case 'quote-view': body = renderDocView('quote', VIEW.params.id); break;
+    case 'receivable-form': body = renderReceivableForm(VIEW.params.id); break;
+    case 'receivable-view': body = renderReceivableView(VIEW.params.id); break;
     case 'stock': body = renderStockList(); break;
     case 'item-form': body = renderItemForm(VIEW.params.id); break;
     case 'inventory-import': body = renderInventoryImport(); break;
@@ -3610,7 +3659,7 @@ function quickFilterList(q){
 /* ---------- TABBAR ---------- */
 const TAB_SECTIONS={
   'dashboard':'dashboard',
-  'sales':'sales','invoice-form':'sales','quote-form':'sales','invoice-view':'sales','quote-view':'sales','bulk-payment':'sales',
+  'sales':'sales','invoice-form':'sales','quote-form':'sales','invoice-view':'sales','quote-view':'sales','bulk-payment':'sales','receivable-form':'sales','receivable-view':'sales',
   'stock':'stock','item-form':'stock','purchase-form':'stock','purchase-view':'stock','inventory-import':'stock','rfq-form':'stock','rfq-view':'stock',
   'projects':'projects','project-form':'projects','project-view':'projects','project-cost':'projects',
   'reports':'more',
@@ -4230,8 +4279,9 @@ function emptyState(icon,title,sub){
   return `<div class="empty">${ic(icon)}<div style="font-weight:600;color:var(--ink);margin-top:6px">${esc(title)}</div><div class="tiny">${esc(sub)}</div></div>`;
 }
 
-/* ---------- SALES (Invoices / Quotes) ---------- */
+/* ---------- SALES (Invoices / Quotes / Other receivables) ---------- */
 function renderSalesList(){
+  if(SALES_TAB==='receivables') return renderReceivablesTab();
   let list = SALES_TAB==='invoices'? S.invoices : S.quotes;
   if(SALES_TAB==='invoices'){
     if(SALES_CUSTOMER_FILTER) list = list.filter(d=>d.customer===SALES_CUSTOMER_FILTER);
@@ -4248,6 +4298,7 @@ function renderSalesList(){
     <div class="segmented">
       <button class="${SALES_TAB==='invoices'?'active':''}" onclick="SALES_TAB='invoices';render()">Invoices</button>
       <button class="${SALES_TAB==='quotes'?'active':''}" onclick="SALES_TAB='quotes';render()">Quotes</button>
+      <button class="${SALES_TAB==='receivables'?'active':''}" onclick="SALES_TAB='receivables';render()">Other</button>
     </div>
     ${SALES_TAB==='invoices'? `<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('bulk-payment',{})">${ic('cart')} Bulk payment — apply one payment across invoices</button></div>`:''}
     ${SALES_TAB==='invoices' && invoiceCustomers.length? `
@@ -4302,6 +4353,159 @@ function renderSalesList(){
 }
 function newInvoice(){ goPush('invoice-form',{id:null}); }
 function newQuote(){ goPush('quote-form',{id:null}); }
+
+/* ---------- OTHER RECEIVABLES — amounts owed by a client with no invoice or
+   project behind them (a deposit, a retainer top-up, a migrated-in old debt, a
+   one-off manual charge). Deliberately lighter-weight than invoices: no items,
+   no VAT, no formal document number — just who owes what, for what, and since
+   when, with the same payments/remaining machinery invoices already use. ---------- */
+function renderReceivablesTab(){
+  const sorted = [...S.receivables].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const totalOutstanding = sorted.reduce((a,r)=>a+receivableRemaining(r),0);
+  return `
+  ${topbar('Sales','Invoices & quotes', false, null, true)}
+  <div class="content">
+    <div class="segmented">
+      <button onclick="SALES_TAB='invoices';render()">Invoices</button>
+      <button onclick="SALES_TAB='quotes';render()">Quotes</button>
+      <button class="active" onclick="SALES_TAB='receivables';render()">Other</button>
+    </div>
+    <div class="tiny muted" style="margin-top:10px">Amounts owed by a client with no invoice or project behind them.</div>
+    ${sorted.length? `<div class="stat" style="margin-top:12px">
+      <div class="num" style="color:${totalOutstanding>0.005?'var(--red)':'var(--green)'}">${fmtMoney(totalOutstanding)}</div>
+      <div class="lbl">${sorted.length} charge${sorted.length===1?'':'s'} · Outstanding</div>
+    </div>` : ''}
+    <div style="height:12px"></div>
+    ${sorted.length===0? emptyState('card','No other charges yet','Tap the + button to add an amount a client owes you outside any invoice or project.') :
+      sorted.map(r=>{
+        const status = receivableStatus(r);
+        return `<div class="card stripe ${status}" onclick="go('receivable-view',{id:'${r.id}'})">
+          <div class="row-between">
+            <div>
+              <div style="font-weight:600">${esc(r.customer||'Untitled')}</div>
+              <div class="tiny muted">${esc(r.description||'')}</div>
+              <div class="tiny mono muted">${fmtDate(r.date)}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="mono" style="font-weight:600">${fmtMoney(Number(r.amount)||0)}</div>
+              <span class="badge ${status}">${status}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+  </div>
+  <button class="fab" onclick="newReceivable()">${ic('plus')}</button>`;
+}
+function newReceivable(){ goPush('receivable-form',{id:null}); }
+function renderReceivableForm(id){
+  const editing = id ? S.receivables.find(x=>x.id===id) : null;
+  const r = editing || { id:null, customer:'', description:'', amount:'', date:todayISO(), dueDate:'', notes:'', payments:[] };
+  return `
+  ${topbar(editing?'Edit charge':'New charge', 'Owed by a client, outside any invoice or project', true)}
+  <div class="content">
+    <div class="card">
+      <label>Customer name</label>
+      <input id="rc_customer" value="${esc(r.customer)}" placeholder="Customer or company name" oninput="acOpen(this,AC_OPTS.customers)" onfocus="acOpen(this,AC_OPTS.customers)" autocomplete="off">
+      ${customerDatalist()}
+      <label>Description</label>
+      <input id="rc_description" value="${esc(r.description)}" placeholder="What is this for? e.g. Deposit, retainer top-up">
+      <label>Amount</label>
+      <input id="rc_amount" type="number" step="0.01" value="${r.amount||''}" placeholder="0.00">
+      <label>Date</label>
+      <input id="rc_date" type="date" value="${r.date||todayISO()}">
+      <label>Due date (optional)</label>
+      <input id="rc_dueDate" type="date" value="${r.dueDate||''}">
+      <label>Notes (optional)</label>
+      <textarea id="rc_notes" rows="3" placeholder="Any extra context">${esc(r.notes)}</textarea>
+    </div>
+  </div>
+  <div class="content" style="padding-top:0">
+    <button class="btn btn-primary btn-block" onclick="saveReceivable('${r.id||''}')">${ic('check')} Save</button>
+    ${editing?`<button class="btn btn-danger btn-block" style="margin-top:10px" onclick="deleteReceivable('${r.id}')">${ic('trash')} Delete</button>`:''}
+  </div>`;
+}
+function saveReceivable(id){
+  const customer = document.getElementById('rc_customer').value.trim();
+  if(!customer){ toast('Please enter a customer name'); return; }
+  const amount = Number(document.getElementById('rc_amount').value)||0;
+  if(amount<=0){ toast('Enter an amount greater than 0'); return; }
+  const isNew = !id;
+  let r;
+  if(isNew){ r = { id:uid(), payments:[] }; S.receivables.push(r); }
+  else { r = S.receivables.find(x=>x.id===id); }
+  r.customer = customer;
+  r.description = document.getElementById('rc_description').value.trim();
+  r.amount = amount;
+  r.date = document.getElementById('rc_date').value || todayISO();
+  r.dueDate = document.getElementById('rc_dueDate').value || '';
+  r.notes = document.getElementById('rc_notes').value;
+  persist('receivables');
+  logActivity(`${isNew?'Added':'Updated'} a charge of ${fmtMoney(amount)} owed by ${customer}`);
+  toast('Saved');
+  goBack();
+}
+function deleteReceivable(id){
+  if(!isAdmin()){ toast('Only admins can delete'); return; }
+  showConfirm('Delete this charge? This cannot be undone.', ()=>{
+    const r = S.receivables.find(x=>x.id===id);
+    S.receivables = S.receivables.filter(x=>x.id!==id);
+    persist('receivables');
+    logActivity(`Deleted a charge${r?' of '+fmtMoney(r.amount)+' owed by '+r.customer:''}`);
+    toast('Deleted');
+    goBack();
+  });
+}
+function renderReceivableView(id){
+  const r = S.receivables.find(x=>x.id===id);
+  if(!r) return topbar('Not found','',true)+`<div class="content">${emptyState('card','Not found','This charge may have been deleted.')}</div>`;
+  const paid = paymentsSum(r);
+  const rem = receivableRemaining(r);
+  const status = receivableStatus(r);
+  return `
+  ${topbar(r.customer, r.description, true)}
+  <div class="content">
+    <div class="card">
+      <div class="row-between">
+        <div>
+          <div class="tiny muted" style="text-transform:uppercase;font-weight:600">Owed by</div>
+          <div style="font-weight:600">${esc(r.customer)}</div>
+        </div>
+        <span class="badge ${status}">${status}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="small" style="font-weight:600">${esc(r.description||'(no description)')}</div>
+      <div class="tiny muted" style="margin-top:2px">${fmtDate(r.date)}${r.dueDate?' · Due '+fmtDate(r.dueDate):''}</div>
+      ${r.notes?`<div class="tiny muted" style="margin-top:8px">${esc(r.notes)}</div>`:''}
+      <div class="totals">
+        <div class="line"><span class="muted">Amount</span><span class="mono">${fmtMoney(Number(r.amount)||0)}</span></div>
+        <div class="line grand"><span>Remaining</span><span class="mono" style="color:${rem>0.005?'var(--red)':'var(--green)'}">${fmtMoney(rem)}</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row-between">
+        <div style="font-weight:600;font-size:14px">Payments</div>
+        <button class="btn btn-teal btn-sm" onclick="showPaymentModal('receivable','${r.id}')">${ic('plus')} Record payment</button>
+      </div>
+      ${(r.payments&&r.payments.length)? r.payments.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(p=>`
+        <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--line)">
+          <div>
+            <div class="small" style="font-weight:600">${fmtMoney(p.amount)} <span class="tiny muted" style="font-weight:400">· ${esc(p.method)}</span></div>
+            <div class="tiny muted">${fmtDate(p.date)} · to ${esc(p.paidTo)}${p.note?' · '+esc(p.note):''}</div>
+          </div>
+          ${isAdmin()?`<button class="icon-btn" onclick="removePayment('receivable','${r.id}','${p.id}')">${ic('trash')}</button>`:''}
+        </div>`).join('') : `<div class="tiny muted" style="padding:8px 0">No payments recorded yet.</div>`}
+      <div class="totals">
+        <div class="line"><span class="muted">Paid so far</span><span class="mono">${fmtMoney(paid)}</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="content" style="padding-top:0">
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-block" onclick="go('receivable-form',{id:'${r.id}'})">${ic('edit')} Edit</button>
+      ${isAdmin()?`<button class="btn btn-danger btn-block" onclick="deleteReceivable('${r.id}')">${ic('trash')} Delete</button>`:''}
+    </div>
+  </div>`;
+}
 
 /* ---------- DOC FORM (shared by invoice & quote) ---------- */
 function renderDocForm(type, id){
