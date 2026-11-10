@@ -2,6 +2,7 @@ import UIKit
 import WebKit
 import LocalAuthentication
 import FirebaseMessaging
+import ContactsUI
 
 /// Hosts the live web app (https://app.hatef.cc) inside a single, full-bleed WKWebView.
 ///
@@ -12,17 +13,23 @@ import FirebaseMessaging
 /// review cycle in the way. Bundling it would mean a native rebuild + resubmission for
 /// every web-only change, which defeats the point of shipping this fast.
 ///
-/// This wrapper's only real job is the two things a WKWebView can't do on its own: Face ID
-/// and push-notification topic subscriptions. The web app already has both sides of this
-/// bridge built in (requestBiometricLogin() / syncPushTopic() in index.html, gated behind
-/// isWrappedApp() = window.webkit && window.webkit.messageHandlers) — it was written
-/// expecting exactly this wrapper to exist.
+/// This wrapper's only real job is things a WKWebView can't do on its own: Face ID,
+/// push-notification topic subscriptions, and picking a contact from the device's own
+/// address book (the web Contact Picker API the hosted site falls back to in Safari
+/// isn't implemented inside a third-party app's WKWebView). The web app already has all
+/// three sides of these bridges built in (requestBiometricLogin() / syncPushTopic() /
+/// pickContact() in index.html, gated behind isWrappedApp() = window.webkit &&
+/// window.webkit.messageHandlers) — it was written expecting exactly this wrapper to exist.
 final class WebViewController: UIViewController {
     private var webView: WKWebView!
     private static let appURL = URL(string: "https://app.hatef.cc/index.html")!
     // Matches desktop/main.js's BrowserWindow backgroundColor, so the native chrome and
     // the web app's own dark app shell don't flash a mismatched color during load.
     private static let shellBackground = UIColor(red: 11/255, green: 18/255, blue: 32/255, alpha: 1)
+    // Set just before presenting the People picker, read back once the user picks (or
+    // cancels) a contact — see handleContactPickerRequest()/CNContactPickerDelegate below.
+    fileprivate var pendingContactPickWantsPhone = false
+    fileprivate var pendingContactPickWantsEmail = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -31,6 +38,7 @@ final class WebViewController: UIViewController {
         let contentController = WKUserContentController()
         contentController.add(self, name: "faceID")
         contentController.add(self, name: "pushTopic")
+        contentController.add(self, name: "contactPicker")
 
         let config = WKWebViewConfiguration()
         config.userContentController = contentController
@@ -64,7 +72,8 @@ final class WebViewController: UIViewController {
     }
 }
 
-// MARK: - WKScriptMessageHandler — the faceID / pushTopic bridge the web app already calls
+// MARK: - WKScriptMessageHandler — the faceID / pushTopic / contactPicker bridges the
+// web app already calls
 extension WebViewController: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         switch message.name {
@@ -72,6 +81,8 @@ extension WebViewController: WKScriptMessageHandler {
             handleFaceIDRequest()
         case "pushTopic":
             handlePushTopicRequest(message.body)
+        case "contactPicker":
+            handleContactPickerRequest(message.body)
         default:
             break
         }
@@ -114,6 +125,51 @@ extension WebViewController: WKScriptMessageHandler {
         case "unsubscribe": Messaging.messaging().unsubscribe(fromTopic: topic)
         default: break
         }
+    }
+
+    // {wantsPhone: bool, wantsEmail: bool} — see pickContact() in index.html. Remembers
+    // which pieces of the picked contact the web page actually wants, then shows the
+    // real iOS People picker; the result comes back via CNContactPickerDelegate below.
+    private func handleContactPickerRequest(_ body: Any) {
+        let dict = body as? [String: Any]
+        pendingContactPickWantsPhone = (dict?["wantsPhone"] as? Bool) ?? false
+        pendingContactPickWantsEmail = (dict?["wantsEmail"] as? Bool) ?? false
+        let picker = CNContactPickerViewController()
+        picker.delegate = self
+        picker.displayedPropertyKeys = [CNContactPhoneNumbersKey, CNContactEmailAddressesKey, CNContactOrganizationNameKey]
+        present(picker, animated: true)
+    }
+}
+
+// MARK: - CNContactPickerDelegate — the "contactPicker" bridge's result. No
+// NSContactsUsageDescription/permission prompt is needed for this: picking a single
+// contact through Apple's own People UI never grants the app bulk address-book access
+// (it runs out-of-process and only ever hands back the one contact chosen), the same
+// privacy model as the web Contact Picker API this mirrors for plain-browser visitors.
+extension WebViewController: CNContactPickerDelegate {
+    func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+        let personName = [contact.givenName, contact.familyName]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let name = personName.isEmpty ? contact.organizationName : personName
+        var payload: [String: Any] = ["name": name]
+        if pendingContactPickWantsPhone, let phone = contact.phoneNumbers.first?.value.stringValue {
+            payload["tel"] = phone
+        }
+        if pendingContactPickWantsEmail, let email = contact.emailAddresses.first?.value as String? {
+            payload["email"] = email
+        }
+        callJS("__contactPicked(\(contactPickJSON(payload)))")
+    }
+
+    func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+        callJS("__contactPickCancelled()")
+    }
+
+    private func contactPickJSON(_ dict: [String: Any]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: dict),
+              let json = String(data: data, encoding: .utf8) else { return "{}" }
+        return json
     }
 }
 

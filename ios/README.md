@@ -4,8 +4,9 @@ This wraps the existing web app (hosted at `https://app.hatef.cc`, deployed
 automatically from this repo's `index.html` — see
 `.github/workflows/deploy-pages.yml`) in a thin native iOS shell, so it runs
 as its own app (Home Screen icon, no Safari address bar) instead of a browser
-tab, with two things the web platform can't provide on its own: **Face ID**
-unlock and **push notification** topic subscriptions.
+tab, with three things the web platform can't provide on its own: **Face ID**
+unlock, **push notification** topic subscriptions, and **picking a contact**
+from the device's own address book.
 
 Unlike the macOS desktop app (`../desktop/`), this does **not** bundle
 `index.html` into the binary. The web app ships constantly — every PR merged
@@ -13,13 +14,13 @@ to `main` in this repo deploys straight to production — so loading it live
 means every user is always on the latest version with no app-update/App
 Store review cycle in the way. Bundling it would mean a new native build and
 resubmission for every web-only change, which defeats the point of shipping
-fast. The native code here only exists for the two bridges below; everything
+fast. The native code here only exists for the bridges below; everything
 else (the UI, the data, Firebase sync) is the same web app, loaded live.
 
 The outer `index.html` is already written expecting this wrapper to exist —
-look for `isWrappedApp()`, `requestBiometricLogin()` and `syncPushTopic()` in
-it. Nothing on the native side needs to change when the web app changes,
-unless a *new* native bridge is needed.
+look for `isWrappedApp()`, `requestBiometricLogin()`, `syncPushTopic()` and
+`pickContact()` in it. Nothing on the native side needs to change when the
+web app changes, unless a *new* native bridge is needed.
 
 ## What's native here, and why
 
@@ -27,9 +28,10 @@ unless a *new* native bridge is needed.
 |---|---|
 | **Face ID** | WebAuthn/Touch ID has no iOS Face ID equivalent reachable from a web page. `WebViewController` adds a `faceID` `WKScriptMessageHandler`; the web app posts `'unlock'` to it and the native side calls back into `window.__faceIDUnlock()` / `window.__faceIDFailed('message')`. |
 | **Push notification topics** | The app targets notifications by *topic* (`staff`, `client_<slug>`, `supplier_<slug>`, etc. — see `pushTopicsForUser()` in `index.html`), not per-device tokens, so it needs Firebase Cloud Messaging's native topic-subscription API. `WebViewController` adds a `pushTopic` handler that the web app posts `{action: 'subscribe'|'unsubscribe', topic}` to. |
+| **Picking a contact** | The web [Contact Picker API](https://developer.mozilla.org/en-US/docs/Web/API/Contact_Picker_API) (`navigator.contacts.select`) that the hosted site falls back to in a plain Safari tab is a *browser-only* API — it is **not** implemented inside a third-party app's WKWebView, which is exactly why this needs its own bridge. `WebViewController` adds a `contactPicker` handler that opens the real iOS People picker (`CNContactPickerViewController`) and calls back into `window.__contactPicked({name, tel, email})` / `window.__contactPickCancelled()`. No `NSContactsUsageDescription`/permission prompt needed — picking one contact through Apple's own picker UI never grants the app bulk address-book access. |
 | **Camera permission** | The barcode/QR scanner uses `getUserMedia`. `WKUIDelegate`'s `requestMediaCapturePermissionFor` auto-grants it once iOS's own one-time system prompt has already been accepted — same behavior as the desktop app's permission handler for the same feature. |
 | **External links** (wa.me, paypal.me) | Routed to Safari/the WhatsApp app instead of loading inside the single WKWebView — same behavior as the desktop app's `setWindowOpenHandler`. |
-| Everything else | Plain web platform features that already work inside any WKWebView with zero native code — `navigator.share` (used for the OS share sheet / PDF sharing), the Contact Picker API, WebAuthn, etc. |
+| Everything else | Plain web platform features that already work inside any WKWebView with zero native code — `navigator.share` (used for the OS share sheet / PDF sharing), WebAuthn, etc. |
 
 ## Project layout
 

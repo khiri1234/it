@@ -2011,16 +2011,36 @@ function supplierDatalist(){
   return '';
 }
 
-/* ---------- DEVICE CONTACTS (Contact Picker API) — lets a customer-name field be
-   filled by picking a contact straight from the phone's own address book (iOS Safari
-   16+, Android Chrome) instead of typing it out. The browser shows its own native
-   picker and consent UI; nothing here ever reads the address book directly. Feature-
-   detected at render time so the "Contacts" button only appears where it will work. */
+/* ---------- DEVICE CONTACTS — lets a customer-name field be filled by picking a
+   contact straight from the phone's own address book instead of typing it out, via
+   two possible backends:
+   1. Inside the native iOS app wrapper (see ../ios/), a "contactPicker"
+      WKScriptMessageHandler opens the real iOS People picker (CNContactPickerViewController)
+      and calls back into __contactPicked()/__contactPickCancelled() below — the iOS
+      equivalent of the faceID/pushTopic bridges already used elsewhere.
+   2. In a plain browser tab (iOS Safari 16+, Android Chrome), the standard Contact
+      Picker API (navigator.contacts.select) — the WKWebView inside the native wrapper
+      does NOT implement this browser-only API, which is exactly why backend 1 exists.
+   Either way the browser/OS shows its own native picker and consent UI; nothing here
+   ever reads the address book directly. Feature-detected at render time so the
+   "Contacts" button only appears where one of the two will actually work. */
+function nativeContactPickerAvailable(){
+  return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contactPicker);
+}
 function contactPickerSupported(){
+  if(nativeContactPickerAvailable()) return true;
   return typeof navigator!=='undefined' && !!navigator.contacts && typeof navigator.contacts.select==='function'
     && typeof window!=='undefined' && 'ContactsManager' in window;
 }
+// Which fields a pending pick (native backend only — the browser API is awaited
+// directly below instead) should fill in once the native side calls back.
+let PENDING_CONTACT_PICK = null;
 async function pickContact(nameId, phoneId, emailId){
+  if(nativeContactPickerAvailable()){
+    PENDING_CONTACT_PICK = {nameId, phoneId, emailId};
+    window.webkit.messageHandlers.contactPicker.postMessage({wantsPhone:!!phoneId, wantsEmail:!!emailId});
+    return;
+  }
   if(!contactPickerSupported()){ toast('Picking from contacts isn\'t supported in this browser'); return; }
   try{
     const props = ['name'];
@@ -2038,6 +2058,22 @@ async function pickContact(nameId, phoneId, emailId){
     if(e && e.name!=='AbortError'){ console.error('contact picker failed',e); toast('Could not read that contact'); }
   }
 }
+// Called by the native iOS wrapper after the user picks a contact in the real People
+// picker — see CNContactPickerDelegate in ios/App/WebViewController.swift.
+function __contactPicked(contact){
+  if(!PENDING_CONTACT_PICK) return;
+  const {nameId, phoneId, emailId} = PENDING_CONTACT_PICK;
+  PENDING_CONTACT_PICK = null;
+  const nameEl = document.getElementById(nameId);
+  if(nameEl && contact && contact.name){ nameEl.value = contact.name; acOpen(nameEl, AC_OPTS.customers); }
+  if(phoneId && contact && contact.tel){ const el=document.getElementById(phoneId); if(el) el.value=contact.tel; }
+  if(emailId && contact && contact.email){ const el=document.getElementById(emailId); if(el) el.value=contact.email; }
+}
+window.__contactPicked = __contactPicked;
+// Called by the native iOS wrapper when the user dismisses the People picker without
+// choosing anyone — mirrors the AbortError case above: not a failure, just a no-op.
+function __contactPickCancelled(){ PENDING_CONTACT_PICK = null; }
+window.__contactPickCancelled = __contactPickCancelled;
 
 /* ---------- BULK PAYMENT (one payment across several invoices) ---------- */
 function bulkCustomers(){
