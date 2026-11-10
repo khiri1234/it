@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- "development" works for Xcode/TestFlight-via-Xcode builds. Switch this to
+	     "production" before an App Store archive, or push notifications silently stop
+	     working once installed from the App Store/TestFlight-via-App-Store-Connect —
+	     see ios/README.md. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

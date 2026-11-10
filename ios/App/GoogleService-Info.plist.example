@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TEMPLATE ONLY — not a real config file. Do not rename this to
+  GoogleService-Info.plist and expect push notifications to work.
+
+  To get the real file:
+  1. Open https://console.firebase.google.com/project/ledgerapp-97a65/settings/general
+     (this is the same Firebase project the web app already uses — see .firebaserc
+     and the FIREBASE_CONFIG object in index.html).
+  2. Under "Your apps", click "Add app" -> iOS, and register bundle ID
+     com.thehitsolutions.businessmanagement.ios (or whatever PRODUCT_BUNDLE_IDENTIFIER
+     you set in ios/project.yml, if you changed it).
+  3. Download the GoogleService-Info.plist it generates and save it as
+     ios/App/GoogleService-Info.plist (sibling of this file). It's gitignored —
+     every developer/CI machine needs its own copy from step 2.
+  4. For push notifications to actually deliver, also upload an APNs key or
+     certificate for this app under Project Settings -> Cloud Messaging -> Apple app
+     configuration. This step needs your own Apple Developer account and can't be
+     done from here.
+
+  Without a real GoogleService-Info.plist present, AppDelegate.swift's
+  FirebaseApp.configure() no-ops harmlessly — the rest of the app (including Face ID)
+  works fine, there's just no push.
+-->
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>YOUR_IOS_API_KEY</string>
+	<key>GCM_SENDER_ID</key>
+	<string>204325234124</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.thehitsolutions.businessmanagement.ios</string>
+	<key>PROJECT_ID</key>
+	<string>ledgerapp-97a65</string>
+	<key>STORAGE_BUCKET</key>
+	<string>ledgerapp-97a65.appspot.com</string>
+	<key>GOOGLE_APP_ID</key>
+	<string>YOUR_IOS_GOOGLE_APP_ID</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<false/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<false/>
+</dict>
+</plist>
