@@ -1,0 +1,59 @@
+name: Build iOS App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/build-ios-app.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/build-ios-app.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # No Apple Developer account/certificates exist in CI, so this builds for the
+      # Simulator only (no code signing required) — proves the project and its Swift
+      # sources actually compile against the Firebase SPM package. A real device or
+      # TestFlight/App Store build needs your own signing — see ios/README.md.
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild \
+            -project TheHBusinessManagement.xcodeproj \
+            -scheme TheHBusinessManagement \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Locate and zip the .app
+        run: |
+          APP_PATH="$(find build/Build/Products -maxdepth 2 -name '*.app' -print -quit)"
+          echo "Built: $APP_PATH"
+          test -n "$APP_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" the-h-ios-simulator-build.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: the-h-ios-simulator-build
+          path: ios/the-h-ios-simulator-build.zip
+          if-no-files-found: error

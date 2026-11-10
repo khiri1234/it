@@ -1,0 +1,61 @@
+name: TheHBusinessManagement
+options:
+  bundleIdPrefix: com.thehitsolutions
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: false
+
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 10.29.0
+
+targets:
+  TheHBusinessManagement:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - "Info.plist"
+          - "App.entitlements"
+          - "GoogleService-Info.plist.example"
+          - "GoogleService-Info.plist"
+          - "Assets.xcassets"
+    resources:
+      - path: App/Assets.xcassets
+      # Real file, downloaded from the Firebase console — gitignored, not committed.
+      # If it's missing, Firebase silently fails to configure; see ios/README.md.
+      - path: App/GoogleService-Info.plist
+        optional: true
+    info:
+      path: App/Info.plist
+    entitlements:
+      path: App/App.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thehitsolutions.businessmanagement.ios
+        PRODUCT_NAME: "THE H"
+    dependencies:
+      - package: Firebase
+        product: FirebaseMessaging
+
+schemes:
+  TheHBusinessManagement:
+    build:
+      targets:
+        TheHBusinessManagement: all
+    run:
+      config: Debug
+    archive:
+      config: Release
