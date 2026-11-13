@@ -717,20 +717,24 @@
     .btn-ghost{background:var(--glass-bg-strong);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:var(--glass-border);}
     .modal-sheet{background:var(--glass-bg-strong);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);}
     /* Dashboard stat tiles as frosted-glass cards, matching a reference clip's
-       "StatsCard" component — same always-dark navy glass as .desktop-sidebar/
-       .topbar (not the theme-adaptive --glass-bg-strong used by .card/.modal-sheet),
-       with the same white/60 title + bold white value + emerald change color
-       layout the reference shows, carried over for desktop only. */
+       "StatsCard" component line for line — same always-dark navy glass as
+       .desktop-sidebar/.topbar (not the theme-adaptive --glass-bg-strong used by
+       .card/.modal-sheet), rounded-2xl (16px) corners, p-6 (24px) padding, and the
+       title-then-value-then-change order/sizes the reference's JSX actually uses
+       (text-sm title ABOVE a bigger text-2xl value, not below it like the mobile
+       layout), carried over for desktop only. */
     .dash-stat{
       background:rgba(16,22,36,.68);
       backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
-      border:1px solid rgba(255,255,255,.1);border-radius:20px;
+      border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;
       box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 14px 28px rgba(21,32,51,.12);
       color:#fff;
     }
     :root[data-theme="dark"] .dash-stat{background:rgba(8,13,24,.68);}
-    .dash-stat .num{font-size:22px;color:#fff;}
-    .dash-stat .lbl{color:rgba(255,255,255,.6);}
+    .dash-stat-icon{order:0;}
+    .dash-stat .lbl{order:1;font-size:14px;color:rgba(255,255,255,.6);text-transform:none;letter-spacing:normal;}
+    .dash-stat .num{order:2;font-size:24px;color:#fff;}
+    .dash-stat .trend{order:3;font-size:14px;}
   }
   @media (min-width:960px) and (hover:hover){
     .card.stripe:hover{box-shadow:0 8px 22px rgba(21,32,51,.09);border-color:#C7D0DC;transform:translateY(-1px);}
