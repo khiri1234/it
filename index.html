@@ -40,6 +40,10 @@
     --red-soft:#FBE7E7;
     --green:#2E8B4F;
     --green-soft:#E7F5EC;
+    /* Matches the "code.xr" StatsCard reference clip's emerald-400 change-indicator
+       color exactly (Tailwind's emerald-400, #34D399) — kept separate from --green,
+       which stays the app-wide semantic color for paid/received/accepted badges etc. */
+    --emerald:#34D399;
     --chip-bg:#EEF1F5;
     --row-bg:#FAFBFC;
     --switch-track:#D7DDE5;
@@ -427,7 +431,7 @@
   .dash-stat .num{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
   .dash-stat .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
   .dash-stat .trend{font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;width:fit-content;}
-  .dash-stat .trend.up{color:var(--green);}
+  .dash-stat .trend.up{color:var(--emerald);}
   .dash-stat .trend.down{color:var(--red);}
   /* ---------- CRM-style stat cards (Apple Store dashboard) — same anatomy as
      .dash-stat above, but a plain bordered card (no hero overlap/shadow) since
