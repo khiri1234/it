@@ -4280,7 +4280,10 @@ function renderDashboard(){
     <div class="card dash-section">
       <div class="tiny muted" style="margin-bottom:12px">By cash received, all time</div>
       ${topCustomers.length===0? `<div class="tiny muted">No payments recorded yet.</div>` : topCustomers.map(c=>{
-        const w = Math.round(c.paid/topCustomers[0].paid*100);
+        // Capped at 50% instead of 100% for the #1 customer, so every bar (including
+        // the top one) renders at half its previous length — still proportional to
+        // each other, just scaled down against a lower ceiling.
+        const w = Math.round(c.paid/topCustomers[0].paid*50);
         return `
         <div style="padding:8px 0;border-bottom:1px solid var(--line)">
           <div class="row-between tiny" style="margin-bottom:5px;gap:10px">
