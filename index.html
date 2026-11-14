@@ -685,6 +685,11 @@
        the other. Stays a single stacked column on mobile, where a split would leave
        each card too narrow to read. */
     .dash-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+    /* Sales list cards (invoices/quotes/other receivables) — two per row on desktop
+       instead of one full-width card per row, so more of the list is visible at once.
+       Stays a single stacked column on mobile. */
+    .list-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
+    .list-grid-2 .card{margin-bottom:0;}
     .crm-stats{grid-template-columns:repeat(4,1fr);}
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
@@ -4466,7 +4471,7 @@ function renderSalesList(){
     </div>` : ''}
     <div style="height:12px"></div>
     ${sorted.length===0? emptyState('sales', hasFilter?'No invoices match these filters':(SALES_TAB==='invoices'?'No invoices yet':'No quotes yet'), hasFilter?'Try different filters, or clear them.':'Tap the + button to create one.') :
-      sorted.map(d=>{
+      `<div class="list-grid-2">${sorted.map(d=>{
         const t = calcTotals(d.items,d.vatOn,d.vatRate,docDiscountType(d),docDiscountValue(d),d.charges);
         const overdue = SALES_TAB==='invoices' && invoiceIsOverdue(d);
         // Any not-yet-overdue invoice that still has a balance due (draft/sent/partial) is
@@ -4488,7 +4493,7 @@ function renderSalesList(){
             </div>
           </div>
         </div>`;
-      }).join('')}
+      }).join('')}</div>`}
   </div>
   <button class="fab" onclick="${SALES_TAB==='invoices'?'newInvoice()':'newQuote()'}">${ic('plus')}</button>`;
 }
@@ -4518,7 +4523,7 @@ function renderReceivablesTab(){
     </div>` : ''}
     <div style="height:12px"></div>
     ${sorted.length===0? emptyState('card','No other charges yet','Tap the + button to add an amount a client owes you outside any invoice or project.') :
-      sorted.map(r=>{
+      `<div class="list-grid-2">${sorted.map(r=>{
         const status = receivableStatus(r);
         return `<div class="card stripe ${status}" onclick="go('receivable-view',{id:'${r.id}'})">
           <div class="row-between">
@@ -4533,7 +4538,7 @@ function renderReceivablesTab(){
             </div>
           </div>
         </div>`;
-      }).join('')}
+      }).join('')}</div>`}
   </div>
   <button class="fab" onclick="newReceivable()">${ic('plus')}</button>`;
 }
