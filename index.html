@@ -537,7 +537,14 @@
       position:fixed;top:var(--ds-gap);left:var(--ds-gap);bottom:var(--ds-gap);width:var(--ds-w);
       background:rgba(16,22,36,.68);
       backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
-      color:var(--ds-text);border:1px solid rgba(255,255,255,.1);border-radius:24px;
+      color:var(--ds-text);
+      /* Merged with the topbar into one seamless "L" shape: only the corners
+         nothing else touches stay rounded. The sidebar's right edge butts
+         straight against the topbar's left edge (see .topbar below), so the
+         top-right corner is squared off and that one side drops its border —
+         a border facing the topbar there would read as a seam line. */
+      border-top:1px solid rgba(255,255,255,.1);border-left:1px solid rgba(255,255,255,.1);border-bottom:1px solid rgba(255,255,255,.1);
+      border-radius:24px 0 24px 24px;
       box-shadow:0 24px 54px rgba(8,14,26,.32), inset 0 1px 0 rgba(255,255,255,.08);
       padding:20px 0;z-index:50;overflow:visible;
       transition:width .22s cubic-bezier(.4,0,.2,1);
@@ -668,12 +675,18 @@
        border values as .desktop-sidebar — instead of a flush opaque navy strip,
        so every other page's header (Projects, Invoices, etc.) reads as part of
        the same glass chrome as the rail. (The Dashboard keeps its own distinct
-       .dash-hero banner, out of scope here.) */
+       .dash-hero banner, out of scope here.)
+       Merged with the sidebar into one seamless "L" shape: margin-left:-16px
+       pulls it the one gap-width left so its left edge butts straight against
+       the sidebar's right edge (the math is gap-width regardless of sidebar
+       width/collapsed state, since #app's own margin-left is always
+       sidebar-width + 2*gap) — so the whole left side is squared off and
+       drops its border, leaving only the two right corners rounded. */
     .desktop-sidebar:not(:empty) ~ #app .topbar{
-      position:sticky;top:16px;margin:16px 16px 16px 0;border-radius:20px;
+      position:sticky;top:16px;margin:16px 16px 16px -16px;border-radius:0 20px 20px 0;
       background:rgba(16,22,36,.68);
       backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
-      color:#fff;border:1px solid rgba(255,255,255,.1);
+      color:#fff;border-top:1px solid rgba(255,255,255,.1);border-right:1px solid rgba(255,255,255,.1);border-bottom:1px solid rgba(255,255,255,.1);
       box-shadow:0 14px 34px rgba(8,14,26,.24), inset 0 1px 0 rgba(255,255,255,.08);
     }
     :root[data-theme="dark"] .desktop-sidebar:not(:empty) ~ #app .topbar{background:rgba(8,13,24,.68);}
