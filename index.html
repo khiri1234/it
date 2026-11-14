@@ -664,7 +664,21 @@
     .desktop-sidebar:empty ~ #app:not(.client-portal) .fab{display:none;}
     .topbar{padding-left:28px;padding-right:28px;}
     .content{padding-left:28px;padding-right:28px;max-width:936px;margin:0 auto;}
-    .dash-hero{padding-left:28px;padding-right:28px;}
+    /* The Dashboard's own hero banner, brought into the same "Glassy SideBar"
+       material/layout as .topbar instead of its old solid navy gradient — same
+       dark glass background/blur/border, merged seamlessly against the sidebar
+       the same way (squared + borderless left edge, rounded right corners),
+       decorative blobs dropped since the plain topbar doesn't have them either. */
+    .dash-hero{
+      padding-left:28px;padding-right:28px;overflow:visible;
+      margin:16px 16px 16px -16px;border-radius:0 20px 20px 0;
+      background:rgba(16,22,36,.68);
+      backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+      border-top:1px solid rgba(255,255,255,.1);border-right:1px solid rgba(255,255,255,.1);border-bottom:1px solid rgba(255,255,255,.1);
+      box-shadow:0 14px 34px rgba(8,14,26,.24), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    :root[data-theme="dark"] .dash-hero{background:rgba(8,13,24,.68);}
+    .dash-hero::before,.dash-hero::after{display:none;}
     .dash-stats{grid-template-columns:repeat(4,1fr);margin:-36px auto 0;max-width:936px;padding:0 28px;}
     .crm-stats{grid-template-columns:repeat(4,1fr);}
     .modal-bg{align-items:center;}
