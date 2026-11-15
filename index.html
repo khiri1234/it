@@ -552,41 +552,23 @@
     :root[data-theme="dark"] .desktop-sidebar{background:rgba(8,13,24,.68);}
     /* On the Dashboard page only (detected by the presence of its .dash-hero
        banner next to this sidebar — every other page uses the plain .topbar
-       instead), the sidebar matches a reference clip's icon-only floating
-       capsule: recolored to the same warm cream "skeuomorphic" palette as the
-       hero banner and content cards, narrowed to the existing icon-only
-       "collapsed" width (reusing those same hide-the-labels rules, just keyed
-       off this selector instead of the .collapsed class), and rounded into a
-       full stadium/pill shape on every corner — a separate floating shape with
-       its own gap before the hero banner, the way the reference clip's sidebar
-       and topbar are two distinct capsules rather than one merged piece.
-       Every other page keeps the normal full-width labeled navy glass sidebar
-       above, untouched. */
+       instead), the sidebar is recolored to the same warm cream
+       "skeuomorphic" palette as the hero banner and content cards, and
+       rounded on every corner — a separate floating shape with its own gap
+       before the hero banner, the way a reference clip's sidebar and topbar
+       are two distinct capsules rather than one merged piece. It keeps its
+       normal full width/labels (an earlier iteration narrowed it to an
+       icon-only rail, but that made it too cramped to use day to day).
+       Every other page keeps the normal full-width labeled navy glass
+       sidebar above, untouched. */
     .desktop-sidebar:has(~ #app .dash-hero){
-      --ds-w:82px;
-      background:#EEE7DC;border-radius:41px;
+      background:#EEE7DC;border-radius:24px;
       --ds-text:#2B2623;--ds-text-soft:rgba(43,38,34,.55);
       --ds-hover-bg:rgba(43,38,34,.06);--ds-active-bg:rgba(14,156,144,.14);--ds-border:rgba(43,38,34,.1);
       border:1px solid rgba(43,38,34,.08);
       box-shadow:0 24px 54px rgba(43,38,34,.14), inset 0 1px 0 rgba(255,255,255,.7);
     }
-    .desktop-sidebar:has(~ #app .dash-hero):not(:empty) ~ #app{margin-left:114px;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-toggle{display:none;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-head{padding:0;justify-content:center;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-company,
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-sub{display:none;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-user-card{justify-content:center;padding:6px 0;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-avatar{width:34px;height:34px;font-size:13px;border-radius:11px;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-user-info{display:none;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-search-btn{justify-content:center;padding:9px;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-search-btn span,
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-search-kbd{display:none;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-section-label{display:none;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn{justify-content:center;padding:7px;gap:0;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn:hover{transform:none;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn span:last-child{display:none;}
     .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn.active{color:#2B2623;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-logout span{display:none;}
     .desktop-sidebar:has(~ #app .dash-hero) .ds-toggle:hover,
     .desktop-sidebar:has(~ #app .dash-hero) .ds-search-btn:hover,
     .desktop-sidebar:has(~ #app .dash-hero) .ds-logout:hover{background:rgba(43,38,34,.08);}
