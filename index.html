@@ -690,6 +690,24 @@
        Stays a single stacked column on mobile. */
     .list-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
     .list-grid-2 .card{margin-bottom:0;}
+    /* Dashboard content cards (To-Do, Revenue trend, Invoices by stage, Top customers,
+       Projects, Cash flow, Recent activity, Low stock) take on a warm, glossy
+       "skeuomorphic" card look from a reference clip — a cream canvas holding
+       bigger-radius white cards with a soft raised shadow instead of a hairline
+       border, bolder section titles, a two-tone Revenue trend chart, and a capsule
+       chip for Cash flow's Net figure. Scoped to the one .content that directly
+       follows .dash-hero + .dash-stats (only the Dashboard page has that exact
+       sequence), so every other page's .content and the sidebar/topbar chrome stay
+       exactly as they are. Desktop only — mobile keeps the existing flat card look. */
+    .dash-hero + .dash-stats + .content{background:#EEE7DC;border-radius:24px;margin-top:16px;padding-bottom:28px;}
+    .dash-hero + .dash-stats + .content .section-title{font-weight:700;font-size:15px;color:#2B2623;}
+    .dash-hero + .dash-stats + .content .card{background:#FBF7F2;border:none;border-radius:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 10px 24px rgba(43,38,34,.1);}
+    .dash-hero + .dash-stats + .content .rev-col:nth-child(even) .rev-bar{background:#2B2623 !important;}
+    .dash-hero + .dash-stats + .content .cf-net-chip{display:inline-flex;padding:4px 12px;border-radius:20px;background:color-mix(in srgb, currentColor 12%, transparent);}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content{background:#211C17;}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content .card{background:#2B2420;box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 10px 24px rgba(0,0,0,.3);}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content .section-title{color:#F3EEE6;}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content .rev-col:nth-child(even) .rev-bar{background:#F3EEE6 !important;}
     .crm-stats{grid-template-columns:repeat(4,1fr);}
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
@@ -4236,9 +4254,9 @@ function renderDashboard(){
             ${revByMonth.map(r=>{
               const h = Math.round(r.value/maxRevMonth*112)+4;
               return `
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
+              <div class="rev-col" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
                 <div class="tiny mono" style="font-size:9.5px;color:var(--ink-soft);white-space:nowrap">${r.value>0?fmtMoneyShort(r.value):''}</div>
-                <div title="${esc(r.label)}: ${fmtMoney(r.value)}" style="width:100%;max-width:34px;height:${h}px;border-radius:4px 4px 2px 2px;background:var(--teal)"></div>
+                <div class="rev-bar" title="${esc(r.label)}: ${fmtMoney(r.value)}" style="width:100%;max-width:34px;height:${h}px;border-radius:4px 4px 2px 2px;background:var(--teal)"></div>
                 <div class="tiny muted">${r.label}</div>
               </div>`;
             }).join('')}
@@ -4371,7 +4389,7 @@ function renderDashboard(){
               <div class="tiny"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-right:5px;vertical-align:middle"></span>In</div>
               <div class="tiny"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--red);margin-right:5px;vertical-align:middle"></span>Out</div>
             </div>
-            <div class="tiny" style="font-weight:700;color:${cfNet>=0?'var(--teal)':'var(--red)'}">Net ${cfNet>=0?'+':'-'}${fmtMoney(Math.abs(cfNet))}</div>
+            <div class="tiny cf-net-chip" style="font-weight:700;color:${cfNet>=0?'var(--teal)':'var(--red)'}">Net ${cfNet>=0?'+':'-'}${fmtMoney(Math.abs(cfNet))}</div>
           </div>
           ${cfRows.map(([k,label],idx)=>{
             const b=cf[k], net=b.incoming-b.outgoing;
