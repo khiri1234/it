@@ -552,18 +552,41 @@
     :root[data-theme="dark"] .desktop-sidebar{background:rgba(8,13,24,.68);}
     /* On the Dashboard page only (detected by the presence of its .dash-hero
        banner next to this sidebar — every other page uses the plain .topbar
-       instead), the sidebar is recolored to the same warm cream "skeuomorphic"
-       palette as the hero banner and content cards, so the whole page reads as
-       one integrated surface instead of a dark rail beside a cream canvas.
-       Every other page keeps the navy glass sidebar above, untouched. */
+       instead), the sidebar matches a reference clip's icon-only floating
+       capsule: recolored to the same warm cream "skeuomorphic" palette as the
+       hero banner and content cards, narrowed to the existing icon-only
+       "collapsed" width (reusing those same hide-the-labels rules, just keyed
+       off this selector instead of the .collapsed class), and rounded into a
+       full stadium/pill shape on every corner — a separate floating shape with
+       its own gap before the hero banner, the way the reference clip's sidebar
+       and topbar are two distinct capsules rather than one merged piece.
+       Every other page keeps the normal full-width labeled navy glass sidebar
+       above, untouched. */
     .desktop-sidebar:has(~ #app .dash-hero){
-      background:#EEE7DC;
+      --ds-w:82px;
+      background:#EEE7DC;border-radius:41px;
       --ds-text:#2B2623;--ds-text-soft:rgba(43,38,34,.55);
       --ds-hover-bg:rgba(43,38,34,.06);--ds-active-bg:rgba(14,156,144,.14);--ds-border:rgba(43,38,34,.1);
-      border-top:1px solid rgba(43,38,34,.08);border-left:1px solid rgba(43,38,34,.08);border-bottom:1px solid rgba(43,38,34,.08);
+      border:1px solid rgba(43,38,34,.08);
       box-shadow:0 24px 54px rgba(43,38,34,.14), inset 0 1px 0 rgba(255,255,255,.7);
     }
+    .desktop-sidebar:has(~ #app .dash-hero):not(:empty) ~ #app{margin-left:114px;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-toggle{display:none;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-head{padding:0;justify-content:center;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-company,
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-sub{display:none;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-user-card{justify-content:center;padding:6px 0;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-avatar{width:34px;height:34px;font-size:13px;border-radius:11px;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-user-info{display:none;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-search-btn{justify-content:center;padding:9px;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-search-btn span,
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-search-kbd{display:none;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-section-label{display:none;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn{justify-content:center;padding:7px;gap:0;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn:hover{transform:none;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn span:last-child{display:none;}
     .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn.active{color:#2B2623;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-logout span{display:none;}
     .desktop-sidebar:has(~ #app .dash-hero) .ds-toggle:hover,
     .desktop-sidebar:has(~ #app .dash-hero) .ds-search-btn:hover,
     .desktop-sidebar:has(~ #app .dash-hero) .ds-logout:hover{background:rgba(43,38,34,.08);}
@@ -687,27 +710,27 @@
     .topbar{padding-left:28px;padding-right:28px;}
     .content{padding-left:28px;padding-right:28px;max-width:936px;margin:0 auto;}
     /* The Dashboard's own hero banner, recolored into the same warm cream
-       "skeuomorphic" palette as the content cards below it (see the
-       .dash-hero + .dash-stats + .content rules further down), so the banner
-       and the sidebar beside it (see .desktop-sidebar:has(...) further down)
-       read as one integrated, continuously-cream surface instead of a dark
-       navy band sitting above a cream page. Keeps the same seamless-merge
-       shape against the sidebar (squared + borderless left edge, rounded
-       right corners) established earlier — only the colors change here.
-       Decorative blobs stay dropped since a plain cream banner doesn't need
-       them either. */
+       "skeuomorphic" palette as the content cards below it and the sidebar
+       beside it (see .desktop-sidebar:has(...) above and the
+       .dash-hero + .dash-stats + .content rules further down) — one
+       integrated cream page instead of a dark navy band. Matches a reference
+       clip's composition: the banner is its own separate rounded floating
+       pill with a natural gap before the (now also separate) sidebar pill,
+       not merged flush against it, and is capped to the same 936px centered
+       width as the stat tiles/cards below so everything lines up. Decorative
+       blobs stay dropped since a plain cream banner doesn't need them. */
     .dash-hero{
       padding-left:28px;padding-right:28px;overflow:visible;
-      margin:16px 16px 16px -16px;border-radius:0 20px 20px 0;
+      max-width:936px;margin:16px auto 0;border-radius:24px;
       background:#EEE7DC;color:#2B2623;
-      border-top:1px solid rgba(43,38,34,.08);border-right:1px solid rgba(43,38,34,.08);border-bottom:1px solid rgba(43,38,34,.08);
+      border:1px solid rgba(43,38,34,.08);
       box-shadow:0 14px 34px rgba(43,38,34,.1), inset 0 1px 0 rgba(255,255,255,.7);
     }
     .dash-hero .dash-greeting{color:rgba(43,38,34,.55);}
     .dash-hero .dash-company{color:#2B2623;}
     .dash-hero .dash-date{color:rgba(43,38,34,.5);}
     .dash-hero .dash-hero-menu{background:rgba(43,38,34,.08);color:#2B2623;}
-    :root[data-theme="dark"] .dash-hero{background:#211C17;color:#F3EEE6;}
+    :root[data-theme="dark"] .dash-hero{background:#211C17;color:#F3EEE6;border-color:rgba(255,255,255,.06);}
     :root[data-theme="dark"] .dash-hero .dash-greeting,:root[data-theme="dark"] .dash-hero .dash-date{color:rgba(243,238,230,.56);}
     :root[data-theme="dark"] .dash-hero .dash-company{color:#F3EEE6;}
     :root[data-theme="dark"] .dash-hero .dash-hero-menu{background:rgba(243,238,230,.1);color:#F3EEE6;}
@@ -804,25 +827,27 @@
     }
     .btn-ghost{background:var(--glass-bg-strong);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:var(--glass-border);}
     .modal-sheet{background:var(--glass-bg-strong);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);}
-    /* Dashboard stat tiles as frosted-glass cards, matching a reference clip's
-       "StatsCard" component line for line — same always-dark navy glass as
-       .desktop-sidebar/.topbar (not the theme-adaptive --glass-bg-strong used by
-       .card/.modal-sheet), rounded-2xl (16px) corners, p-6 (24px) padding, and the
-       title-then-value-then-change order/sizes the reference's JSX actually uses
-       (text-sm title ABOVE a bigger text-2xl value, not below it like the mobile
-       layout), carried over for desktop only. */
+    /* Dashboard stat tiles, matching the same warm cream "skeuomorphic" card
+       look as the hero banner, sidebar, and content cards below them (see the
+       .dash-hero/.desktop-sidebar:has(...)/.dash-hero + .dash-stats + .content
+       rules elsewhere in this file) — rounded-2xl (16px) corners, p-6 (24px)
+       padding, and the title-then-value-then-change order/sizes an earlier
+       reference clip's JSX used, carried over for desktop only. Previously
+       these were dark navy glass tiles sitting in a dark hero; now that the
+       hero/sidebar/content are all cream, these switch to the same glossy
+       off-white card so the whole page reads as one consistent surface. */
     .dash-stat{
-      background:rgba(16,22,36,.68);
-      backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
-      border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 14px 28px rgba(21,32,51,.12);
-      color:#fff;
+      background:#FBF7F2;border:none;border-radius:16px;padding:24px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 10px 24px rgba(43,38,34,.1);
+      color:#2B2623;
     }
-    :root[data-theme="dark"] .dash-stat{background:rgba(8,13,24,.68);}
+    :root[data-theme="dark"] .dash-stat{background:#2B2420;box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 10px 24px rgba(0,0,0,.3);color:#F3EEE6;}
     .dash-stat-icon{order:0;}
-    .dash-stat .lbl{order:1;font-size:14px;color:rgba(255,255,255,.6);text-transform:none;letter-spacing:normal;}
-    .dash-stat .num{order:2;font-size:24px;color:#fff;}
+    .dash-stat .lbl{order:1;font-size:14px;color:rgba(43,38,34,.55);text-transform:none;letter-spacing:normal;}
+    .dash-stat .num{order:2;font-size:24px;color:#2B2623;}
     .dash-stat .trend{order:3;font-size:14px;}
+    :root[data-theme="dark"] .dash-stat .lbl{color:rgba(243,238,230,.56);}
+    :root[data-theme="dark"] .dash-stat .num{color:#F3EEE6;}
   }
   @media (min-width:960px) and (hover:hover){
     .card.stripe:hover{box-shadow:0 8px 22px rgba(21,32,51,.09);border-color:#C7D0DC;transform:translateY(-1px);}
@@ -868,13 +893,13 @@
     /* Plain #app (no .client-portal qualifier) so this covers the staff/admin shell's
        right-hand Messages panel too, not just the client/supplier portal's. */
     .portal-msg-panel:not(:empty) ~ #app{margin-right:300px;}
-    /* Both the plain .topbar (every non-dashboard page) and the Dashboard's own taller
-       .dash-hero banner stop short at that same 300px gutter — widen each the rest of
-       the way to the real screen edge so their controls (datetime/theme/logout, or the
-       hero's dark-mode/more buttons) redistribute out to the true edge instead of
-       stopping in the middle of the bar. */
-    .portal-msg-panel:not(:empty) ~ #app .topbar,
-    .portal-msg-panel:not(:empty) ~ #app .dash-hero{margin-right:-300px;}
+    /* The plain .topbar (every non-dashboard page) stops short at that same
+       300px gutter — widen it the rest of the way to the real screen edge so
+       its controls (datetime/theme/logout) redistribute out to the true edge
+       instead of stopping in the middle of the bar. The Dashboard's own
+       .dash-hero banner doesn't need this: it's capped to a centered 936px
+       width regardless of the panel, same as the stat tiles/cards below it. */
+    .portal-msg-panel:not(:empty) ~ #app .topbar{margin-right:-300px;}
     .portal-msg-head{
       display:flex;align-items:center;gap:10px;padding:16px 16px 14px;flex-shrink:0;
       background:linear-gradient(135deg,var(--navy),#0F2A4D);color:#fff;
