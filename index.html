@@ -5499,7 +5499,7 @@ function renderStockList(){
     const itemsHtml = items.map(i=>{
       const firstChar = (i.name||'').trim().charAt(0).toUpperCase();
       const groupLetter = /[A-Z]/.test(firstChar) ? firstChar : '#';
-      const header = groupLetter!==lastLetter ? `<div class="section-title" style="margin-top:${lastLetter===null?'0':'18px'}">${groupLetter}</div>` : '';
+      const header = groupLetter!==lastLetter ? `<div class="section-title" style="margin-top:${lastLetter===null?'0':'18px'};grid-column:1/-1">${groupLetter}</div>` : '';
       lastLetter = groupLetter;
       const low = Number(i.stock) <= Number(i.lowStockThreshold||0);
       return header + `<div class="card stripe ${low?'boq-under':''}" onclick="goPush('item-form',{id:'${i.id}'})">
@@ -5522,7 +5522,7 @@ function renderStockList(){
       <div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="scanToFindItem()">${ic('camera')} Scan a barcode / QR code</button></div>
       ${S.projects.length?`<div style="margin-top:10px"><button class="btn btn-ghost btn-block" onclick="goPush('inventory-import',{})">${ic('box')} Import items from projects' BOQs</button></div>`:''}
       <div style="height:12px"></div>
-      ${items.length===0? emptyState('box','No items yet','Tap + to add your first product or service.') : itemsHtml}
+      ${items.length===0? emptyState('box','No items yet','Tap + to add your first product or service.') : `<div class="list-grid-2">${itemsHtml}</div>`}
     </div>
     <button class="fab" onclick="goPush('item-form',{id:null})">${ic('plus')}</button>`;
   } else if(STOCK_TAB==='rfqs'){
@@ -5533,7 +5533,7 @@ function renderStockList(){
       ${stockSegmented('rfqs')}
       <div style="height:12px"></div>
       ${list.length===0? emptyState('mail','No RFQs yet','Create one to request pricing from your suppliers.') :
-        list.map(r=>{
+        `<div class="list-grid-2">${list.map(r=>{
           const quoteCount = new Set((S.supplierQuotes||[]).filter(q=>q.rfqId===r.id).map(q=>q.supplierName)).size;
           const proj = r.projectId ? S.projects.find(x=>x.id===r.projectId) : null;
           return `<div class="card stripe ${rfqBadgeClass(r.status)}" onclick="go('rfq-view',{id:'${r.id}'})">
@@ -5547,7 +5547,7 @@ function renderStockList(){
             </div>
             <div class="tiny muted" style="margin-top:6px">${r.items.length} item${r.items.length===1?'':'s'} · ${quoteCount} supplier${quoteCount===1?'':'s'} quoted · sent to ${esc(rfqSupplierSummary(r))}</div>
           </div>`;
-        }).join('')}
+        }).join('')}</div>`}
     </div>
     <button class="fab" onclick="newRfq()">${ic('plus')}</button>`;
   } else {
@@ -5590,7 +5590,7 @@ function renderStockList(){
         <div class="num">${fmtMoney(listTotal)}</div><div class="lbl">${list.length} purchase${list.length===1?'':'s'} · Total amount</div>
       </div>` : ''}
       ${list.length===0? emptyState('cart', hasFilter?'No purchases for this filter':'No purchases yet', hasFilter?'Try a different filter, or clear the filters.':'Record a purchase to stock up your inventory.') :
-        list.map(p=>{
+        `<div class="list-grid-2">${list.map(p=>{
           const total=purchaseTotal(p);
           const proj = p.projectId ? S.projects.find(x=>x.id===p.projectId) : null;
           return `<div class="card stripe ${p.status}" onclick="go('purchase-view',{id:'${p.id}'})">
@@ -5607,7 +5607,7 @@ function renderStockList(){
               </div>
             </div>
           </div>`;
-        }).join('')}
+        }).join('')}</div>`}
     </div>
     <button class="fab" onclick="newPurchase()">${ic('plus')}</button>`;
   }
@@ -6756,7 +6756,7 @@ function renderProjectsList(){
     </div>` : ''}
     <div style="height:12px"></div>
     ${list.length===0? emptyState('box', hasFilter?'No projects match these filters':'No projects yet', hasFilter?'Try different filters, or clear them.':'Tap + to start a project with a bill of quantities.') :
-      list.map(p=>{
+      `<div class="list-grid-2">${list.map(p=>{
         const val=projectValue(p), adv=projectAdvances(p), bal=projectBalance(p);
         return `<div class="card stripe ${p.status}" onclick="go('project-view',{id:'${p.id}'})">
           <div class="row-between">
@@ -6783,7 +6783,7 @@ function renderProjectsList(){
           ${(p.docs&&p.docs.length)?`
           <button class="btn btn-ghost btn-sm btn-block" style="margin-top:10px" onclick="event.stopPropagation();viewProjectDocuments('${p.id}')">${ic('file')} View documents (${p.docs.length})</button>`:''}
         </div>`;
-      }).join('')}
+      }).join('')}</div>`}
   </div>
   <button class="fab" onclick="newProject()">${ic('plus')}</button>`;
 }
