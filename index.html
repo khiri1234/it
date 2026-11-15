@@ -552,29 +552,31 @@
     :root[data-theme="dark"] .desktop-sidebar{background:rgba(8,13,24,.68);}
     /* On the Dashboard page only (detected by the presence of its .dash-hero
        banner next to this sidebar — every other page uses the plain .topbar
-       instead), the sidebar matches a "commerce console" reference clip's
-       dark wood-textured rail — a warm brown wood-grain gradient instead of
-       navy glass, an orange active-item accent, and rounded on every corner
-       — a separate floating shape with its own gap before the hero banner.
-       Always this dark wood look regardless of the app's light/dark toggle,
-       the same way the StatsCard tiles below are always-dark rather than
-       theme-adaptive. It keeps its normal full width/labels. Every other
-       page keeps the normal full-width labeled navy glass sidebar, untouched. */
+       instead), the sidebar is recolored to the same warm cream
+       "skeuomorphic" palette as the hero banner and content cards, and
+       rounded on every corner — a separate floating shape with its own gap
+       before the hero banner, the way a reference clip's sidebar and topbar
+       are two distinct capsules rather than one merged piece. It keeps its
+       normal full width/labels (an earlier iteration narrowed it to an
+       icon-only rail, but that made it too cramped to use day to day).
+       Every other page keeps the normal full-width labeled navy glass
+       sidebar above, untouched. */
     .desktop-sidebar:has(~ #app .dash-hero){
-      background:
-        repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 2px, transparent 2px 9px),
-        linear-gradient(170deg,#4a2f1a 0%,#2e1c10 100%);
-      border-radius:24px;
-      --ds-text:#F4F1EC;--ds-text-soft:rgba(244,241,236,.56);
-      --ds-hover-bg:rgba(0,0,0,.22);--ds-active-bg:rgba(221,120,39,.22);--ds-border:rgba(0,0,0,.3);
-      border:1px solid rgba(0,0,0,.3);
-      box-shadow:0 24px 54px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);
+      background:#EEE7DC;border-radius:24px;
+      --ds-text:#2B2623;--ds-text-soft:rgba(43,38,34,.55);
+      --ds-hover-bg:rgba(43,38,34,.06);--ds-active-bg:rgba(14,156,144,.14);--ds-border:rgba(43,38,34,.1);
+      border:1px solid rgba(43,38,34,.08);
+      box-shadow:0 24px 54px rgba(43,38,34,.14), inset 0 1px 0 rgba(255,255,255,.7);
     }
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn.active{color:#F4F1EC;}
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn.active::before{background:#DD7827;}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn.active{color:#2B2623;}
     .desktop-sidebar:has(~ #app .dash-hero) .ds-toggle:hover,
     .desktop-sidebar:has(~ #app .dash-hero) .ds-search-btn:hover,
-    .desktop-sidebar:has(~ #app .dash-hero) .ds-logout:hover{background:rgba(0,0,0,.22);}
+    .desktop-sidebar:has(~ #app .dash-hero) .ds-logout:hover{background:rgba(43,38,34,.08);}
+    :root[data-theme="dark"] .desktop-sidebar:has(~ #app .dash-hero){
+      background:#211C17;--ds-text:#F3EEE6;--ds-text-soft:rgba(243,238,230,.56);
+      --ds-hover-bg:rgba(243,238,230,.07);--ds-border:rgba(243,238,230,.09);
+    }
+    :root[data-theme="dark"] .desktop-sidebar:has(~ #app .dash-hero) .ds-navbtn.active{color:#F3EEE6;}
     .desktop-sidebar.collapsed{--ds-w:82px;}
     .desktop-sidebar:empty{display:none;}
 
@@ -689,27 +691,31 @@
     .desktop-sidebar:empty ~ #app:not(.client-portal) .fab{display:none;}
     .topbar{padding-left:28px;padding-right:28px;}
     .content{padding-left:28px;padding-right:28px;max-width:936px;margin:0 auto;}
-    /* The Dashboard's own hero banner, recolored into the same dark
-       "commerce console" palette as the sidebar/content cards (see
-       .desktop-sidebar:has(...) above and the
+    /* The Dashboard's own hero banner, recolored into the same warm cream
+       "skeuomorphic" palette as the content cards below it and the sidebar
+       beside it (see .desktop-sidebar:has(...) above and the
        .dash-hero + .dash-stats + .content rules further down) — one
-       consistent dark console instead of a cream page. Always this dark look
-       regardless of the app's light/dark toggle, same as the sidebar. Keeps
-       its separate-rounded-pill composition (its own gap before the sidebar,
-       not merged flush against it), capped to the same 936px centered width
-       as the stat tiles/cards below so everything lines up. Decorative blobs
-       stay dropped since a plain dark banner doesn't need them. */
+       integrated cream page instead of a dark navy band. Matches a reference
+       clip's composition: the banner is its own separate rounded floating
+       pill with a natural gap before the (now also separate) sidebar pill,
+       not merged flush against it, and is capped to the same 936px centered
+       width as the stat tiles/cards below so everything lines up. Decorative
+       blobs stay dropped since a plain cream banner doesn't need them. */
     .dash-hero{
       padding-left:28px;padding-right:28px;overflow:visible;
       max-width:936px;margin:16px auto 0;border-radius:24px;
-      background:#232429;color:#F4F1EC;
-      border:1px solid rgba(0,0,0,.3);
-      box-shadow:0 14px 34px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05);
+      background:#EEE7DC;color:#2B2623;
+      border:1px solid rgba(43,38,34,.08);
+      box-shadow:0 14px 34px rgba(43,38,34,.1), inset 0 1px 0 rgba(255,255,255,.7);
     }
-    .dash-hero .dash-greeting{color:rgba(244,241,236,.5);}
-    .dash-hero .dash-company{color:#F4F1EC;}
-    .dash-hero .dash-date{color:rgba(244,241,236,.5);}
-    .dash-hero .dash-hero-menu{background:rgba(255,255,255,.08);color:#F4F1EC;}
+    .dash-hero .dash-greeting{color:rgba(43,38,34,.55);}
+    .dash-hero .dash-company{color:#2B2623;}
+    .dash-hero .dash-date{color:rgba(43,38,34,.5);}
+    .dash-hero .dash-hero-menu{background:rgba(43,38,34,.08);color:#2B2623;}
+    :root[data-theme="dark"] .dash-hero{background:#211C17;color:#F3EEE6;border-color:rgba(255,255,255,.06);}
+    :root[data-theme="dark"] .dash-hero .dash-greeting,:root[data-theme="dark"] .dash-hero .dash-date{color:rgba(243,238,230,.56);}
+    :root[data-theme="dark"] .dash-hero .dash-company{color:#F3EEE6;}
+    :root[data-theme="dark"] .dash-hero .dash-hero-menu{background:rgba(243,238,230,.1);color:#F3EEE6;}
     .dash-hero::before,.dash-hero::after{display:none;}
     .dash-stats{grid-template-columns:repeat(4,1fr);margin:-36px auto 0;max-width:936px;padding:0 28px;}
     /* Top customers + Projects side by side on desktop — there's room to spare at
@@ -723,34 +729,23 @@
     .list-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
     .list-grid-2 .card{margin-bottom:0;}
     /* Dashboard content cards (To-Do, Revenue trend, Invoices by stage, Top customers,
-       Projects, Cash flow, Recent activity, Low stock) take on a dark "commerce
-       console" card look from a reference clip — a near-black canvas holding
-       bigger-radius dark cards with a soft raised shadow instead of a hairline
-       border, bolder light section titles, an orange Revenue trend chart (with a
-       teal line overlay echoing the clip's bar+line combo chart), and a capsule
+       Projects, Cash flow, Recent activity, Low stock) take on a warm, glossy
+       "skeuomorphic" card look from a reference clip — a cream canvas holding
+       bigger-radius white cards with a soft raised shadow instead of a hairline
+       border, bolder section titles, a two-tone Revenue trend chart, and a capsule
        chip for Cash flow's Net figure. Scoped to the one .content that directly
        follows .dash-hero + .dash-stats (only the Dashboard page has that exact
        sequence), so every other page's .content and the sidebar/topbar chrome stay
-       exactly as they are. Always this dark look regardless of the app's light/dark
-       toggle. Desktop only — mobile keeps the existing flat card look. */
-    .dash-hero + .dash-stats + .content{
-      background:#1C1D21;border-radius:24px;margin-top:16px;padding-bottom:28px;
-      /* Every existing card-internal rule (muted labels, dividers, progress-bar
-         tracks, etc.) already reads these tokens — overriding them locally here
-         recolors all of that content for free, without having to re-target each
-         inner selector one by one. The explicit color:var(--ink) matters too:
-         plain text (e.g. .small) has no color of its own and just inherits
-         whatever body{color:var(--ink)} resolved to at the root theme — setting
-         color here re-establishes the inherited base at the new dark value so
-         that inheritance (not just the variable) carries all the way down. */
-      --ink:#F4F1EC;--ink-soft:rgba(244,241,236,.55);--line:rgba(255,255,255,.08);
-      --chip-bg:rgba(255,255,255,.08);--surface:#2A2B30;--row-bg:#242529;
-      color:var(--ink);
-    }
-    .dash-hero + .dash-stats + .content .section-title{font-weight:700;font-size:15px;color:#F4F1EC;}
-    .dash-hero + .dash-stats + .content .card{background:#2A2B30;border:none;border-radius:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px rgba(0,0,0,.3);}
-    .dash-hero + .dash-stats + .content .rev-bar{background:#DD7827 !important;}
+       exactly as they are. Desktop only — mobile keeps the existing flat card look. */
+    .dash-hero + .dash-stats + .content{background:#EEE7DC;border-radius:24px;margin-top:16px;padding-bottom:28px;}
+    .dash-hero + .dash-stats + .content .section-title{font-weight:700;font-size:15px;color:#2B2623;}
+    .dash-hero + .dash-stats + .content .card{background:#FBF7F2;border:none;border-radius:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 10px 24px rgba(43,38,34,.1);}
+    .dash-hero + .dash-stats + .content .rev-col:nth-child(even) .rev-bar{background:#2B2623 !important;}
     .dash-hero + .dash-stats + .content .cf-net-chip{display:inline-flex;padding:4px 12px;border-radius:20px;background:color-mix(in srgb, currentColor 12%, transparent);}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content{background:#211C17;}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content .card{background:#2B2420;box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 10px 24px rgba(0,0,0,.3);}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content .section-title{color:#F3EEE6;}
+    :root[data-theme="dark"] .dash-hero + .dash-stats + .content .rev-col:nth-child(even) .rev-bar{background:#F3EEE6 !important;}
     .crm-stats{grid-template-columns:repeat(4,1fr);}
     .modal-bg{align-items:center;}
     .modal-sheet{max-width:480px;border-radius:18px;margin:auto;max-height:80vh;}
@@ -814,23 +809,27 @@
     }
     .btn-ghost{background:var(--glass-bg-strong);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:var(--glass-border);}
     .modal-sheet{background:var(--glass-bg-strong);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);}
-    /* Dashboard stat tiles, matching the same dark "commerce console" card
+    /* Dashboard stat tiles, matching the same warm cream "skeuomorphic" card
        look as the hero banner, sidebar, and content cards below them (see the
        .dash-hero/.desktop-sidebar:has(...)/.dash-hero + .dash-stats + .content
        rules elsewhere in this file) — rounded-2xl (16px) corners, p-6 (24px)
        padding, and the title-then-value-then-change order/sizes an earlier
-       reference clip's JSX used, carried over for desktop only. Always this
-       dark look regardless of the app's light/dark toggle, same as the rest
-       of the Dashboard's dark console reskin. */
+       reference clip's JSX used, carried over for desktop only. Previously
+       these were dark navy glass tiles sitting in a dark hero; now that the
+       hero/sidebar/content are all cream, these switch to the same glossy
+       off-white card so the whole page reads as one consistent surface. */
     .dash-stat{
-      background:#2A2B30;border:none;border-radius:16px;padding:24px;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px rgba(0,0,0,.3);
-      color:#F4F1EC;
+      background:#FBF7F2;border:none;border-radius:16px;padding:24px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 10px 24px rgba(43,38,34,.1);
+      color:#2B2623;
     }
+    :root[data-theme="dark"] .dash-stat{background:#2B2420;box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 10px 24px rgba(0,0,0,.3);color:#F3EEE6;}
     .dash-stat-icon{order:0;}
-    .dash-stat .lbl{order:1;font-size:14px;color:rgba(244,241,236,.5);text-transform:none;letter-spacing:normal;}
-    .dash-stat .num{order:2;font-size:24px;color:#F4F1EC;}
+    .dash-stat .lbl{order:1;font-size:14px;color:rgba(43,38,34,.55);text-transform:none;letter-spacing:normal;}
+    .dash-stat .num{order:2;font-size:24px;color:#2B2623;}
     .dash-stat .trend{order:3;font-size:14px;}
+    :root[data-theme="dark"] .dash-stat .lbl{color:rgba(243,238,230,.56);}
+    :root[data-theme="dark"] .dash-stat .num{color:#F3EEE6;}
   }
   @media (min-width:960px) and (hover:hover){
     .card.stripe:hover{box-shadow:0 8px 22px rgba(21,32,51,.09);border-color:#C7D0DC;transform:translateY(-1px);}
@@ -4291,10 +4290,7 @@ function renderDashboard(){
         <div class="section-title" style="margin-top:0">Revenue trend</div>
         <div class="card">
           <div class="tiny muted" style="margin-bottom:4px">Cash received, last 6 months</div>
-          <div style="position:relative;display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:14px">
-            <svg style="position:absolute;left:0;right:0;top:14px;height:112px;pointer-events:none" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <polyline points="${revByMonth.map((r,i)=>`${(i+0.5)/revByMonth.length*100},${100-(r.value/maxRevMonth*100)}`).join(' ')}" fill="none" stroke="var(--teal)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-            </svg>
+          <div style="display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:14px">
             ${revByMonth.map(r=>{
               const h = Math.round(r.value/maxRevMonth*112)+4;
               return `
