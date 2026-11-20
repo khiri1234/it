@@ -460,6 +460,40 @@
   .chip-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
   .chip{flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12.5px;font-weight:600;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
   .chip.active{background:var(--navy);border-color:var(--navy);color:#fff;}
+  /* ---------- PROJECTS BOARD — a Kanban pipeline view (alternate to the default
+     list), matching a reference clip's "Deal Pipeline" concept: one column per
+     status, draggable glass-style cards. Uses the app's existing theme tokens
+     (not a fixed dark palette) so it follows the light/dark toggle like the
+     rest of the app. The "Board" toggle button is hidden on narrow screens —
+     HTML5 drag-and-drop doesn't work on touch, so mobile always gets List. ---------- */
+  .proj-view-toggle{margin-bottom:12px;max-width:220px;}
+  .proj-board-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
+  .proj-board-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;}
+  .proj-board-summary{text-align:right;}
+  .proj-board-summary-value{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:var(--green);}
+  .proj-board{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;align-items:flex-start;}
+  .proj-col{flex:0 0 240px;background:var(--chip-bg);border-radius:14px;padding:10px;}
+  .proj-col.drag-over{outline:2px dashed var(--teal);outline-offset:-2px;}
+  .proj-col-head{display:flex;align-items:center;gap:6px;padding:4px 6px 10px;}
+  .proj-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .proj-col-label{font-weight:700;font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .proj-col-count{font-size:11px;color:var(--ink-soft);background:var(--surface);border-radius:20px;padding:1px 7px;flex-shrink:0;}
+  .proj-col-total{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);flex-shrink:0;}
+  .proj-col-body{display:flex;flex-direction:column;gap:8px;min-height:40px;}
+  .proj-card{
+    background:var(--glass-bg-strong);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid var(--glass-border);border-radius:14px;padding:12px;cursor:grab;
+    transition:transform .15s,box-shadow .15s,opacity .15s;
+  }
+  .proj-card:active{cursor:grabbing;}
+  .proj-card.dragging{opacity:.4;}
+  .proj-card-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px;}
+  .proj-card-title{font-weight:700;font-size:13.5px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .proj-card-value{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;margin-top:2px;}
+  .proj-card-bar{height:3px;border-radius:2px;margin:8px 0 7px;}
+  @media (max-width:959px){
+    .proj-view-toggle .board-btn{display:none;}
+  }
   ::-webkit-scrollbar{display:none;}
   .low-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;}
   @keyframes spin{to{transform:rotate(360deg);}}
@@ -835,6 +869,7 @@
     .card.stripe:hover{box-shadow:0 8px 22px rgba(21,32,51,.09);border-color:#C7D0DC;transform:translateY(-1px);}
     .dash-stat{transition:transform .18s ease,box-shadow .18s ease;}
     .dash-stat:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 18px 36px rgba(21,32,51,.18);transform:translateY(-5px);}
+    .proj-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(21,32,51,.14);}
   }
   @media (min-width:1280px){
     .desktop-sidebar{--ds-w:264px;}
@@ -1103,7 +1138,7 @@ const DEFAULT_SETTINGS={
 let S = { settings:{...DEFAULT_SETTINGS}, invoices:[], quotes:[], purchases:[], inventory:[], users:[], projects:[], activityLog:[], chat:[], clientChats:{}, chatReads:{}, clientChatReads:{}, rfqs:[], supplierQuotes:[], todos:[], supplierChats:{}, supplierChatReads:{}, iphoneOrders:[], receivables:[] };
 let VIEW = {name:'dashboard', params:{}};
 let SALES_TAB='invoices', STOCK_TAB='inventory', PURCHASE_PROJECT_FILTER='', PURCHASE_PAYMENT_FILTER='', PURCHASE_SUPPLIER_FILTER='';
-let PROJECT_CUSTOMER_FILTER='', PROJECT_STATUS_FILTER='';
+let PROJECT_CUSTOMER_FILTER='', PROJECT_STATUS_FILTER='', PROJECTS_VIEW='list', PROJ_DRAG_ID=null;
 let SALES_CUSTOMER_FILTER='', SALES_STATUS_FILTER='';
 let TODO_FILTER='open', TODO_DRAFT='', TODO_ASSIGNEE='', TODO_DUE='';
 let UPLOADING_PROJECT_DOC=null; // {projectId, name} while a document upload is in flight
@@ -6787,6 +6822,7 @@ function quickPurchaseStatus(id,val){
 /* ---------- PROJECTS ---------- */
 function newProject(){ goPush('project-form',{id:null}); }
 function renderProjectsList(){
+  if(PROJECTS_VIEW==='board') return renderProjectsBoard();
   let list=[...S.projects].sort((a,b)=>(b.number||'').localeCompare(a.number||''));
   if(PROJECT_CUSTOMER_FILTER) list=list.filter(p=>p.customer===PROJECT_CUSTOMER_FILTER);
   if(PROJECT_STATUS_FILTER) list=list.filter(p=>p.status===PROJECT_STATUS_FILTER);
@@ -6796,6 +6832,10 @@ function renderProjectsList(){
   return `
   ${topbar('Projects','Bill of quantities & site progress', false, null, true)}
   <div class="content">
+    <div class="proj-view-toggle segmented">
+      <button class="active">List</button>
+      <button class="board-btn" onclick="PROJECTS_VIEW='board';render()">Board</button>
+    </div>
     ${projectCustomers.length? `
     <label>Filter by client</label>
     <select onchange="PROJECT_CUSTOMER_FILTER=this.value;render()">
@@ -6848,6 +6888,96 @@ function renderProjectsList(){
 function viewProjectDocuments(id){
   SCROLL_TO_PROJECT_DOCS = true;
   go('project-view',{id});
+}
+
+/* ---------- PROJECTS BOARD — a Kanban-style pipeline view (alternate to the
+   default list), one column per status, cards draggable between columns to
+   change a project's status. Matches a reference clip's "Deal Pipeline" board
+   concept and glass-card look, adapted to this app's existing project
+   statuses/colors instead of a generic sales-pipeline's stages. ---------- */
+const PROJ_BOARD_STATUSES = ['planning','active','on-hold','payment-pending','completed'];
+function projStatusColorVar(status){
+  return {planning:'yellow',active:'orange','on-hold':'purple','payment-pending':'red',completed:'green'}[status] || 'ink-soft';
+}
+function renderProjectsBoard(){
+  const all = S.projects;
+  const completed = all.filter(p=>p.status==='completed');
+  const open = all.filter(p=>p.status!=='completed');
+  const completedValue = completed.reduce((a,p)=>a+projectValue(p),0);
+  const openValue = open.reduce((a,p)=>a+projectValue(p),0);
+  return `
+  ${topbar('Projects','Bill of quantities & site progress', false, null, false)}
+  <div class="content">
+    <div class="proj-view-toggle segmented">
+      <button onclick="PROJECTS_VIEW='list';render()">List</button>
+      <button class="board-btn active">Board</button>
+    </div>
+    <div class="proj-board-head">
+      <div>
+        <div class="proj-board-title">Project Pipeline</div>
+        <div class="tiny muted">Drag projects between stages to keep status current.</div>
+      </div>
+      <div class="proj-board-summary">
+        <div class="tiny muted" style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--green)"></span>Completed value
+        </div>
+        <div class="proj-board-summary-value">${fmtMoney(completedValue)}</div>
+        <div class="tiny muted">${completed.length} completed · ${open.length} open worth ${fmtMoney(openValue)}</div>
+      </div>
+    </div>
+    <div class="proj-board">
+      ${PROJ_BOARD_STATUSES.map(status=>{
+        const colProjects = all.filter(p=>p.status===status).sort((a,b)=>(b.number||'').localeCompare(a.number||''));
+        const colTotal = colProjects.reduce((a,p)=>a+projectValue(p),0);
+        const colorVar = projStatusColorVar(status);
+        return `<div class="proj-col" ondragover="projBoardDragOver(event)" ondragleave="projBoardDragLeave(event)" ondrop="projBoardDrop(event,'${status}')">
+          <div class="proj-col-head">
+            <span class="proj-col-dot" style="background:var(--${colorVar})"></span>
+            <span class="proj-col-label">${projectStatusLabel(status)}</span>
+            <span class="proj-col-count">${colProjects.length}</span>
+            <span class="proj-col-total">${fmtMoneyShort(colTotal)}</span>
+          </div>
+          <div class="proj-col-body">
+            ${colProjects.length===0? `<div class="tiny muted" style="padding:16px 4px">No projects</div>` :
+              colProjects.map(p=>`
+              <div class="proj-card" draggable="true" ondragstart="projBoardDragStart(event,'${p.id}')" ondragend="projBoardDragEnd(event)" onclick="go('project-view',{id:'${p.id}'})">
+                <div class="row-between">
+                  <span class="tiny mono muted">${esc(p.number||'')}</span>
+                  <span class="proj-card-dot" style="background:var(--${colorVar})"></span>
+                </div>
+                <div class="proj-card-title">${esc(p.name||'Untitled project')}</div>
+                <div class="proj-card-value">${fmtMoney(projectValue(p))}</div>
+                <div class="proj-card-bar" style="background:var(--${colorVar})"></div>
+                <div class="tiny muted">${esc(p.customer||'—')} · ${fmtDate(p.date)}</div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+  <button class="fab" onclick="newProject()">${ic('plus')}</button>`;
+}
+function projBoardDragStart(e, id){
+  PROJ_DRAG_ID = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.classList.add('dragging');
+}
+function projBoardDragEnd(e){ e.target.classList.remove('dragging'); }
+function projBoardDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function projBoardDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+function projBoardDrop(e, status){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const id = PROJ_DRAG_ID;
+  PROJ_DRAG_ID = null;
+  if(!id) return;
+  const p = S.projects.find(x=>x.id===id);
+  if(!p || p.status===status) return;
+  p.status = status;
+  persist('projects');
+  logActivity(`Moved project ${p.number} to ${projectStatusLabel(status)}`);
+  toast('Status updated');
+  render();
 }
 function renderProjectForm(id){
   const editing = id? S.projects.find(p=>p.id===id): null;
